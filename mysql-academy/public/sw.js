@@ -1,6 +1,6 @@
 /* Service worker: a app funciona offline depois da primeira visita. */
-const V = 'mya-v1';
-const CORE = ['./', 'index.html', 'styles.css', 'app.js', 'content.js', 'score.js', 'db.js', 'vendor/alasql.min.js', 'manifest.webmanifest', 'icon.svg', 'icon-192.png'];
+const V = 'mya-v2';
+const CORE = ['./', 'index.html', 'styles.css', 'app.js', 'content.js', 'score.js', 'db.js', 'vendor/alasql.min.js', 'manifest.webmanifest', 'icon.svg', 'icon-mark.svg', 'icon-192.png'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(V).then((c) => c.addAll(CORE)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== V).map((k) => caches.delete(k)))).then(() => self.clients.claim()));

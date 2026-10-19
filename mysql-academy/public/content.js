@@ -5,7 +5,7 @@
 (function (root) {
 const CHAPTERS = [
 {
-  id: 'intro', icon: '🚀', color: '#6c8cff', title: 'Introdução ao MySQL',
+  id: 'intro', icon: 'compass', color: '#6c8cff', title: 'Introdução ao MySQL',
   desc: 'Bases de dados, SGBD, SQL e os primeiros comandos.',
   lessons: [
   {
@@ -57,7 +57,7 @@ const CHAPTERS = [
   }],
 },
 {
-  id: 'ddl', icon: '🏗️', color: '#34d399', title: 'Criar bases de dados e tabelas',
+  id: 'ddl', icon: 'table', color: '#34d399', title: 'Criar bases de dados e tabelas',
   desc: 'CREATE, ALTER, DROP, chaves primárias e estrangeiras.',
   lessons: [
   {
@@ -120,7 +120,7 @@ DROP TABLE estudantes;</code></pre>`,
   }],
 },
 {
-  id: 'dml', icon: '✏️', color: '#fbbf24', title: 'Inserir, alterar e eliminar dados',
+  id: 'dml', icon: 'edit', color: '#fbbf24', title: 'Inserir, alterar e eliminar dados',
   desc: 'INSERT, UPDATE, DELETE e transações.',
   lessons: [
   {
@@ -146,7 +146,7 @@ INSERT INTO alunos (nome, idade, cidade) VALUES
     body: `<p><code>UPDATE</code> modifica linhas existentes. A cláusula <code>WHERE</code> escolhe <b>quais</b>.</p>
     <pre><code>UPDATE alunos SET cidade = 'Évora' WHERE id = 3;
 UPDATE notas SET nota = nota + 1 WHERE disciplina = 'Programação';</code></pre>
-    <p class="warn">⚠️ <b>Sem WHERE, todas as linhas são alteradas!</b> Antes de um UPDATE importante, teste o WHERE com um <code>SELECT</code>.</p>
+    <p class="warn"><b>Sem WHERE, todas as linhas são alteradas!</b> Antes de um UPDATE importante, teste o WHERE com um <code>SELECT</code>.</p>
     <p>O MySQL Workbench tem o modo <i>safe updates</i>, que recusa UPDATE/DELETE sem WHERE sobre chave.</p>`,
     examples: [{ sql: "UPDATE alunos\nSET cidade = 'Évora'\nWHERE id = 3;", note: 'Só altera a linha com id 3.' }],
     ex: [
@@ -175,7 +175,7 @@ ROLLBACK;   -- desfaz   (ou COMMIT; para confirmar)</code></pre>
   }],
 },
 {
-  id: 'select', icon: '🔎', color: '#f472b6', title: 'Consultas com SELECT',
+  id: 'select', icon: 'search', color: '#f472b6', title: 'Consultas com SELECT',
   desc: 'O coração do SQL: filtrar, ordenar, agrupar e juntar tabelas.',
   lessons: [
   {
@@ -271,7 +271,7 @@ WHERE id IN (SELECT aluno_id FROM notas WHERE nota &gt;= 17);</code></pre>
   }],
 },
 {
-  id: 'sec', icon: '🔐', color: '#a78bfa', title: 'Segurança: utilizadores e permissões',
+  id: 'sec', icon: 'shield', color: '#a78bfa', title: 'Segurança: utilizadores e permissões',
   desc: 'Contas, privilégios, roles (grupos) e boas práticas.',
   lessons: [
   {
@@ -325,7 +325,7 @@ SET DEFAULT ROLE 'leitor' TO 'rui'@'localhost';</code></pre>
   }],
 },
 {
-  id: 'backup', icon: '💾', color: '#fb923c', title: 'Backup e restauro',
+  id: 'backup', icon: 'archive', color: '#fb923c', title: 'Backup e restauro',
   desc: 'mysqldump, restauro, backups físicos e estratégias.',
   lessons: [
   {
@@ -359,7 +359,7 @@ SOURCE /caminho/escola.sql;
 
 # ficheiro comprimido
 gunzip &lt; escola.sql.gz | mysql -u root -p escola</code></pre>
-    <p class="warn">⚠️ Um backup só é bom se o restauro for <b>testado</b>. Experimente restaurar regularmente num servidor de teste.</p>`,
+    <p class="warn">Um backup só é bom se o restauro for <b>testado</b>. Experimente restaurar regularmente num servidor de teste.</p>`,
     examples: [{ sql: 'mysql -u root -p escola < escola.sql', note: 'Repõe os dados do ficheiro na BD escola.' }],
     ex: [
       { t: 'code', q: 'Escreva o comando de terminal que restaura o ficheiro escola.sql na base de dados escola (utilizador root, com palavra-passe).', ok: ['^mysql -u ?root -p ?escola<escola\\.sql$', '^mysql -p -u ?root escola<escola\\.sql$'], solution: 'mysql -u root -p escola < escola.sql', hint: 'Troque o sentido do redirecionamento: <' },
@@ -394,15 +394,15 @@ CHAPTERS.forEach((c, ci) => {
 });
 
 const BADGES = [
-  { id: 'first', icon: '🌱', name: 'Primeiros passos', desc: 'Resolveu o primeiro exercício', test: (s) => s.exDone >= 1 },
-  { id: 'ten', icon: '🔟', name: 'Dez certos', desc: '10 exercícios resolvidos', test: (s) => s.exDone >= 10 },
-  { id: 'thirty', icon: '🧠', name: 'Mente SQL', desc: '30 exercícios resolvidos', test: (s) => s.exDone >= 30 },
-  { id: 'perfect', icon: '🎯', name: 'Pontaria', desc: '5 exercícios à primeira tentativa', test: (s) => s.firstTry >= 5 },
-  { id: 'streak3', icon: '🔥', name: 'Em chamas', desc: '3 dias seguidos a estudar', test: (s) => s.streak >= 3 },
-  { id: 'streak7', icon: '🌋', name: 'Imparável', desc: '7 dias seguidos a estudar', test: (s) => s.streak >= 7 },
-  { id: 'select', icon: '🔎', name: 'Detetive SELECT', desc: 'Completou o capítulo de SELECT', test: (s) => s.chaptersDone.includes('select') },
-  { id: 'sec', icon: '🛡️', name: 'Guardião', desc: 'Completou o capítulo de segurança', test: (s) => s.chaptersDone.includes('sec') },
-  { id: 'all', icon: '🏆', name: 'Mestre MySQL', desc: 'Completou todos os capítulos', test: (s) => s.chaptersDone.length === CHAPTERS.length },
+  { id: 'first', icon: 'check', name: 'Primeiros passos', desc: 'Resolveu o primeiro exercício', test: (s) => s.exDone >= 1 },
+  { id: 'ten', icon: 'hash', name: 'Dez certos', desc: '10 exercícios resolvidos', test: (s) => s.exDone >= 10 },
+  { id: 'thirty', icon: 'cpu', name: 'Mente SQL', desc: '30 exercícios resolvidos', test: (s) => s.exDone >= 30 },
+  { id: 'perfect', icon: 'target', name: 'Pontaria', desc: '5 exercícios à primeira tentativa', test: (s) => s.firstTry >= 5 },
+  { id: 'streak3', icon: 'flame', name: 'Em chamas', desc: '3 dias seguidos a estudar', test: (s) => s.streak >= 3 },
+  { id: 'streak7', icon: 'zap', name: 'Imparável', desc: '7 dias seguidos a estudar', test: (s) => s.streak >= 7 },
+  { id: 'select', icon: 'search', name: 'Detetive SELECT', desc: 'Completou o capítulo de SELECT', test: (s) => s.chaptersDone.includes('select') },
+  { id: 'sec', icon: 'shield', name: 'Guardião', desc: 'Completou o capítulo de segurança', test: (s) => s.chaptersDone.includes('sec') },
+  { id: 'all', icon: 'award', name: 'Mestre MySQL', desc: 'Completou todos os capítulos', test: (s) => s.chaptersDone.length === CHAPTERS.length },
 ];
 
 const api = { CHAPTERS, BADGES };
