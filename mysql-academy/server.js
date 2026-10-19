@@ -49,14 +49,39 @@ function authed(req) {
   return Object.values(users).find((u) => u.tokenHash === h) || null;
 }
 
+const CHAPTER_IDS = new Set(require('./public/content.js').CHAPTERS.map((c) => c.id));
+const LESSON_IDS = new Set(require('./public/content.js').CHAPTERS.flatMap((c) => c.lessons.map((l) => l.id)));
+const int = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.round(+v) || 0));
+
 function cleanState(s) {
-  const done = {};
-  for (const [id, d] of Object.entries((s && s.done) || {})) {
-    if (SCORE.EXS[id]) done[id] = { tries: Math.max(1, Math.min(99, +d.tries || 1)), hints: Math.max(0, Math.min(9, +d.hints || 0)), at: +d.at || Date.now() };
+  s = s || {};
+  const done = {}, rev = {}, tests = {}, pos = {};
+  for (const [id, d] of Object.entries(s.done || {})) {
+    if (SCORE.EXS[id]) done[id] = { tries: int(d.tries, 1, 99), hints: int(d.hints, 0, 9), at: +d.at || Date.now() };
   }
-  const days = Array.isArray(s && s.days) ? s.days.filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).slice(-400) : [];
-  const log = Array.isArray(s && s.log) ? s.log.slice(-500).map((e) => ({ at: +e.at || 0, id: String(e.id).slice(0, 20), ok: !!e.ok })) : [];
-  return { done, days, log };
+  for (const id of Object.keys(s.rev || {})) if (SCORE.EXS[id]) rev[id] = 1;
+  for (const [id, t] of Object.entries(s.tests || {})) {
+    if (CHAPTER_IDS.has(id)) tests[id] = { best: int(t.best, 0, 100), attempts: int(t.attempts, 0, 999), at: +t.at || 0 };
+  }
+  for (const [id, p] of Object.entries(s.pos || {})) if (LESSON_IDS.has(id)) pos[id] = int(p, 0, 200);
+  const days = Array.isArray(s.days) ? s.days.filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).slice(-400) : [];
+  const log = Array.isArray(s.log) ? s.log.slice(-500).map((e) => ({ at: +e.at || 0, id: String(e.id).slice(0, 20), ok: !!e.ok, ...(e.score !== undefined ? { score: int(e.score, 0, 100) } : {}) })) : [];
+  return { done, rev, tests, pos, days, log };
+}
+
+// Junta o progresso de dois dispositivos sem nunca perder trabalho já feito.
+function mergeState(a, b) {
+  for (const [id, d] of Object.entries(b.done || {})) if (!a.done[id] || a.done[id].at > d.at) a.done[id] = d;
+  Object.assign(a.rev, b.rev || {});
+  for (const [id, t] of Object.entries(b.tests || {})) {
+    const m = a.tests[id];
+    a.tests[id] = !m ? t : { best: Math.max(m.best, t.best), attempts: Math.max(m.attempts, t.attempts), at: Math.max(m.at, t.at) };
+  }
+  for (const [id, p] of Object.entries(b.pos || {})) a.pos[id] = Math.max(a.pos[id] || 0, p);
+  a.days = [...new Set([...a.days, ...(b.days || [])])].sort().slice(-400);
+  const seen = new Set(a.log.map((e) => e.at + e.id));
+  a.log = [...a.log, ...(b.log || []).filter((e) => !seen.has(e.at + e.id))].sort((x, y) => x.at - y.at).slice(-500);
+  return a;
 }
 
 const publicRow = (u) => {
@@ -98,12 +123,7 @@ async function api(req, res, url) {
   if (!u) return send(res, 401, { error: 'Sessão inválida.' });
   if (req.method === 'GET' && url.pathname === '/api/progress') return send(res, 200, { state: u.state });
   if (req.method === 'PUT' && url.pathname === '/api/progress') {
-    const incoming = cleanState((await body(req)).state);
-    // junta o progresso: nunca perde exercícios já resolvidos noutro dispositivo
-    for (const [id, d] of Object.entries(u.state.done)) if (!incoming.done[id] || incoming.done[id].at > d.at) incoming.done[id] = d;
-    incoming.days = [...new Set([...u.state.days, ...incoming.days])].sort().slice(-400);
-    const seen = new Set(incoming.log.map((e) => e.at + e.id));
-    incoming.log = [...incoming.log, ...u.state.log.filter((e) => !seen.has(e.at + e.id))].sort((a, b) => a.at - b.at).slice(-500);
+    const incoming = mergeState(cleanState((await body(req)).state), u.state);
     u.state = incoming; u.updated = Date.now(); save();
     return send(res, 200, { state: u.state, me: publicRow(u) });
   }

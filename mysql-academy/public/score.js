@@ -4,6 +4,7 @@
   const C = typeof require !== 'undefined' ? require('./content.js') : root.CONTENT;
   const BASE = { quiz: 10, code: 15, query: 20 };
   const LESSON_BONUS = 20, CHAPTER_BONUS = 100, HINT_COST = 3;
+  const TEST_WEIGHT = 3; // peso do miniteste no progresso do capítulo, equivalente a 3 exercícios
   const TITLES = ['Aprendiz', 'Explorador', 'Consultor', 'Analista', 'Arquiteto', 'Mestre', 'Lenda'];
 
   const EXS = {};
@@ -28,9 +29,11 @@
     return n;
   }
 
+  // Uma lição está concluída quando todos os exercícios foram resolvidos (ou a solução foi consultada).
+  // Um capítulo está concluído quando todas as lições estão concluídas E o miniteste foi aprovado.
   function summarize(state, now) {
-    const done = state.done || {};
-    let xp = 0, exDone = 0, firstTry = 0;
+    const done = state.done || {}, rev = state.rev || {}, tests = state.tests || {};
+    let xp = 0, exDone = 0, firstTry = 0, testsPassed = 0, perfectTests = 0, allOk = 0, allTot = 0;
     const lessonsDone = [], chaptersDone = [], perChapter = {};
     for (const [id, d] of Object.entries(done)) {
       const e = EXS[id]; if (!e) continue;
@@ -40,22 +43,26 @@
     for (const c of C.CHAPTERS) {
       let ok = 0, tot = 0, lessonsOk = 0;
       for (const l of c.lessons) {
-        const n = l.ex.filter((e) => done[e.id]).length;
+        const n = l.ex.filter((e) => done[e.id] || rev[e.id]).length;
         tot += l.ex.length; ok += n;
         if (n === l.ex.length) { lessonsDone.push(l.id); lessonsOk++; xp += LESSON_BONUS; }
       }
-      const complete = lessonsOk === c.lessons.length;
-      if (complete) { chaptersDone.push(c.id); xp += CHAPTER_BONUS; }
-      perChapter[c.id] = { ok, tot, pct: Math.round((100 * ok) / tot), complete };
+      const t = tests[c.id] || {};
+      const unlocked = lessonsOk === c.lessons.length;
+      const passed = unlocked && (t.best || 0) >= C.PASS_MARK;
+      if (passed) { chaptersDone.push(c.id); xp += CHAPTER_BONUS; testsPassed++; if (t.best === 100) perfectTests++; }
+      perChapter[c.id] = { ok, tot, lessonsOk, lessons: c.lessons.length, unlocked, test: { best: t.best || 0, attempts: t.attempts || 0, passed },
+        pct: Math.round((100 * (ok + (passed ? TEST_WEIGHT : 0))) / (tot + TEST_WEIGHT)), complete: passed };
+      allOk += ok + (passed ? TEST_WEIGHT : 0); allTot += tot + TEST_WEIGHT;
     }
     const streak = streakOf(state.days, now);
     const level = levelOf(xp);
-    const s = { xp, level, title: titleOf(level), exDone, firstTry, lessonsDone, chaptersDone, perChapter, streak,
-      pct: Math.round((100 * exDone) / TOTAL_EX), next: levelStart(level + 1), cur: levelStart(level) };
+    const s = { xp, level, title: titleOf(level), exDone, firstTry, testsPassed, perfectTests, lessonsDone, chaptersDone, perChapter, streak,
+      pct: Math.round((100 * allOk) / allTot), next: levelStart(level + 1), cur: levelStart(level) };
     s.badges = C.BADGES.filter((b) => b.test(s)).map((b) => b.id);
     return s;
   }
 
-  const api = { BASE, HINT_COST, LESSON_BONUS, CHAPTER_BONUS, EXS, TOTAL_EX, exXp, levelOf, levelStart, titleOf, dayKey, streakOf, summarize };
+  const api = { BASE, HINT_COST, PASS_MARK: C.PASS_MARK, LESSON_BONUS, CHAPTER_BONUS, EXS, TOTAL_EX, exXp, levelOf, levelStart, titleOf, dayKey, streakOf, summarize };
   if (typeof module !== 'undefined') module.exports = api; else root.SCORE = api;
 })(typeof window !== 'undefined' ? window : globalThis);
