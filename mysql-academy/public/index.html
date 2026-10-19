@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MySQL Academy</title>
+<meta name="description" content="Aprenda MySQL ao seu ritmo: lições, exercícios interativos, pontuação e ranking.">
+<meta name="theme-color" content="#0f1226">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app">
+  <aside id="side">
+    <a class="brand" href="#/"><img src="icon.svg" alt="" width="36" height="36"><span>MySQL <b>Academy</b></span></a>
+    <nav id="nav"></nav>
+    <div id="mini"></div>
+  </aside>
+  <main id="view" tabindex="-1"></main>
+</div>
+<nav id="tabbar"></nav>
+<div id="toasts" aria-live="polite"></div>
+<div id="modal" hidden></div>
+<script src="vendor/alasql.min.js"></script>
+<script src="content.js"></script>
+<script src="score.js"></script>
+<script src="db.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
