@@ -332,3 +332,12 @@ input.txt:focus{outline:2px solid var(--accent);outline-offset:1px}
   pre{white-space:pre-wrap;border:1px solid #ccc;background:#f6f6f6!important;color:#000!important}
   pre span{color:#000!important}.m-sec{break-inside:avoid-page}
 }
+
+/* ---- contas e área do professor ---- */
+.seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:9px;padding:3px;margin-bottom:16px}
+.seg button{border:0;background:none;font:inherit;font-size:.86rem;font-weight:600;color:var(--muted);padding:6px 14px;border-radius:7px;cursor:pointer}
+.seg button.on{background:var(--surface);color:var(--text);box-shadow:var(--shadow)}
+select.txt.sel{height:30px;padding:0 8px;font-size:.82rem;margin:0;width:auto}
+.tbl.prof th.c,.tbl.prof td.c{text-align:center}
+.tbl tr.pr{cursor:pointer}.tbl tr.pr:hover td{background:var(--surface-2)}
+#modal form.box .txt{display:block}

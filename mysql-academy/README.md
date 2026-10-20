@@ -27,7 +27,11 @@ Exercícios: escolha múltipla, "escreva o comando" e consultas SELECT validadas
 - Página **Progresso**: lições, exercícios e resultado do miniteste por capítulo, gráfico de 14 dias, histórico completo de tentativas e minitestes, exportação CSV/JSON
 - **Classificação** entre alunos (requer o servidor); o XP é recalculado no servidor a partir do progresso
 
-## Executar
+## Publicar na Internet (gratuito)
+
+Siga o guia **[PUBLICAR.md](PUBLICAR.md)**: o site fica no Cloudflare Pages e as contas, o progresso e a classificação no Supabase (plano gratuito). Basta executar `supabase/schema.sql` no Supabase e preencher `public/config.js`.
+
+## Executar localmente
 
 ```bash
 cd mysql-academy
@@ -36,14 +40,17 @@ npm start            # http://localhost:3000   (sem dependências, Node >= 18)
 npm test             # valida todas as soluções dos exercícios
 ```
 
-- Sem servidor também funciona (abrindo `public/` num servidor estático): o progresso fica guardado no dispositivo; só o ranking fica indisponível.
-- **Instalar**: no Chrome/Edge (desktop) ou no telemóvel, use "Instalar aplicação" / "Adicionar ao ecrã principal". Para acesso fora de `localhost` a PWA exige HTTPS (use um proxy como Caddy/nginx).
-- **Professor**: com `TEACHER_KEY` definido, `GET /api/admin/students` com o cabeçalho `x-teacher-key` devolve o progresso detalhado por aluno (capítulos e histórico).
+- Com `public/config.js` vazio, as contas e a classificação usam este servidor local (nome + PIN). Com o Supabase configurado, usam o Supabase (email + palavra-passe).
+- Sem nenhum dos dois, a app funciona na mesma; o progresso fica guardado no dispositivo.
+- **Área do professor** (`#/prof`): com o Supabase, contas marcadas como professor; com o servidor local, a chave `TEACHER_KEY`.
 
 ## Estrutura
 
 ```
-server.js          API (registo/login, sincronização, ranking) + ficheiros estáticos; dados em data/students.json
+server.js          servidor local opcional: API (registo/login, sincronização, ranking) + ficheiros estáticos
+supabase/schema.sql  tabelas, regras de segurança (RLS) e funções para o Supabase
+public/config.js   endereço e chave pública do Supabase
+public/backend.js  contas e sincronização (Supabase ou servidor local)
 public/            a aplicação (HTML/CSS/JS puro, sem build)
   content.js       capítulos → lições → passos (learn/quiz/code/query), resumo de sintaxe e miniteste
   score.js         regras de XP e níveis (partilhado cliente/servidor)
@@ -55,4 +62,4 @@ public/            a aplicação (HTML/CSS/JS puro, sem build)
 ## Notas
 
 - O simulador de SELECT usa AlaSQL: é uma aproximação do MySQL e não substitui um servidor real; as lições de DDL, segurança e backup são validadas por padrões de texto.
-- As contas do ranking são simples (nome + PIN, guardado com scrypt). Não use palavras-passe reais; para uso em produção acrescente HTTPS e, se necessário, um fornecedor de identidade.
+- A pontuação é calculada no browser do aluno; as regras do Supabase impedem alterar o progresso de outros alunos e valores impossíveis, mas um aluno com conhecimentos técnicos poderia falsificar o seu próprio progresso.

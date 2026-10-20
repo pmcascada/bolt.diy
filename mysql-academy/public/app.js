@@ -51,6 +51,7 @@ const P = {
   printer: 'M6 9V2h12v7 M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2 M6 14h12v8H6z',
   arrowDown: 'M12 5v14 M5 12l7 7 7-7',
   list: 'M8 6h13 M8 12h13 M8 18h13 M3 6h.01 M3 12h.01 M3 18h.01',
+  users: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M23 21v-2a4 4 0 0 0-3-3.9 M16 3.1a4 4 0 0 1 0 7.8',
 };
 const ic = (n, cls = '') => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${P[n] || P.circle}"/></svg>`;
 
@@ -68,13 +69,8 @@ function persist() {
 }
 const sum = () => S.summarize(st);
 
-/* ---------- sincronização com o servidor (opcional) ---------- */
-async function api(path, method, data) {
-  const r = await fetch(path, { method, headers: { 'Content-Type': 'application/json', ...(st.token ? { Authorization: 'Bearer ' + st.token } : {}) }, body: data ? JSON.stringify(data) : undefined });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw Object.assign(new Error(j.error || 'Erro de rede'), { status: r.status });
-  return j;
-}
+/* ---------- sincronização com a conta do aluno (Supabase ou servidor local) ---------- */
+const BK = window.BACKEND;
 const payload = () => ({ done: st.done, rev: st.rev, pos: st.pos, tests: st.tests, days: st.days, log: st.log });
 function merge(remote) {
   for (const [id, d] of Object.entries(remote.done || {})) if (!st.done[id] || st.done[id].at > d.at) st.done[id] = d;
@@ -88,10 +84,21 @@ function merge(remote) {
   const seen = new Set(st.log.map((e) => e.at + e.id));
   st.log = [...st.log, ...(remote.log || []).filter((e) => !seen.has(e.at + e.id))].sort((a, b) => a.at - b.at).slice(-500);
 }
+// Junta o progresso guardado na conta com o deste dispositivo e grava o resultado.
+let pushing = null;
 async function push() {
-  if (!st.token) return;
-  try { const j = await api('/api/progress', 'PUT', { state: payload() }); merge(j.state); online = true; localStorage.setItem(KEY, JSON.stringify(st)); }
-  catch (e) { if (e.status === 401) st.token = ''; online = false; }
+  if (!BK.user) return;
+  if (pushing) return pushing;
+  pushing = (async () => {
+    try {
+      const remote = await BK.load();
+      if (remote) merge(remote);
+      await BK.save(payload(), sum());
+      online = true;
+      try { localStorage.setItem(KEY, JSON.stringify(st)); } catch { /* ignorar */ }
+    } catch { online = false; } finally { pushing = null; }
+  })();
+  return pushing;
 }
 
 /* ---------- utilitários de UI ---------- */
@@ -188,10 +195,11 @@ function isOn(h) {
   return r.startsWith(h);
 }
 function renderChrome() {
-  $('#nav').innerHTML = NAV.map(([g, items]) => `<div class="grp">${g}</div>` + items.map(([h, i, t]) => `<a href="${h}" class="${isOn(h) ? 'on' : ''}">${ic(i)}<span>${t}</span></a>`).join('')).join('');
+  const nav = BK.user && BK.user.teacher ? [...NAV.slice(0, 2), ['Conta', [['#/me', 'user', 'Perfil'], ['#/prof', 'users', 'Área do professor']]]] : NAV;
+  $('#nav').innerHTML = nav.map(([g, items]) => `<div class="grp">${g}</div>` + items.map(([h, i, t]) => `<a href="${h}" class="${isOn(h) ? 'on' : ''}">${ic(i)}<span>${t}</span></a>`).join('')).join('');
   $('#tabbar').innerHTML = TABS.map(([h, i, t]) => `<a href="${h}" class="${isOn(h) ? 'on' : ''}">${ic(i)}<span>${t}</span></a>`).join('');
   const s = sum();
-  $('#mini').innerHTML = `<a class="who" href="#/me" style="color:inherit;text-decoration:none"><span class="avatar">${esc(initials(st.name || 'A'))}</span><span><b>${esc(st.name || 'Aluno convidado')}</b><span>Nível ${s.level} · ${s.title}</span></span></a>${bar(lvlPct(s))}<span class="small muted num-t">${s.xp} / ${s.next} XP</span>`;
+  $('#mini').innerHTML = `<a class="who" href="#/me" style="color:inherit;text-decoration:none"><span class="avatar">${esc(initials((BK.user && BK.user.name) || 'A'))}</span><span><b>${esc((BK.user && BK.user.name) || 'Aluno convidado')}</b><span>Nível ${s.level} · ${s.title}</span></span></a>${bar(lvlPct(s))}<span class="small muted num-t">${s.xp} / ${s.next} XP</span>`;
   $('#crumbs').innerHTML = crumbs.map((c, i) => (i === crumbs.length - 1 ? `<b>${esc(c[0])}</b>` : `<a href="${c[1]}">${esc(c[0])}</a><span class="sep">/</span>`)).join('');
   const dark = document.documentElement.dataset.theme ? document.documentElement.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme:dark)').matches;
   $('#topr').innerHTML = `<span class="pill hide-m" title="Dias consecutivos de estudo">${ic('flame')}${s.streak} ${s.streak === 1 ? 'dia' : 'dias'}</span><span class="pill" title="Pontuação total">${ic('zap')}<span class="num-t">${s.xp} XP</span></span><button class="iconbtn" id="themeBtn" aria-label="Alternar tema claro/escuro">${ic(dark ? 'sun' : 'moon')}</button>`;
@@ -218,7 +226,7 @@ function vHome() {
   }
   view.innerHTML = `
   <div class="page-h"><div><h1>${greet}${st.name ? ', ' + esc(st.name.split(' ')[0]) : ''}</h1><p>${s.exDone ? `Concluiu ${s.chaptersDone.length} de ${CHAPTERS.length} capítulos e resolveu ${s.exDone} exercícios.` : 'Bem-vindo ao curso de MySQL. A matéria é apresentada passo a passo: leia, pratique e avance.'}</p></div>
-  ${st.token ? '' : `<a class="btn sec-b" href="#/me">${ic('user')}Criar perfil</a>`}</div>
+  ${BK.user ? '' : `<a class="btn sec-b" href="#/me">${ic('user')}${BK.kind === 'supabase' ? 'Entrar / criar conta' : 'Criar perfil'}</a>`}</div>
   <div class="dash">
     <section class="card resume">${resume}</section>
     <section class="card lvl">
@@ -552,43 +560,155 @@ async function vRank() {
   crumbs = [['Classificação', '#/rank']];
   view.innerHTML = `<div class="page-h"><div><div class="eyebrow">Desempenho</div><h1>Classificação</h1><p>Compare a sua evolução com a dos restantes alunos.</p></div></div><div class="card" id="rk" style="padding:0"><div class="empty">A carregar…</div></div>`;
   try {
-    const rows = await api('/api/leaderboard', 'GET');
-    const me = (st.name || '').toLowerCase();
-    $('#rk').outerHTML = (st.token ? '' : `<div style="margin-bottom:16px">${alertBox('info', 'info', 'Crie um perfil na página <a href="#/me">Perfil</a> para aparecer na classificação.')}</div>`) +
-      `<div class="card" style="padding:0">${rows.length ? `<div class="scroll"><table class="tbl"><thead><tr><th style="width:60px">#</th><th>Aluno</th><th>Nível</th><th class="r">XP</th><th style="width:22%">Conclusão</th><th class="r">Sequência</th></tr></thead><tbody>${rows.map((r, i) => `<tr class="${r.name.toLowerCase() === me ? 'me' : ''}"><td><span class="pos ${i < 3 ? 'p' + (i + 1) : ''}">${i + 1}</span></td><td><span class="who"><span class="avatar">${esc(initials(r.name))}</span><b>${esc(r.name)}</b></span></td><td>${r.level} <span class="small muted">${esc(r.title)}</span></td><td class="r"><b>${r.xp}</b></td><td><div class="row" style="flex-wrap:nowrap">${bar(r.pct)}<span class="small muted num-t" style="min-width:36px">${r.pct}%</span></div></td><td class="r">${r.streak} d</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Ainda não há alunos na classificação.</div>'}</div>`;
+    const rows = await BK.leaderboard();
+    const me = (BK.user ? BK.user.name : '').toLowerCase();
+    $('#rk').outerHTML = (BK.user ? '' : `<div style="margin-bottom:16px">${alertBox('info', 'info', 'Crie uma conta na página <a href="#/me">Perfil</a> para aparecer na classificação.')}</div>`) +
+      `<div class="card" style="padding:0">${rows.length ? `<div class="scroll"><table class="tbl"><thead><tr><th style="width:60px">#</th><th>Aluno</th><th>Nível</th><th class="r">XP</th><th style="width:22%">Conclusão</th><th class="r">Sequência</th></tr></thead><tbody>${rows.map((r, i) => `<tr class="${r.name.toLowerCase() === me ? 'me' : ''}"><td><span class="pos ${i < 3 ? 'p' + (i + 1) : ''}">${i + 1}</span></td><td><span class="who"><span class="avatar">${esc(initials(r.name))}</span><b>${esc(r.name)}</b></span></td><td>${r.level} <span class="small muted">${esc(S.titleOf(r.level))}</span></td><td class="r"><b>${r.xp}</b></td><td><div class="row" style="flex-wrap:nowrap">${bar(r.pct)}<span class="small muted num-t" style="min-width:36px">${r.pct}%</span></div></td><td class="r">${r.streak} d</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Ainda não há alunos na classificação.</div>'}</div>`;
     view.querySelectorAll('.tbl .bar').forEach((b) => (b.style.flex = '1'));
-  } catch { $('#rk').outerHTML = alertBox('bad', 'alert', 'Não foi possível contactar o servidor. A classificação requer o servidor da aplicação (<code>npm start</code>). O seu progresso continua guardado neste dispositivo.'); }
+  } catch (e) { $('#rk').outerHTML = alertBox('bad', 'alert', `Não foi possível obter a classificação. ${esc(BK.errorText(e))} O seu progresso continua guardado neste dispositivo.`); }
 }
 
 function vMe() {
   crumbs = [['Perfil', '#/me']];
-  const s = sum();
-  view.innerHTML = `<div class="page-h"><div><div class="eyebrow">Conta</div><h1>Perfil</h1></div></div>
-  <div class="two">
-  <div class="card">${st.token ? `<div class="who" style="margin-bottom:14px"><span class="avatar" style="width:44px;height:44px">${esc(initials(st.name))}</span><span><b>${esc(st.name)}</b><span>Sessão iniciada · Nível ${s.level}</span></span></div>
-    <p class="small muted">O progresso é sincronizado com o servidor e pode ser retomado noutro dispositivo.</p>${online === false ? alertBox('bad', 'alert', 'Sem ligação ao servidor. A sincronização será feita mais tarde.') : ''}
-    <div class="row" style="margin-top:14px"><button class="btn" id="sync">${ic('refresh')}Sincronizar</button><button class="btn sec-b" id="out">${ic('logout')}Terminar sessão</button></div>`
-    : `<h3>Criar perfil ou iniciar sessão</h3><p class="small muted">O nome é visível na classificação. O progresso já realizado neste dispositivo é mantido.</p>
-    <label class="field">Nome<input class="txt" id="nm" maxlength="24" autocomplete="username" value="${esc(st.name)}"></label>
-    <label class="field">PIN ou palavra-passe (mín. 4 caracteres)<input class="txt" id="pin" type="password" autocomplete="current-password"></label>
-    <div class="row"><button class="btn" id="reg">Criar perfil</button><button class="btn sec-b" id="login">Iniciar sessão</button></div><div id="msg"></div>`}</div>
-  <div class="card"><h3>Preferências e dados</h3><p class="small muted">Nível ${s.level} · ${s.xp} XP · ${s.exDone} exercícios resolvidos.</p>
-    <div class="row"><button class="btn sec-b" id="theme">${ic('moon')}Alternar tema</button><button class="btn danger" id="reset">${ic('trash')}Apagar progresso local</button></div></div>
-  </div>`;
-  const auth = async (kind) => {
-    const name = $('#nm').value.trim(), pin = $('#pin').value;
-    try {
-      const j = await api('/api/' + kind, 'POST', { name, pin, state: payload() });
-      st.token = j.token; st.name = j.name; merge(j.state); persist(); await push(); toast('Sessão iniciada'); route();
-    } catch (e) { $('#msg').innerHTML = alertBox('bad', 'alert', esc(e.status ? e.message : 'Servidor indisponível. Execute "npm start" para ativar a classificação.')); }
-  };
-  if (st.token) {
-    $('#sync').onclick = async () => { await push(); toast(online ? 'Progresso sincronizado' : 'Sem ligação ao servidor', online ? 'check' : 'alert'); vMe(); };
-    $('#out').onclick = () => { st.token = ''; persist(); route(); };
-  } else { $('#reg').onclick = () => auth('register'); $('#login').onclick = () => auth('login'); }
+  const s = sum(), sbMode = BK.kind === 'supabase', u = BK.user;
+  const prefs = `<div class="card"><h3>Preferências e dados</h3><p class="small muted">Nível ${s.level} · ${s.xp} XP · ${s.exDone} exercícios resolvidos.</p>
+    <div class="row"><button class="btn sec-b" id="theme">${ic('moon')}Alternar tema</button>${u ? '' : `<button class="btn danger" id="reset">${ic('trash')}Apagar progresso local</button>`}</div>
+    <p class="small muted" style="margin-top:14px"><a href="#/prof">Área do professor</a></p></div>`;
+  let acct;
+  if (u) {
+    acct = `<div class="who" style="margin-bottom:14px"><span class="avatar" style="width:44px;height:44px">${esc(initials(u.name))}</span><span><b>${esc(u.name)}</b><span>${esc(u.email || 'Sessão iniciada')}${u.teacher ? ' · Professor' : ''}</span></span></div>
+    <p class="small muted">O progresso é guardado na sua conta e pode ser retomado em qualquer dispositivo.</p>${online === false ? alertBox('bad', 'alert', 'Sem ligação neste momento. A sincronização será feita mais tarde.') : ''}
+    <div class="row" style="margin-top:14px"><button class="btn" id="sync">${ic('refresh')}Sincronizar</button><button class="btn sec-b" id="out">${ic('logout')}Terminar sessão</button>${u.teacher ? `<a class="btn sec-b" href="#/prof">${ic('users')}Área do professor</a>` : ''}</div>`;
+  } else if (sbMode) {
+    const reg = meTab === 'reg';
+    acct = `<div class="seg" role="tablist"><button class="${reg ? '' : 'on'}" data-tab="in">Iniciar sessão</button><button class="${reg ? 'on' : ''}" data-tab="reg">Criar conta</button></div>
+    <form id="authf" novalidate>
+      ${reg ? '<label class="field">Nome (aparece na classificação)<input class="txt" id="nm" maxlength="24" autocomplete="nickname" required></label>' : ''}
+      <label class="field">Email<input class="txt" id="em" type="email" autocomplete="email" required></label>
+      <label class="field">Palavra-passe${reg ? ' (mín. 6 caracteres)' : ''}<input class="txt" id="pw" type="password" autocomplete="${reg ? 'new-password' : 'current-password'}" required></label>
+      <div class="row"><button class="btn" type="submit">${reg ? 'Criar conta' : 'Entrar'}</button>${reg ? '' : '<button class="btn link sm" type="button" id="forgot">Esqueci-me da palavra-passe</button>'}</div>
+      <p class="small muted" style="margin:12px 0 0">O progresso já feito neste dispositivo é juntado à sua conta.</p><div id="msg"></div></form>`;
+  } else {
+    acct = `<h3>Criar perfil ou iniciar sessão</h3><p class="small muted">O nome é visível na classificação. O progresso já realizado neste dispositivo é mantido.</p>
+    <form id="authf"><label class="field">Nome<input class="txt" id="nm" maxlength="24" autocomplete="username" value="${esc(st.name)}"></label>
+    <label class="field">PIN ou palavra-passe (mín. 4 caracteres)<input class="txt" id="pw" type="password" autocomplete="current-password"></label>
+    <div class="row"><button class="btn" type="button" id="reg">Criar perfil</button><button class="btn sec-b" type="submit">Iniciar sessão</button></div><div id="msg"></div></form>`;
+  }
+  view.innerHTML = `<div class="page-h"><div><div class="eyebrow">Conta</div><h1>Perfil</h1></div></div><div class="two"><div class="card">${acct}</div>${prefs}</div>`;
+  const msg = (kind, icon, html) => { $('#msg').innerHTML = alertBox(kind, icon, html); };
+  const entered = async (user) => { meTab = 'in'; st.name = user.name; persist(); await push(); toast('Sessão iniciada'); route(); };
+  const busy = async (fn) => { const b = view.querySelectorAll('#authf .btn'); b.forEach((x) => (x.disabled = true)); try { await fn(); } catch (e) { msg('bad', 'alert', esc(BK.errorText(e))); } finally { b.forEach((x) => (x.disabled = false)); } };
+  if (u) {
+    $('#sync').onclick = async () => { await push(); toast(online ? 'Progresso sincronizado' : 'Sem ligação', online ? 'check' : 'alert'); vMe(); };
+    $('#out').onclick = async () => {
+      if (!confirm('Terminar sessão? O progresso fica guardado na sua conta e é removido deste dispositivo.')) return;
+      await push(); await BK.logout();
+      Object.assign(st, { name: '', done: {}, rev: {}, att: {}, pos: {}, tests: {}, days: [], log: [] }); persist(); route();
+    };
+  } else if (sbMode) {
+    view.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { meTab = b.dataset.tab; vMe(); }));
+    $('#authf').onsubmit = (e) => {
+      e.preventDefault();
+      const email = $('#em').value.trim(), password = $('#pw').value;
+      if (meTab === 'reg') {
+        const name = $('#nm').value.trim().replace(/\s+/g, ' ');
+        if (name.length < 2) return msg('bad', 'alert', 'Indique um nome com pelo menos 2 caracteres.');
+        if (password.length < 6) return msg('bad', 'alert', 'A palavra-passe deve ter pelo menos 6 caracteres.');
+        busy(async () => {
+          const r = await BK.register({ name, email, password });
+          if (r.needsConfirm) { st.name = name; persist(); msg('ok', 'checkCircle', `Conta criada. Enviámos um email para <b>${esc(email)}</b>: abra-o e clique no link de confirmação. Depois volte aqui e inicie sessão.`); meTab = 'in'; }
+          else await entered(r.user);
+        });
+      } else busy(async () => entered(await BK.login({ email, password })));
+    };
+    if ($('#forgot')) $('#forgot').onclick = () => {
+      const email = $('#em').value.trim();
+      if (!email) return msg('info', 'info', 'Escreva primeiro o seu email no campo acima.');
+      busy(async () => { await BK.resetPassword(email); msg('ok', 'checkCircle', `Enviámos para <b>${esc(email)}</b> um link para definir uma nova palavra-passe.`); });
+    };
+  } else {
+    const go = (kind) => busy(async () => {
+      const name = $('#nm').value.trim(), password = $('#pw').value;
+      const user = kind === 'reg' ? (await BK.register({ name, password, state: payload() })).user : await BK.login({ name, password });
+      await entered(user);
+    });
+    $('#authf').onsubmit = (e) => { e.preventDefault(); go('in'); };
+    $('#reg').onclick = () => go('reg');
+  }
   $('#theme').onclick = () => $('#themeBtn').click();
-  $('#reset').onclick = () => { if (confirm('Apagar todo o progresso guardado neste dispositivo?')) { st.done = {}; st.rev = {}; st.att = {}; st.pos = {}; st.tests = {}; st.days = []; st.log = []; persist(); route(); } };
+  if ($('#reset')) $('#reset').onclick = () => { if (confirm('Apagar todo o progresso guardado neste dispositivo?')) { Object.assign(st, { done: {}, rev: {}, att: {}, pos: {}, tests: {}, days: [], log: [] }); persist(); route(); } };
 }
+let meTab = 'in';
+
+// Depois de abrir o link "recuperar palavra-passe" recebido por email.
+function askNewPassword() {
+  const m = $('#modal');
+  m.innerHTML = `<form class="box" id="npf" role="dialog" aria-modal="true" aria-labelledby="npt"><div class="mi">${ic('lock')}</div><h2 id="npt">Nova palavra-passe</h2><p>Defina a nova palavra-passe da sua conta.</p>
+    <input class="txt" id="np" type="password" autocomplete="new-password" placeholder="Mínimo 6 caracteres" style="width:100%;margin-bottom:12px"><div id="npm"></div><button class="btn" type="submit">Guardar</button></form>`;
+  m.hidden = false; $('#np').focus();
+  $('#npf').onsubmit = async (e) => {
+    e.preventDefault();
+    try { await BK.updatePassword($('#np').value); m.hidden = true; toast('Palavra-passe alterada'); history.replaceState(null, '', location.pathname + '#/'); route(); }
+    catch (err) { $('#npm').innerHTML = alertBox('bad', 'alert', esc(BK.errorText(err))); }
+  };
+}
+
+/* ---------- área do professor ---------- */
+let profRows = null, profSort = 'xp';
+async function vProf() {
+  crumbs = [['Área do professor', '#/prof']];
+  const head = `<div class="page-h"><div><div class="eyebrow">Acompanhamento</div><h1>Área do professor</h1><p>Evolução de todos os alunos inscritos.</p></div><div class="row" id="profTools"></div></div>`;
+  if (BK.kind === 'supabase' && !(BK.user && BK.user.teacher)) {
+    view.innerHTML = head + `<div class="card locked-card"><span class="side-i">${ic('lock')}</span><div><h2>Acesso reservado</h2><p class="muted">Esta área só está disponível para contas de professor. ${BK.user ? '' : 'Inicie sessão na página <a href="#/me">Perfil</a>. '}Para atribuir o perfil de professor a uma conta, execute no Supabase (SQL Editor):</p><pre><code>update public.profiles set is_teacher = true\nwhere lower(name) = lower('Nome do Professor');</code></pre></div></div>`;
+    enhanceCode(view); return;
+  }
+  if (BK.kind === 'server' && !sessionStorage.getItem('mya.teacherKey')) {
+    view.innerHTML = head + `<div class="card" style="max-width:480px"><h3>Chave de professor</h3><p class="small muted">Indique a chave definida ao arrancar o servidor (<code>TEACHER_KEY=… npm start</code>).</p><form id="kf"><input class="txt" id="tk" type="password" style="width:100%;margin-bottom:12px"><button class="btn" type="submit">Entrar</button></form></div>`;
+    $('#kf').onsubmit = (e) => { e.preventDefault(); sessionStorage.setItem('mya.teacherKey', $('#tk').value); profRows = null; vProf(); };
+    return;
+  }
+  view.innerHTML = head + '<div class="card"><div class="empty">A carregar alunos…</div></div>';
+  try {
+    if (!profRows) profRows = (await BK.students(sessionStorage.getItem('mya.teacherKey'))).map((r) => ({ ...r, s: S.summarize(r.state) }));
+  } catch (e) {
+    if (BK.kind === 'server') sessionStorage.removeItem('mya.teacherKey');
+    view.innerHTML = head + alertBox('bad', 'alert', esc(BK.errorText(e))); return;
+  }
+  if (!location.hash.startsWith('#/prof')) return;
+  const rows = profRows.slice().sort(profSort === 'name' ? (a, b) => a.name.localeCompare(b.name) : profSort === 'recent' ? (a, b) => b.updated - a.updated : (a, b) => b.s.xp - a.s.xp);
+  const n = rows.length, avg = (f) => (n ? Math.round(rows.reduce((k, r) => k + f(r), 0) / n) : 0);
+  const week = Date.now() - 7 * 864e5;
+  view.innerHTML = head + `<div class="kpis" style="margin-top:0">
+    <div class="kpi"><div class="l">${ic('users')}Alunos</div><div class="v">${n}</div><div class="s">${rows.filter((r) => r.updated > week).length} ativos nos últimos 7 dias</div></div>
+    <div class="kpi"><div class="l">${ic('checkCircle')}Conclusão média</div><div class="v">${avg((r) => r.s.pct)}%</div><div class="s">do curso</div></div>
+    <div class="kpi"><div class="l">${ic('clipboard')}Minitestes</div><div class="v">${rows.reduce((k, r) => k + r.s.testsPassed, 0)}</div><div class="s">aprovações no total</div></div>
+    <div class="kpi"><div class="l">${ic('zap')}XP médio</div><div class="v">${avg((r) => r.s.xp)}</div><div class="s">por aluno</div></div></div>
+  <div class="card" style="margin-top:16px;padding:0">${n ? `<div class="scroll"><table class="tbl prof"><thead><tr><th>Aluno</th><th>Nível</th><th class="r">XP</th><th style="width:18%">Conclusão</th>${CHAPTERS.map((c) => `<th class="c" title="${esc(c.title)}">C${c.idx + 1}</th>`).join('')}<th>Última atividade</th></tr></thead><tbody>
+    ${rows.map((r, i) => `<tr class="pr" data-i="${i}"><td><span class="who"><span class="avatar">${esc(initials(r.name))}</span><b>${esc(r.name)}</b></span></td><td>${r.s.level}</td><td class="r"><b>${r.s.xp}</b></td><td><div class="row" style="flex-wrap:nowrap">${bar(r.s.pct)}<span class="small muted num-t" style="min-width:36px">${r.s.pct}%</span></div></td>
+      ${CHAPTERS.map((c) => { const p = r.s.perChapter[c.id]; return `<td class="c">${p.test.passed ? `<span class="chip ok" title="Miniteste aprovado">${p.test.best}%</span>` : p.test.attempts ? `<span class="chip bad" title="Melhor resultado no miniteste">${p.test.best}%</span>` : `<span class="small muted" title="Lições concluídas">${p.lessonsOk}/${p.lessons}</span>`}</td>`; }).join('')}
+      <td class="small muted" style="white-space:nowrap">${r.updated ? new Date(r.updated).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' }) : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Ainda não há alunos inscritos.</div>'}</div>
+  <p class="small muted" style="margin-top:10px">Colunas C1–C${CHAPTERS.length}: resultado do miniteste de cada capítulo (verde = aprovado) ou lições concluídas. Clique num aluno para ver o detalhe.</p><div id="profDetail"></div>`;
+  $('#profTools').innerHTML = `<select class="txt sel" id="psort" aria-label="Ordenar"><option value="xp">Ordenar por XP</option><option value="name">Ordenar por nome</option><option value="recent">Mais recentes</option></select><button class="btn sec-b sm" id="prefresh">${ic('refresh')}Atualizar</button><button class="btn sec-b sm" id="pcsv">${ic('download')}Exportar CSV</button>`;
+  $('#psort').value = profSort;
+  $('#psort').onchange = () => { profSort = $('#psort').value; vProf(); };
+  $('#prefresh').onclick = () => { profRows = null; vProf(); };
+  $('#pcsv').onclick = () => {
+    const q = (v) => `"${String(v).replace(/"/g, '""')}"`;
+    const head2 = ['aluno', 'nivel', 'xp', 'conclusao_pct', 'exercicios', 'licoes', 'capitulos_concluidos', ...CHAPTERS.map((c) => `miniteste_${c.id}`), 'ultima_atividade'];
+    const lines = rows.map((r) => [q(r.name), r.s.level, r.s.xp, r.s.pct, r.s.exDone, r.s.lessonsDone.length, r.s.chaptersDone.length, ...CHAPTERS.map((c) => (r.s.perChapter[c.id].test.attempts ? r.s.perChapter[c.id].test.best : '')), r.updated ? new Date(r.updated).toISOString() : ''].join(','));
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + [head2.join(','), ...lines].join('\n')], { type: 'text/csv' })); a.download = 'alunos-mysql-academy.csv'; a.click();
+  };
+  view.querySelectorAll('tr.pr').forEach((tr) => (tr.onclick = () => {
+    const r = rows[+tr.dataset.i];
+    view.querySelectorAll('tr.pr').forEach((x) => x.classList.toggle('me', x === tr));
+    $('#profDetail').innerHTML = `<div class="card" style="margin-top:16px"><div class="card-h"><h3>${esc(r.name)}</h3><span class="small muted">Nível ${r.s.level} · ${r.s.xp} XP · ${r.s.exDone} exercícios · ${r.s.firstTry} à 1.ª tentativa</span></div>
+      <div class="scroll"><table class="tbl"><thead><tr><th>Capítulo</th><th>Lições</th><th>Exercícios</th><th>Miniteste</th></tr></thead><tbody>${CHAPTERS.map((c) => { const p = r.s.perChapter[c.id]; return `<tr><td>${c.idx + 1}. ${esc(c.title)}</td><td>${p.lessonsOk}/${p.lessons}</td><td>${p.ok}/${p.tot}</td><td>${p.test.attempts ? `<span class="chip ${p.test.passed ? 'ok' : 'bad'}">${p.test.best}% · ${p.test.attempts} ${p.test.attempts === 1 ? 'tentativa' : 'tentativas'}</span>` : '—'}</td></tr>`; }).join('')}</tbody></table></div>
+      <h3 style="margin-top:18px">Últimas atividades</h3>${(r.state.log || []).length ? `<div class="scroll" style="max-height:300px"><table class="tbl"><tbody>${r.state.log.slice(-30).reverse().map((e) => { const x = logLabel(e); return `<tr><td class="small muted" style="white-space:nowrap">${new Date(e.at).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' })}</td><td style="font-family:var(--mono);font-size:.8rem">${esc(x.code)}</td><td class="small">${esc(x.text)}</td><td>${e.score !== undefined ? `<span class="chip ${e.ok ? 'ok' : 'bad'}">${e.score}%</span>` : e.ok ? '<span class="chip ok">Correto</span>' : '<span class="chip bad">Incorreto</span>'}</td></tr>`; }).join('')}</tbody></table></div>` : '<p class="muted small">Sem atividade registada.</p>'}</div>`;
+    $('#profDetail').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }));
+}
+const enhanceCode = (root) => root.querySelectorAll('pre > code:not(.hl)').forEach((c) => { c.innerHTML = hl(c.textContent); c.classList.add('hl'); });
+
 function applyTheme() {
   if (st.theme) document.documentElement.dataset.theme = st.theme; else delete document.documentElement.dataset.theme;
 }
@@ -600,7 +720,7 @@ function route() {
   const h = location.hash || '#/';
   const [, a, b] = h.split('/');
   if (a !== 't') quizRun = null;
-  ({ '': vHome, learn: vLearn, c: () => vChapter(b), l: () => vLesson(b), m: () => vManual(b), t: () => vTest(b), lab: vLab, progress: vProgress, rank: vRank, me: vMe }[a || ''] || vHome)();
+  ({ '': vHome, learn: vLearn, c: () => vChapter(b), l: () => vLesson(b), m: () => vManual(b), t: () => vTest(b), lab: vLab, progress: vProgress, rank: vRank, me: vMe, prof: vProf }[a || ''] || vHome)();
   renderChrome();
   const steps = a === 'l' ? view.querySelectorAll('.step') : [];
   if (steps.length > 1) steps[steps.length - 1].scrollIntoView({ block: 'start' }); else window.scrollTo(0, 0);
@@ -609,6 +729,15 @@ addEventListener('hashchange', route);
 addEventListener('keydown', (e) => { if (e.key === 'Escape') { $('#modal').hidden = true; const d = $('#drawer'); d.hidden = true; d.innerHTML = ''; } });
 applyTheme();
 route();
-if (st.token) push();
+// Restaura a sessão (se existir) e sincroniza; só redesenha páginas sem trabalho em curso.
+BK.onRecovery = askNewPassword;
+BK.init().then(async (u) => {
+  if (BK.recovery) askNewPassword();
+  if (!u) { renderChrome(); return; }
+  st.name = u.name;
+  await push();
+  const a = (location.hash.split('/')[1] || '');
+  if (['', 'learn', 'c', 'progress', 'rank', 'me', 'prof'].includes(a)) route(); else renderChrome();
+}).catch(() => renderChrome());
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();

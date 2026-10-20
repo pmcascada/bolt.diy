@@ -97,7 +97,7 @@ async function api(req, res, url) {
   }
   if (req.method === 'GET' && url.pathname === '/api/admin/students') {
     if (!TEACHER_KEY || req.headers['x-teacher-key'] !== TEACHER_KEY) return send(res, 403, { error: 'Chave de professor inválida.' });
-    return send(res, 200, Object.values(users).map((u) => ({ ...publicRow(u), created: u.created, chapters: SCORE.summarize(u.state).perChapter, log: u.state.log.slice(-100) })));
+    return send(res, 200, Object.values(users).map((u) => ({ ...publicRow(u), created: u.created, chapters: SCORE.summarize(u.state).perChapter, log: u.state.log.slice(-100), state: u.state })));
   }
   if (req.method === 'POST' && (url.pathname === '/api/register' || url.pathname === '/api/login')) {
     if (throttled(ip)) return send(res, 429, { error: 'Demasiadas tentativas. Aguarde um minuto.' });
