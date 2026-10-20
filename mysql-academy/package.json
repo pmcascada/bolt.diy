@@ -1,0 +1,9 @@
+{
+  "name": "mysql-academy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Aplicação (PWA) de autoaprendizagem de MySQL com gamificação e ranking",
+  "type": "commonjs",
+  "scripts": { "start": "node server.js", "test": "node test/content.test.js" },
+  "engines": { "node": ">=18" }
+}
