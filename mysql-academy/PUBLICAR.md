@@ -1,4 +1,4 @@
-# Publicar a MySQL Academy (gratuito): Supabase + Cloudflare Pages
+# Publicar a MySQL Academy (gratuito): Supabase + Cloudflare Pages ou Vercel
 
 - **Cloudflare Pages** aloja o site (ficheiros de `public/`), com HTTPS, sempre ligado.
 - **Supabase** guarda as contas dos alunos, o progresso e a classificação.
@@ -52,6 +52,19 @@ A chave pública pode ficar no site: os dados estão protegidos pelas regras de 
    - **Build output directory:** `mysql-academy/public`
 4. **Save and Deploy**. Ao fim de um minuto o site fica disponível em `https://<nome>.pages.dev`.
    Cada novo push para o ramo publica automaticamente uma nova versão.
+
+### Alternativa: publicar no Vercel
+
+1. Crie uma conta gratuita em https://vercel.com (pode entrar com a conta do GitHub).
+2. **Add New…** → **Project** → importe o repositório `bolt.diy` (autorize o acesso, se pedido).
+3. Configure:
+   - **Root Directory:** `mysql-academy/public` (botão **Edit**)
+   - **Framework Preset:** *Other*
+   - **Build Command / Output Directory / Install Command:** deixar vazios (sem build)
+4. **Deploy**. O site fica em `https://<nome>.vercel.app`; cada push para o ramo de produção publica uma nova versão.
+5. Para publicar a partir do ramo `claude/mysql-learning-app-i359yb` (e não do `main`): **Settings** → **Environments** → **Production** → **Branch Tracking**; ou junte o ramo ao `main`.
+
+O plano gratuito do Vercel (*Hobby*) destina-se a uso pessoal e não comercial.
 
 ## 6. Indicar o endereço do site ao Supabase
 

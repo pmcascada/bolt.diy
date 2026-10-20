@@ -88,6 +88,8 @@
     async function api(path, method, data, headers = {}) {
       const r = await fetch(path, { method, headers: { 'Content-Type': 'application/json', ...(auth.token ? { Authorization: 'Bearer ' + auth.token } : {}), ...headers }, body: data ? JSON.stringify(data) : undefined });
       const j = await r.json().catch(() => ({}));
+      // Site publicado sem servidor (ex.: Vercel, Cloudflare Pages) e sem Supabase configurado.
+      if (!r.ok && !j.error && [404, 405, 501].includes(r.status)) throw Object.assign(new Error('As contas e a classificação ainda não estão ativas neste site.'), { status: r.status });
       if (!r.ok) throw Object.assign(new Error(j.error || 'Erro de rede'), { status: r.status });
       return j;
     }
