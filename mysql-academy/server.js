@@ -51,6 +51,7 @@ function authed(req) {
 
 const CHAPTER_IDS = new Set(require('./public/content.js').CHAPTERS.map((c) => c.id));
 const LESSON_IDS = new Set(require('./public/content.js').CHAPTERS.flatMap((c) => c.lessons.map((l) => l.id)));
+const ROOM_IDS = new Set(SCORE.ROOMS.map((r) => r.id));
 const int = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.round(+v) || 0));
 
 function cleanState(s) {
@@ -64,9 +65,11 @@ function cleanState(s) {
     if (CHAPTER_IDS.has(id)) tests[id] = { best: int(t.best, 0, 100), attempts: int(t.attempts, 0, 999), at: +t.at || 0 };
   }
   for (const [id, p] of Object.entries(s.pos || {})) if (LESSON_IDS.has(id)) pos[id] = int(p, 0, 200);
+  const game = { done: {} };
+  for (const [id, d] of Object.entries((s.game && s.game.done) || {})) if (ROOM_IDS.has(id)) game.done[id] = { at: +d.at || Date.now(), hints: int(d.hints, 0, 9), rev: !!d.rev };
   const days = Array.isArray(s.days) ? s.days.filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).slice(-400) : [];
   const log = Array.isArray(s.log) ? s.log.slice(-500).map((e) => ({ at: +e.at || 0, id: String(e.id).slice(0, 20), ok: !!e.ok, ...(e.score !== undefined ? { score: int(e.score, 0, 100) } : {}) })) : [];
-  return { done, rev, tests, pos, days, log };
+  return { done, rev, tests, pos, game, days, log };
 }
 
 // Junta o progresso de dois dispositivos sem nunca perder trabalho já feito.
@@ -78,6 +81,7 @@ function mergeState(a, b) {
     a.tests[id] = !m ? t : { best: Math.max(m.best, t.best), attempts: Math.max(m.attempts, t.attempts), at: Math.max(m.at, t.at) };
   }
   for (const [id, p] of Object.entries(b.pos || {})) a.pos[id] = Math.max(a.pos[id] || 0, p);
+  for (const [id, d] of Object.entries((b.game && b.game.done) || {})) if (!a.game.done[id] || a.game.done[id].at > d.at) a.game.done[id] = d;
   a.days = [...new Set([...a.days, ...(b.days || [])])].sort().slice(-400);
   const seen = new Set(a.log.map((e) => e.at + e.id));
   a.log = [...a.log, ...(b.log || []).filter((e) => !seen.has(e.at + e.id))].sort((x, y) => x.at - y.at).slice(-500);

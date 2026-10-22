@@ -28,6 +28,15 @@ Exercícios: escolha múltipla, "escreva o comando", consultas SELECT validadas 
 - Página **Progresso**: lições, exercícios e resultado do miniteste por capítulo, gráfico de 14 dias, histórico completo de tentativas e minitestes, exportação CSV/JSON
 - **Classificação** entre alunos (requer o servidor); o XP é recalculado no servidor a partir do progresso
 
+## Protocolo NEXUS (jogo 3D)
+
+Jogo na primeira pessoa (só para computador), acessível no menu por baixo do Laboratório SQL. Na estação espacial Órion, tomada pela inteligência artificial NEXUS, o aluno usa SQL em terminais para abrir portas e desativar drones de segurança (sem violência: os drones são desligados com `UPDATE`).
+
+- **Parte 1 (4 salas):** criogenia (`SELECT *`), manutenção (`WHERE`), arquivo (`ORDER BY` / `LIMIT`) e laboratório (`LIKE` + `UPDATE` para desativar o drone; um `UPDATE` sem `WHERE` dispara o alarme).
+- **Pulsos EMP:** cápsulas espalhadas pelas salas; a tecla Q imobiliza os drones durante 8 segundos.
+- Cada sala dá XP (−5 por dica, 0 se vir a solução) e conquistas, e o progresso é sincronizado com a conta.
+- Motor em Three.js (`public/game/`), com o mundo gerado em código; só é carregado quando o jogo é aberto. As salas estão em `public/game/levels.js` e são validadas por `test/game.test.js`.
+
 ## Publicar na Internet (gratuito)
 
 Siga o guia **[PUBLICAR.md](PUBLICAR.md)**: o site fica no Cloudflare Pages e as contas, o progresso e a classificação no Supabase (plano gratuito). Basta executar `supabase/schema.sql` no Supabase e preencher `public/config.js`.
@@ -56,6 +65,8 @@ public/            a aplicação (HTML/CSS/JS puro, sem build)
   content.js       capítulos → lições → passos (learn/quiz/code/query), resumo de sintaxe e miniteste
   score.js         regras de XP e níveis (partilhado cliente/servidor)
   db.js            BD de exemplo "escola" + validação de respostas
+  game/levels.js   história e salas do Protocolo NEXUS (bases de dados, objetivos, regras das portas)
+  game/game.js     motor 3D do jogo (Three.js)
   ddl.js           verificador de CREATE/ALTER/DROP TABLE (compara a estrutura obtida com a esperada)
   app.js           interface e lógica
   sw.js            service worker (offline)
