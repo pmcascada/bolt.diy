@@ -3,6 +3,7 @@
 const { CHAPTERS, BADGES, PASS_MARK } = window.CONTENT;
 const S = window.SCORE;
 const D = window.SQLDB;
+const DDL = window.DDL;
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -175,7 +176,7 @@ function record(ex, ok) {
   if (st.rev[ex.id]) { persist(); toast('Correto · sem pontuação (resposta consultada)', 'info'); return; }
   const before = sum();
   st.done[ex.id] = { tries: a.tries, hints: a.hints, at: Date.now() };
-  toast(`Resposta correta · +${S.exXp(ex.t, a.tries, a.hints)} XP`);
+  toast(`Resposta correta · +${S.exXp(ex, a.tries, a.hints)} XP`);
   celebrate(before, sum());
 }
 
@@ -394,13 +395,22 @@ function schemaPanel(used, onPick, showViews) {
   return el;
 }
 
+// Estrutura das tabelas (como DESCRIBE) obtida num exercício de criação/alteração de tabelas.
+function structureHtml(db, names, title) {
+  const ts = DDL.describe(db, names);
+  if (!ts.length) return '';
+  return `<div class="ddl-out"><div class="small muted" style="margin:10px 0 6px"><b>${esc(title)}</b></div>${ts.map((t) => `<div class="ddl-t"><div class="ddl-n">${ic('table')}${esc(t.name)}</div>
+    <div class="res" style="margin-top:6px"><table><thead><tr><th>Campo</th><th>Tipo</th><th>Nulo</th><th>Chave</th><th>Default</th><th>Extra</th></tr></thead><tbody>${t.rows.map((r) => `<tr>${r.map((v) => `<td>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+    ${t.extra.length ? `<div class="ddl-x">${t.extra.map((x) => `<code>${esc(x)}</code>`).join('')}</div>` : ''}</div>`).join('')}</div>`;
+}
+
 function taskEl(ex, i, onPass) {
   const el = document.createElement('div');
-  const tag = { quiz: 'Escolha múltipla', code: 'Escrever comando', query: 'Consulta SELECT' }[ex.t];
+  const tag = { quiz: 'Escolha múltipla', code: 'Escrever comando', query: 'Consulta SELECT', ddl: ex.loose ? 'Desafio: criar tabelas' : 'Criar/alterar tabelas' }[ex.t];
   function paint(fbHtml) {
     const done = st.done[ex.id], rev = st.rev[ex.id], a = st.att[ex.id] || { tries: 0, hints: 0 };
     el.className = 'task' + (done || rev ? ' done' : '');
-    const chip = done ? `<span class="chip ok">${ic('check')}+${S.exXp(ex.t, done.tries, done.hints)} XP</span>` : rev ? '<span class="chip">Resposta consultada · 0 XP</span>' : `<span class="chip">${S.BASE[ex.t]} XP</span>`;
+    const chip = done ? `<span class="chip ok">${ic('check')}+${S.exXp(ex, done.tries, done.hints)} XP</span>` : rev ? '<span class="chip">Resposta consultada · 0 XP</span>' : `<span class="chip">${S.baseOf(ex)} XP</span>`;
     el.innerHTML = `<div class="task-h"><span>${ic('edit')}Exercício ${i + 1} · ${tag}</span>${chip}</div>
       <div class="task-b"><div class="q">${esc(ex.q)}</div><div class="body"></div><div class="fb" aria-live="polite">${fbHtml || ''}</div></div>`;
     const body = el.querySelector('.body'), fb = el.querySelector('.fb');
@@ -409,13 +419,13 @@ function taskEl(ex, i, onPass) {
       ? `<b>Resposta certa:</b> ${esc(ex.opts[ex.a])}. ${esc(ex.why)}<br><span class="small">Pode continuar a lição; este exercício já não conta XP.</span>`
       : `<b>Resposta certa:</b> <code>${esc(ex.solution)}</code><br><span class="small">Estude-a com atenção. Pode continuar a lição; este exercício já não conta XP.</span>`;
     const reveal = () => {
-      if (!confirm(`Ver a resposta certa?\n\nPerde os ${S.BASE[ex.t]} XP deste exercício, mas pode continuar a lição.`)) return;
+      if (!confirm(`Ver a resposta certa?\n\nPerde os ${S.baseOf(ex)} XP deste exercício, mas pode continuar a lição.`)) return;
       st.rev[ex.id] = 1; st.log.push({ at: Date.now(), id: ex.id, ok: false }); touchDay(); persist();
-      if (ex.t !== 'quiz') { el._val = ex.solution; if (ex.t === 'query') { try { el._out = table(D.run(D.create(), ex.solution)); } catch { el._out = ''; } } }
+      if (ex.t !== 'quiz') { el._val = ex.solution; if (ex.t === 'query') { try { el._out = table(D.run(D.create(), ex.solution)); } catch { el._out = ''; } } if (ex.t === 'ddl') { const r = DDL.check(ex.solution, ex); el._out = structureHtml(r.db, r.touched, 'Estrutura esperada'); } }
       paint(alertBox('info', 'eye', answerHtml()));
       onPass(); renderChrome();
     };
-    const revealBtn = () => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn link sm'; b.innerHTML = ic('eye') + `Ver resposta certa (−${S.BASE[ex.t]} XP)`; b.onclick = reveal; return b; };
+    const revealBtn = () => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn link sm'; b.innerHTML = ic('eye') + `Ver resposta certa (−${S.baseOf(ex)} XP)`; b.onclick = reveal; return b; };
     if (rev && !done && !fbHtml) fb.innerHTML = alertBox('info', 'eye', answerHtml());
     if (ex.t === 'quiz') {
       body.className = 'body opts';
@@ -436,7 +446,8 @@ function taskEl(ex, i, onPass) {
     }
     const ta = document.createElement('textarea'); ta.className = 'sql'; ta.spellcheck = false; ta.autocapitalize = 'off'; ta.autocomplete = 'off';
     ta.setAttribute('aria-label', 'Resposta SQL');
-    ta.placeholder = ex.t === 'query' ? 'SELECT …' : 'Escreva aqui o comando…'; ta.value = el._val ?? (done ? ex.solution : '');
+    ta.placeholder = ex.t === 'query' ? 'SELECT …' : ex.t === 'ddl' ? 'CREATE TABLE … (pode escrever em várias linhas)' : 'Escreva aqui o comando…'; ta.value = el._val ?? (done ? ex.solution : '');
+    if (ex.t === 'ddl') ta.style.minHeight = ex.loose ? '320px' : '170px';
     ta.oninput = () => (el._val = ta.value);
     const out = document.createElement('div'); out.innerHTML = el._out || '';
     const tools = document.createElement('div'); tools.className = 'tools';
@@ -446,9 +457,14 @@ function taskEl(ex, i, onPass) {
       let ok = false;
       try {
         if (ex.t === 'code') ok = D.checkCode(ta.value, ex);
+        else if (ex.t === 'ddl') {
+          const r = DDL.check(ta.value, ex); ok = r.ok;
+          out.innerHTML = el._out = structureHtml(r.db, r.touched, 'Estrutura obtida com a sua resposta');
+          if (!ok) { record(ex, false); fb.innerHTML = alertBox('bad', 'x', `<b>Ainda não está certo.</b><ul class="ddl-msgs">${r.msgs.slice(0, 5).map((m) => `<li>${m}</li>`).join('')}</ul>${r.msgs.length > 5 ? `<span class="small">… e mais ${r.msgs.length - 5} diferença(s).</span>` : ''}`); return; }
+        }
         else { const r = D.check(ta.value, ex); ok = r.ok; out.innerHTML = el._out = table(r.rows); }
-      } catch (err) { out.innerHTML = el._out = ''; fb.innerHTML = alertBox('bad', 'alert', `<b>Erro.</b> ${esc(sqlError(err))}`); return; }
-      if (ok) { record(ex, true); paint(alertBox('ok', 'checkCircle', '<b>Correto.</b>' + (ex.t === 'query' ? ' O resultado coincide com o esperado.' : ''))); onPass(); }
+      } catch (err) { out.innerHTML = el._out = ''; if (ex.t === 'ddl') record(ex, false); fb.innerHTML = alertBox('bad', 'alert', `<b>Erro.</b> ${esc(err instanceof DDL.SqlError ? err.message : sqlError(err))}`); return; }
+      if (ok) { record(ex, true); paint(alertBox('ok', 'checkCircle', '<b>Correto.</b>' + (ex.t === 'query' ? ' O resultado coincide com o esperado.' : ex.t === 'ddl' ? ' A estrutura criada corresponde ao pedido.' : ''))); onPass(); }
       else {
         record(ex, false);
         fb.innerHTML = alertBox('bad', 'x', ex.t === 'query' ? 'O resultado não coincide com o esperado. Verifique colunas, filtros e agrupamentos.' : 'Ainda não está correto. Confira a sintaxe e os nomes utilizados.');
@@ -468,6 +484,7 @@ function taskEl(ex, i, onPass) {
     if (!done && !rev) tools.append(revealBtn());
     const k = document.createElement('span'); k.className = 'small muted kb'; k.innerHTML = '<span class="kbd">Ctrl</span> + <span class="kbd">Enter</span>'; tools.append(k);
     ta.onkeydown = (ev) => { if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter') { ev.preventDefault(); check(); } };
+    if (ex.t === 'ddl' && ex.setup) { const pre = document.createElement('div'); pre.className = 'ddl-setup'; pre.innerHTML = `<div class="small muted">${ic('table')}Tabelas que já existem:</div><pre><code class="hl">${hl(ex.setup)}</code></pre>`; body.append(pre); }
     body.append(ta, tools, out);
     if (sb && el._schema) { el._schema = false; toggleSchema(); }
   }

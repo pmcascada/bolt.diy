@@ -4,6 +4,11 @@
   "private": true,
   "description": "Aplicação (PWA) de autoaprendizagem de MySQL com gamificação e ranking",
   "type": "commonjs",
-  "scripts": { "start": "node server.js", "test": "node test/content.test.js" },
-  "engines": { "node": ">=18" }
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/content.test.js && node test/ddl.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
 }
