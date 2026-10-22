@@ -177,6 +177,32 @@ grant execute on function public.is_admin() to authenticated;
 grant execute on function public.admin_users() to authenticated;
 grant execute on function public.set_teacher(uuid, boolean) to authenticated;
 
+-- ------------------------------------------------------------
+-- Versão 4: definições do site. O gestor escolhe que capítulos ficam ocultos aos alunos
+-- (para controlar o ritmo da turma). Todos podem ler; só o gestor altera, através de set_hidden_chapters().
+-- ------------------------------------------------------------
+create table if not exists public.settings (
+  id               int primary key default 1 check (id = 1),
+  hidden_chapters  text[] not null default '{}',
+  updated_at       timestamptz not null default now()
+);
+insert into public.settings (id) values (1) on conflict (id) do nothing;
+alter table public.settings enable row level security;
+revoke all on public.settings from anon, authenticated;
+grant select on public.settings to anon, authenticated;
+drop policy if exists "settings: todos podem ler" on public.settings;
+create policy "settings: todos podem ler" on public.settings for select to anon, authenticated using (true);
+
+create or replace function public.set_hidden_chapters(ids text[]) returns boolean
+language sql volatile security definer set search_path = public as
+'with changed as (
+   update public.settings set hidden_chapters = coalesce(ids, ''{}''), updated_at = now()
+    where id = 1 and public.is_admin()
+   returning 1)
+ select count(*) > 0 from changed';
+revoke execute on function public.set_hidden_chapters(text[]) from public, anon;
+grant execute on function public.set_hidden_chapters(text[]) to authenticated;
+
 -- ============================================================
 -- Gestor do site: executar uma única vez, com o email da conta do gestor. A partir daí,
 -- o gestor atribui o perfil de professor a outras contas na Área do professor.

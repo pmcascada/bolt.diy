@@ -73,6 +73,17 @@
       if (error) throw error;
       B.user.turma = t;
     };
+    // Definições do site (capítulos ocultos aos alunos): todos leem, só o gestor altera.
+    B.settings = async () => {
+      const { data, error } = await sb.from('settings').select('hidden_chapters').eq('id', 1).maybeSingle();
+      if (error) throw error;
+      return { hidden: (data && data.hidden_chapters) || [] };
+    };
+    B.setHiddenChapters = async (ids) => {
+      const { data, error } = await sb.rpc('set_hidden_chapters', { ids });
+      if (error) throw error;
+      if (!data) throw new Error('Só o gestor do site pode alterar os capítulos visíveis.');
+    };
     // Gestor do site: lista de contas e atribuição do perfil de professor.
     B.adminUsers = async () => {
       const { data, error } = await sb.rpc('admin_users');
@@ -116,6 +127,7 @@
     const enter = (j) => { auth = { token: j.token, name: j.name, turma: j.turma || '' }; keep(); B.user = { name: j.name, teacher: false, turma: auth.turma }; return B.user; };
     B.init = async () => (auth.token ? (B.user = { name: auth.name, teacher: false, turma: auth.turma || '' }) : null);
     B.register = async ({ name, password, state, turma }) => ({ user: enter(await api('/api/register', 'POST', { name, pin: password, state, turma: cleanTurma(turma) })) });
+    B.settings = async () => ({ hidden: [] }); // no servidor local todos os capítulos estão visíveis
     B.setTurma = async (turma) => { const j = await api('/api/turma', 'PUT', { turma: cleanTurma(turma) }); auth.turma = j.turma; keep(); if (B.user) B.user.turma = j.turma; };
     B.login = async ({ name, password }) => enter(await api('/api/login', 'POST', { name, pin: password }));
     B.logout = async () => { auth = {}; keep(); B.user = null; };
