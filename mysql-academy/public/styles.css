@@ -2,7 +2,10 @@
 :root{
   --bg:#f6f7f9;--surface:#fff;--surface-2:#f1f3f6;--border:#e3e6eb;--border-strong:#cfd5dd;
   --text:#0f172a;--text-2:#334155;--muted:#64748b;
-  --accent:#1d4ed8;--accent-h:#1e40af;--accent-weak:#eef2ff;--on-accent:#fff;
+  /* Cor institucional: laranja da ESGHT (UAlg). --brand é a cor oficial; --accent é um tom mais escuro
+     do mesmo laranja para texto e botões, com contraste suficiente sobre fundo branco. */
+  --brand:#f39200;
+  --accent:#d06a00;--accent-h:#b35800;--accent-weak:#fff3e2;--on-accent:#fff;
   --ok:#15803d;--ok-weak:#ecfdf3;--bad:#b91c1c;--bad-weak:#fef2f2;--warn:#b45309;--warn-weak:#fffbeb;
   --code-bg:#0f172a;--code-head:#1e293b;--code-text:#e2e8f0;
   --k:#93c5fd;--s:#86efac;--n:#fdba74;--c:#64748b;
@@ -15,13 +18,13 @@
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]){
   --bg:#0b1120;--surface:#111827;--surface-2:#172033;--border:#1f2a3c;--border-strong:#2c3a52;
   --text:#e5e9f0;--text-2:#cbd5e1;--muted:#8b98ad;
-  --accent:#3b82f6;--accent-h:#60a5fa;--accent-weak:#172554;
+  --accent:#f39200;--accent-h:#ffad42;--accent-weak:#3a2300;--on-accent:#1c1100;
   --ok:#4ade80;--ok-weak:#052e1a;--bad:#f87171;--bad-weak:#3b0d0d;--warn:#fbbf24;--warn-weak:#2d2106;
   --code-bg:#0a0f1c;--code-head:#141c2e;--shadow:none;--toast-bg:#e5e9f0;--toast-fg:#0f172a;--toast-ic:#15803d;color-scheme:dark}}
 :root[data-theme=dark]{
   --bg:#0b1120;--surface:#111827;--surface-2:#172033;--border:#1f2a3c;--border-strong:#2c3a52;
   --text:#e5e9f0;--text-2:#cbd5e1;--muted:#8b98ad;
-  --accent:#3b82f6;--accent-h:#60a5fa;--accent-weak:#172554;
+  --accent:#f39200;--accent-h:#ffad42;--accent-weak:#3a2300;--on-accent:#1c1100;
   --ok:#4ade80;--ok-weak:#052e1a;--bad:#f87171;--bad-weak:#3b0d0d;--warn:#fbbf24;--warn-weak:#2d2106;
   --code-bg:#0a0f1c;--code-head:#141c2e;--shadow:none;--toast-bg:#e5e9f0;--toast-fg:#0f172a;--toast-ic:#15803d;color-scheme:dark}
 
@@ -42,7 +45,7 @@ svg.i{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-widt
 .brand:hover{text-decoration:none}
 .brand b{display:block;font-size:.98rem;font-weight:700;letter-spacing:-.01em}
 .brand small{display:block;color:var(--muted);font-size:.74rem;margin-top:-2px}
-.logo{width:32px;height:32px;border-radius:8px;background:var(--accent) url("icon-mark.svg") center/20px no-repeat;flex:none}
+.logo{width:32px;height:32px;border-radius:8px;background:var(--brand) url("icon-mark.svg") center/20px no-repeat;flex:none}
 #nav .grp{font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:14px 10px 6px}
 #nav a{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--r-sm);color:var(--text-2);font-weight:500;font-size:.92rem}
 #nav a:hover{background:var(--surface-2);text-decoration:none}
@@ -158,7 +161,7 @@ pre .k{color:var(--k)}pre .s{color:var(--s)}pre .n{color:var(--n)}pre .c{color:v
 .code-h{flex-wrap:wrap;display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--code-head);color:#94a3b8;padding:6px 8px 6px 14px;font-size:.74rem;font-weight:600;letter-spacing:.06em}
 .code-h .btn{height:26px;padding:0 8px;font-size:.76rem;background:transparent;color:#cbd5e1;border:1px solid #334155}
 .code-h .btn:hover{background:#1e293b}
-.code-h .btn.run{background:#2563eb;border-color:#2563eb;color:#fff}
+.code-h .btn.run{background:var(--brand);border-color:var(--brand);color:#1c1100}
 .code .cap{padding:10px 14px;font-size:.86rem;color:var(--muted);border-top:1px solid var(--border)}
 .code .out:not(:empty){padding:0 14px 14px}
 .res{overflow:auto;max-height:320px;border:1px solid var(--border);border-radius:var(--r-sm);margin-top:12px;background:var(--surface)}
@@ -481,7 +484,7 @@ pre.sol{margin:8px 0 0;border-radius:var(--r-sm);font-size:12.5px;white-space:pr
 .viz{border:1px solid var(--border);border-radius:var(--r);padding:14px;margin:14px 0;background:var(--surface)}
 .viz-sql{background:var(--code-bg);color:var(--code-text);border-radius:var(--r-sm);padding:10px 14px;font:13px/1.7 var(--mono)}
 .viz-sql div{opacity:.45;padding:0 6px;border-radius:4px;transition:opacity .2s}
-.viz-sql div.on{opacity:1;background:#1e3a8a}
+.viz-sql div.on{opacity:1;background:#7a3e00}
 .viz-steps{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 8px}
 .viz-steps button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--muted);border-radius:999px;padding:4px 10px 4px 4px;font:600 .74rem var(--font);cursor:pointer}
 .viz-steps button span{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:var(--surface);border:1px solid var(--border)}
