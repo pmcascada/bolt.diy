@@ -30,6 +30,7 @@ export function startGame(container, opts) {
       <div class="gx-top"><span class="gx-progress"></span><span class="gx-emp" title="Pulsos EMP: imobilizam os drones durante ${EMP_TIME} s"><span class="gx-key">Q</span> EMP <b>0</b><i></i></span><span class="gx-key">Esc</span> menu</div>
       <div class="gx-cross"></div>
       <div class="gx-prompt" hidden></div>
+      <div class="gx-lock" hidden>Clique no ecrã para controlar a câmara com o rato</div>
       <div class="gx-log"></div>
     </div>
     <div class="gx-flash"></div>
@@ -195,7 +196,7 @@ export function startGame(container, opts) {
     screen.position.set(0, 1.45, -0.18); screen.rotation.x = -0.22; g.add(screen);
     box(1.45, 0.95, 0.06, mat.metal, 0, 1.45, -0.22, g).rotation.x = -0.22;
     scr.draw(['TERMINAL ÓRION', `SALA ${i + 1}`, '> [E] LIGAR_', ''], false);
-    interactables.push({ pos: new THREE.Vector3(x + 0.8, 1, z), kind: 'terminal', room: i, label: 'Usar o terminal' });
+    interactables.push({ pos: new THREE.Vector3(x, 1, z), kind: 'terminal', room: i, label: 'Usar o terminal' });
     return scr;
   }
 
@@ -207,7 +208,7 @@ export function startGame(container, opts) {
       g.fillStyle = '#ef4444'; g.fillRect(16, 16, 96, 26);
     }) }));
     pad.position.set(x, 1.45, z); world.add(pad);
-    interactables.push({ pos: new THREE.Vector3(x, 1, z + 0.7), kind: 'keypad', room: i, label: 'Introduzir o código da porta' });
+    interactables.push({ pos: new THREE.Vector3(x, 1, z), kind: 'keypad', room: i, label: 'Introduzir o código da porta' });
   }
 
   // Elementos decorativos próprios de cada sala.
@@ -509,11 +510,14 @@ export function startGame(container, opts) {
         log(`Recolheu um pulso EMP. Prima Q para imobilizar os drones durante ${EMP_TIME} s.`, 'SISTEMA', 'ok');
       }
       // objeto próximo para interagir
-      near = null; let best = 2.3;
+      // objeto com que se pode interagir: até 2,6 m e mais ou menos à frente; encostado (≤ 1,3 m) basta estar ao lado
+      near = null; let best = Infinity;
       for (const it of interactables) {
         if (it.kind === 'keypad' && rooms[it.room].door.open) continue;
         const d = Math.hypot(it.pos.x - p.x, it.pos.z - p.z);
-        if (d < best) { tmp.set(it.pos.x - p.x, 0, it.pos.z - p.z).normalize(); if (tmp.dot(fwd) > 0.35) { best = d; near = it; } }
+        if (d > 2.6 || d >= best) continue;
+        tmp.set(it.pos.x - p.x, 0, it.pos.z - p.z).normalize();
+        if (d <= 1.3 || tmp.dot(fwd) > 0.2) { best = d; near = it; }
       }
       const pr = $('.gx-prompt');
       if (near) { pr.hidden = false; pr.innerHTML = `<span class="gx-key">E</span> ${esc(near.label)}`; } else pr.hidden = true;
@@ -546,6 +550,7 @@ export function startGame(container, opts) {
       }
     }));
     spinners.forEach((s) => { s.rotation.y += dt * 0.6; s.rotation.x += dt * 0.25; });
+    $('.gx-lock').hidden = !(state.mode === 'play' && document.pointerLockElement !== canvas);
     rooms.forEach((r, i) => { r.light.intensity = 66 + Math.sin(t * 1.3 + i) * 4 + (r.door.open ? 0 : Math.max(0, Math.sin(t * 7 + i * 3)) * (i === state.room ? 0 : 8)); });
     dust.rotation.y = Math.sin(t * 0.05) * 0.02;
   }
