@@ -9,14 +9,15 @@ Aplicação de **autoaprendizagem de MySQL** para desktop e telemóvel (PWA inst
 3. **Manual do capítulo** — toda a matéria do capítulo num documento de consulta, com resumo de sintaxe, sempre disponível (página própria, painel lateral durante as lições, imprimível/PDF).
 4. **Miniteste final** — escolha múltipla (8 perguntas, ordem aleatória), desbloqueado após as lições; aprovação com 70% conclui o capítulo. Correção detalhada no fim; conta o melhor resultado.
 
-## Conteúdo (6 capítulos · 20 lições · 146 passos · 77 exercícios · 48 perguntas de miniteste)
+## Conteúdo (7 capítulos · 24 lições · 166 passos · 88 exercícios · 56 perguntas de miniteste)
 
 1. Introdução ao MySQL
 2. Criar bases de dados e tabelas
-3. Inserir, alterar e eliminar dados
+3. Inserir, alterar e eliminar dados (INSERT, UPDATE, DELETE, TRUNCATE)
 4. Consultas com SELECT (SELECT, WHERE, ORDER BY/LIMIT/DISTINCT, agregações e GROUP BY/HAVING, JOIN, subconsultas) – consultas executadas numa BD de exemplo no browser (AlaSQL)
-5. Segurança: utilizadores, GRANT/REVOKE, roles
-6. Backup e restauro (mysqldump, restauro, binlog, regra 3-2-1)
+5. Restrições, índices e vistas (CHECK, CREATE INDEX, CREATE VIEW)
+6. Segurança: utilizadores, GRANT/REVOKE, roles
+7. Backup e restauro (mysqldump, restauro, binlog, regra 3-2-1)
 
 Exercícios: escolha múltipla, "escreva o comando" e consultas SELECT validadas pelo resultado. Há ainda um **Laboratório SQL** livre.
 

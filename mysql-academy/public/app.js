@@ -347,8 +347,19 @@ function tocHtml(C, cur) {
   <div class="toc-sep"></div><a href="#/m/${C.id}">${ic('book')}<span>Manual do capítulo</span></a>
   ${p.unlocked ? `<a href="#/t/${C.id}" class="${p.test.passed ? 'done' : ''}">${ic(p.test.passed ? 'checkCircle' : 'clipboard')}<span>Miniteste${p.test.attempts ? ` · ${p.test.best}%` : ''}</span></a>` : `<span class="toc-lock">${ic('lock')}<span>Miniteste</span></span>`}`;
 }
+// Mensagens do motor do simulador traduzidas para o equivalente do MySQL.
+const SQL_ERRORS = [
+  [/violation of check constraint/i, 'Violação da restrição CHECK: o valor não cumpre a condição. A linha não foi guardada. (No MySQL: ERROR 3819)'],
+  [/table does not exist: (\w+)/i, (m) => `A tabela ou vista '${m[1]}' não existe. (No MySQL: ERROR 1146)`],
+  [/already exists/i, 'Já existe um objeto com esse nome. (No MySQL: ERROR 1050)'],
+];
+function sqlError(err) {
+  const msg = String((err && err.message) || err);
+  for (const [re, txt] of SQL_ERRORS) { const m = msg.match(re); if (m) return typeof txt === 'function' ? txt(m) : txt; }
+  return msg;
+}
 function runSql(db, sql) {
-  try { return table(D.run(db, sql)); } catch (err) { return alertBox('bad', 'alert', `<b>Erro:</b> ${esc(err.message || err)}`); }
+  try { return table(D.run(db, sql)); } catch (err) { return alertBox('bad', 'alert', `<b>Erro:</b> ${esc(sqlError(err))}`); }
 }
 
 /* ---------- estrutura das tabelas (consulta durante os exercícios) ---------- */
@@ -361,14 +372,16 @@ function insertAt(ta, text) {
   ta.dispatchEvent(new Event('input'));
 }
 // Painel com a estrutura (DESCRIBE) e os dados de cada tabela; as tabelas da pergunta aparecem primeiro.
-function schemaPanel(used, onPick) {
-  const names = [...used, ...Object.keys(D.SCHEMA).filter((t) => !used.includes(t))];
+// As vistas só aparecem quando a pergunta as usa (ou com showViews, no laboratório).
+function schemaPanel(used, onPick, showViews) {
+  const names = [...used, ...Object.keys(D.SCHEMA).filter((t) => !used.includes(t) && (showViews || !D.SCHEMA[t].view))];
   const el = document.createElement('div'); el.className = 'sp';
   let cur = names[0], showData = false;
   function paint() {
-    const t = D.SCHEMA[cur], rows = D.SEED[cur], cols = D.COLS[cur];
-    el.innerHTML = `<div class="sp-tabs" role="tablist">${names.map((n) => `<button type="button" role="tab" aria-selected="${n === cur}" class="${n === cur ? 'on' : ''}" data-t="${n}">${ic('table')}${n}${used.includes(n) ? '<span class="sp-dot" title="Usada nesta pergunta"></span>' : ''}</button>`).join('')}</div>
-      <div class="sp-b"><p class="small muted" style="margin:0 0 8px"><b>${cur}</b> — ${esc(t.desc)}${used.includes(cur) ? ' · <span class="chip acc">usada nesta pergunta</span>' : ''}</p>
+    const t = D.SCHEMA[cur], cols = D.COLS[cur];
+    const rows = D.SEED[cur] || D.run(D.create(), `SELECT * FROM ${cur}`).map((r) => cols.map((c) => r[c]));
+    el.innerHTML = `<div class="sp-tabs" role="tablist">${names.map((n) => `<button type="button" role="tab" aria-selected="${n === cur}" class="${n === cur ? 'on' : ''}" data-t="${n}">${ic(D.SCHEMA[n].view ? 'layers' : 'table')}${n}${used.includes(n) ? '<span class="sp-dot" title="Usada nesta pergunta"></span>' : ''}</button>`).join('')}</div>
+      <div class="sp-b"><p class="small muted" style="margin:0 0 8px"><b>${cur}</b>${t.view ? ' <span class="chip">vista</span>' : ''} — ${esc(t.desc)}${used.includes(cur) ? ' · <span class="chip acc">usada nesta pergunta</span>' : ''}</p>
       <div class="scroll"><table class="tbl sp-t"><thead><tr><th>Campo</th><th>Tipo</th><th>Chave</th><th>Descrição</th></tr></thead><tbody>
         ${t.cols.map(([c, ty, k, d]) => `<tr><td>${onPick ? `<button type="button" class="sp-col" data-c="${c}" title="Inserir na resposta">${c}</button>` : `<code>${c}</code>`}</td><td class="mono">${ty}</td><td>${k ? `<span class="chip ${k === 'PK' ? 'acc' : ''}">${esc(k)}</span>` : ''}</td><td class="small muted">${esc(d)}</td></tr>`).join('')}</tbody></table></div>
       <div class="row" style="margin-top:10px;justify-content:space-between"><button type="button" class="btn link sm sp-data">${ic(showData ? 'chevL' : 'eye')}${showData ? 'Esconder dados' : `Ver dados (${rows.length} linhas)`}</button>${onPick ? '<span class="small muted">Clique num campo para o inserir na resposta.</span>' : ''}</div>
@@ -420,7 +433,7 @@ function taskEl(ex, i, onPass) {
       try {
         if (ex.t === 'code') ok = D.checkCode(ta.value, ex);
         else { const r = D.check(ta.value, ex); ok = r.ok; out.innerHTML = el._out = table(r.rows); }
-      } catch (err) { out.innerHTML = el._out = ''; fb.innerHTML = alertBox('bad', 'alert', `<b>Erro de sintaxe.</b> ${esc(err.message || err)}`); return; }
+      } catch (err) { out.innerHTML = el._out = ''; fb.innerHTML = alertBox('bad', 'alert', `<b>Erro.</b> ${esc(sqlError(err))}`); return; }
       if (ok) { record(ex, true); paint(alertBox('ok', 'checkCircle', '<b>Correto.</b>' + (ex.t === 'query' ? ' O resultado coincide com o esperado.' : ''))); onPass(); }
       else {
         record(ex, false);
@@ -559,7 +572,7 @@ function vLab() {
   const q = $('#labq'); q.value = labSql;
   $('#schemaBtn').onclick = () => {
     const box = $('#labSchema'), open = !box.firstChild;
-    box.innerHTML = ''; if (open) box.append(schemaPanel(D.tablesIn(q.value), (c) => insertAt(q, c)));
+    box.innerHTML = ''; if (open) box.append(schemaPanel(D.tablesIn(q.value), (c) => insertAt(q, c), true));
     $('#schemaBtn').innerHTML = ic('table') + (open ? 'Esconder estrutura' : 'Estrutura das tabelas');
   };
   const go = () => { labSql = q.value; $('#labout').innerHTML = runSql(labDb, q.value); touchDay(); persist(); };
