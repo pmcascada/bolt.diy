@@ -713,6 +713,8 @@ const BADGES = [
   { id: 'streak7', icon: 'zap', name: 'Imparável', desc: '7 dias seguidos a estudar', test: (s) => s.streak >= 7 },
   { id: 'select', icon: 'search', name: 'Detetive SELECT', desc: 'Concluiu o capítulo de SELECT', test: (s) => s.chaptersDone.includes('select') },
   { id: 'sec', icon: 'shield', name: 'Guardião', desc: 'Concluiu o capítulo de segurança', test: (s) => s.chaptersDone.includes('sec') },
+  { id: 'nexus1', icon: 'terminal', name: 'Primeiro acesso', desc: 'Abriu a primeira porta da estação Órion', test: (s) => s.gameDone >= 1 },
+  { id: 'drone', icon: 'zap', name: 'Drone desligado', desc: 'Desativou um drone com SQL no Protocolo NEXUS', test: (s) => s.gameRooms.includes('g4') },
   { id: 'all', icon: 'award', name: 'Mestre MySQL', desc: 'Concluiu todos os capítulos', test: (s) => s.chaptersDone.length === CHAPTERS.length },
 ];
 

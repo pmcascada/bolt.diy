@@ -52,6 +52,7 @@ const P = {
   printer: 'M6 9V2h12v7 M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2 M6 14h12v8H6z',
   arrowDown: 'M12 5v14 M5 12l7 7 7-7',
   list: 'M8 6h13 M8 12h13 M8 18h13 M3 6h.01 M3 12h.01 M3 18h.01',
+  gamepad: 'M6 11h4 M8 9v4 M15 12h.01 M18 10h.01 M17.3 5H6.7a4 4 0 0 0-4 3.6L2 15a3 3 0 0 0 5.2 2.3L9 15h6l1.8 2.3A3 3 0 0 0 22 15l-.7-6.4a4 4 0 0 0-4-3.6z',
   users: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M23 21v-2a4 4 0 0 0-3-3.9 M16 3.1a4 4 0 0 1 0 7.8',
 };
 const ic = (n, cls = '') => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${P[n] || P.circle}"/></svg>`;
@@ -60,9 +61,10 @@ const ic = (n, cls = '') => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidd
    done: exercícios resolvidos · rev: soluções consultadas · pos: passo atual de cada lição
    tests: melhor resultado dos minitestes · log: histórico de tentativas */
 const KEY = 'mysql-academy.v1';
-let st = { name: '', token: '', theme: '', done: {}, rev: {}, att: {}, pos: {}, tests: {}, days: [], log: [] };
+let st = { name: '', token: '', theme: '', done: {}, rev: {}, att: {}, pos: {}, tests: {}, game: { done: {} }, days: [], log: [] };
 try { Object.assign(st, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch { /* sem storage */ }
 for (const k of ['rev', 'pos', 'tests', 'att', 'done']) st[k] = st[k] || {};
+st.game = st.game || { done: {} }; st.game.done = st.game.done || {};
 let syncTimer, online = null;
 function persist() {
   try { localStorage.setItem(KEY, JSON.stringify(st)); } catch { /* ignorar */ }
@@ -72,7 +74,7 @@ const sum = () => S.summarize(st);
 
 /* ---------- sincronização com a conta do aluno (Supabase ou servidor local) ---------- */
 const BK = window.BACKEND;
-const payload = () => ({ done: st.done, rev: st.rev, pos: st.pos, tests: st.tests, days: st.days, log: st.log });
+const payload = () => ({ done: st.done, rev: st.rev, pos: st.pos, tests: st.tests, game: { done: st.game.done }, days: st.days, log: st.log });
 function merge(remote) {
   for (const [id, d] of Object.entries(remote.done || {})) if (!st.done[id] || st.done[id].at > d.at) st.done[id] = d;
   Object.assign(st.rev, remote.rev || {});
@@ -81,6 +83,7 @@ function merge(remote) {
     st.tests[id] = !m ? t : { best: Math.max(m.best, t.best), attempts: Math.max(m.attempts, t.attempts), at: Math.max(m.at || 0, t.at || 0) };
   }
   for (const [id, p] of Object.entries(remote.pos || {})) st.pos[id] = Math.max(st.pos[id] || 0, p);
+  for (const [id, d] of Object.entries((remote.game && remote.game.done) || {})) if (!st.game.done[id] || st.game.done[id].at > d.at) st.game.done[id] = d;
   st.days = [...new Set([...st.days, ...(remote.days || [])])].sort().slice(-400);
   const seen = new Set(st.log.map((e) => e.at + e.id));
   st.log = [...st.log, ...(remote.log || []).filter((e) => !seen.has(e.at + e.id))].sort((a, b) => a.at - b.at).slice(-500);
@@ -183,7 +186,7 @@ function record(ex, ok) {
 /* ---------- estrutura (navegação, topo) ---------- */
 const view = $('#view');
 const NAV = [
-  ['Curso', [['#/', 'home', 'Painel'], ['#/learn', 'book', 'Conteúdos'], ['#/lab', 'terminal', 'Laboratório SQL']]],
+  ['Curso', [['#/', 'home', 'Painel'], ['#/learn', 'book', 'Conteúdos'], ['#/lab', 'terminal', 'Laboratório SQL'], ['#/jogo', 'gamepad', 'Protocolo NEXUS']]],
   ['Desempenho', [['#/progress', 'chart', 'Progresso'], ['#/rank', 'trophy', 'Classificação']]],
   ['Conta', [['#/me', 'user', 'Perfil']]],
 ];
@@ -602,6 +605,7 @@ function vLab() {
 
 /* ---------- progresso ---------- */
 function logLabel(e) {
+  if (e.id.startsWith('nexus.')) { const r = window.GAME.LEVELS.find((l) => 'nexus.' + l.id === e.id); return { code: 'Protocolo NEXUS', text: r ? `Sala concluída: ${r.name}` : '' }; }
   if (e.id.endsWith('.teste')) { const c = CHAPTERS.find((x) => x.id === e.id.split('.')[0]); return { code: 'Miniteste', text: c ? c.title : '' }; }
   const x = S.EXS[e.id]; return { code: e.id, text: x ? (x.q.length > 80 ? x.q.slice(0, 80) + '…' : x.q) : '' };
 }
@@ -680,7 +684,7 @@ function vMe() {
     $('#out').onclick = async () => {
       if (!confirm('Terminar sessão? O progresso fica guardado na sua conta e é removido deste dispositivo.')) return;
       await push(); await BK.logout();
-      Object.assign(st, { name: '', done: {}, rev: {}, att: {}, pos: {}, tests: {}, days: [], log: [] }); persist(); route();
+      Object.assign(st, { name: '', done: {}, rev: {}, att: {}, pos: {}, tests: {}, game: { done: {} }, days: [], log: [] }); persist(); route();
     };
   } else if (sbMode) {
     view.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { meTab = b.dataset.tab; vMe(); }));
@@ -713,7 +717,7 @@ function vMe() {
     $('#reg').onclick = () => go('reg');
   }
   $('#theme').onclick = () => $('#themeBtn').click();
-  if ($('#reset')) $('#reset').onclick = () => { if (confirm('Apagar todo o progresso guardado neste dispositivo?')) { Object.assign(st, { done: {}, rev: {}, att: {}, pos: {}, tests: {}, days: [], log: [] }); persist(); route(); } };
+  if ($('#reset')) $('#reset').onclick = () => { if (confirm('Apagar todo o progresso guardado neste dispositivo?')) { Object.assign(st, { done: {}, rev: {}, att: {}, pos: {}, tests: {}, game: { done: {} }, days: [], log: [] }); persist(); route(); } };
 }
 let meTab = 'in';
 
@@ -786,18 +790,91 @@ async function vProf() {
 }
 const enhanceCode = (root) => root.querySelectorAll('pre > code:not(.hl)').forEach((c) => { c.innerHTML = hl(c.textContent); c.classList.add('hl'); });
 
+/* ---------- Protocolo NEXUS (jogo 3D) ---------- */
+let gameCtl = null;
+const gameSupported = () => {
+  const desktop = matchMedia('(pointer: fine)').matches && innerWidth >= 900;
+  let webgl = false; try { const c = document.createElement('canvas'); webgl = !!(c.getContext('webgl2') || c.getContext('webgl')); } catch { /* sem WebGL */ }
+  return { desktop, webgl };
+};
+function vGame() {
+  crumbs = [['Protocolo NEXUS', '#/jogo']];
+  const G = window.GAME, done = (st.game && st.game.done) || {};
+  const next = G.LEVELS.findIndex((l) => !done[l.id]);
+  const all = next < 0, sup = gameSupported();
+  view.innerHTML = `<div class="nx-hero"><div class="nx-hero-in">
+      <div class="eyebrow" style="color:#7dd3fc">Jogo · aplicar SQL</div><h1>${esc(G.STORY.title)}</h1>
+      ${G.STORY.intro.map((p) => `<p>${esc(p)}</p>`).join('')}
+      <div class="row" style="margin-top:18px">${sup.desktop && sup.webgl ? `<button class="btn" id="nxPlay">${ic('play')}${all ? 'Jogar de novo' : next > 0 ? `Continuar na sala ${next + 1}` : 'Iniciar missão'}</button>${next > 0 || all ? '<button class="btn sec-b" id="nxRestart">Recomeçar do início</button>' : ''}` : ''}</div>
+      ${!sup.webgl ? alertBox('bad', 'alert', 'Este browser não suporta gráficos 3D (WebGL). Experimente uma versão recente do Chrome, Edge ou Firefox.') : !sup.desktop ? alertBox('info', 'info', 'O Protocolo NEXUS foi pensado para computador, com teclado e rato. Abra a MySQL Academy num computador para jogar.') : ''}
+    </div></div>
+    <div class="two" style="margin-top:16px">
+      <div class="card"><div class="card-h"><h3>Salas da missão — parte 1</h3><span class="small muted">${Object.keys(done).filter((k) => G.LEVELS.some((l) => l.id === k)).length}/${G.LEVELS.length}</span></div>
+        <div class="list" style="box-shadow:none">${G.LEVELS.map((l, i) => { const d = done[l.id]; return `<div class="item lesson-i"><span class="status ${d ? 'done' : i === next ? 'part' : ''}">${d ? ic('check') : i + 1}</span><span><b>${esc(l.name)}</b><span class="d">Treina: ${esc(l.skill)}</span></span><span class="chip ${d ? 'ok' : ''}">${d ? `+${S.roomXp(l, d)} XP` : `${l.xp} XP`}</span><span></span></div>`; }).join('')}
+          <div class="item lesson-i locked"><span class="status">${ic('lock')}</span><span><b>Energia, hangar, segurança e núcleo da NEXUS</b><span class="d">Em preparação (parte 2)</span></span><span class="chip">Brevemente</span><span></span></div></div></div>
+      <div class="card"><h3>Como se joga</h3>
+        <ul class="nx-how"><li><span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> mover · <b>rato</b> olhar · <span class="kbd">Shift</span> correr</li>
+        <li><span class="kbd">E</span> usar terminais e painéis das portas</li>
+        <li><span class="kbd">Q</span> pulso EMP: imobiliza os drones durante 8 segundos (recolha as cápsulas azuis)</li>
+        <li><span class="kbd">Esc</span> pausa, qualidade gráfica e sensibilidade do rato</li></ul>
+        <p class="small muted">Em cada sala, use o terminal para consultar ou alterar a base de dados e descobrir como abrir a porta. Cada sala vale XP (−5 por dica; sem XP se vir a solução). Se um drone o detetar, volta à entrada da sala.</p></div>
+    </div>`;
+  const go = (start) => openGame(start);
+  if ($('#nxPlay')) $('#nxPlay').onclick = () => go(all ? 0 : Math.max(0, next));
+  if ($('#nxRestart')) $('#nxRestart').onclick = () => go(0);
+}
+async function openGame(startRoom) {
+  const root = document.createElement('div'); root.id = 'gameRoot'; root.innerHTML = '<div class="gx-loading">A carregar a estação Órion…</div>';
+  document.body.append(root); document.body.classList.add('in-game');
+  try {
+    const { startGame } = await import('./game/game.js');
+    const G = window.GAME; st.game = st.game || { done: {} };
+    const settings = st.game.settings || {};
+    root.innerHTML = '';
+    gameCtl = startGame(root, {
+      levels: G.LEVELS, story: G.STORY, startRoom,
+      doneRooms: Object.keys(st.game.done), quality: settings.quality, sensitivity: settings.sensitivity,
+      ui: { esc, table, sqlError },
+      onRoomDone(id, info) {
+        st.game.done = st.game.done || {};
+        if (st.game.done[id]) return; // repetir uma sala não volta a dar XP
+        const before = sum();
+        st.game.done[id] = { at: Date.now(), hints: info.hints, rev: info.rev };
+        st.log.push({ at: Date.now(), id: 'nexus.' + id, ok: true }); st.log = st.log.slice(-500);
+        touchDay();
+        const room = G.LEVELS.find((l) => l.id === id);
+        toast(`Protocolo NEXUS · ${room.name} · +${S.roomXp(room, st.game.done[id])} XP`, 'zap');
+        celebrate(before, sum());
+      },
+      onSettings(s) { st.game.settings = s; persist(); },
+      onExit: closeGame,
+    });
+    if (/[?&]nxdebug\b/.test(location.search)) window.__nexus = gameCtl;
+  } catch (e) {
+    root.innerHTML = `<div class="gx-loading">Não foi possível iniciar o jogo: ${esc(e.message || e)}<br><button class="btn" id="gxBack" style="margin-top:14px">Voltar</button></div>`;
+    root.querySelector('#gxBack').onclick = closeGame;
+  }
+}
+function closeGame() {
+  if (gameCtl) { gameCtl.dispose(); gameCtl = null; }
+  const r = document.getElementById('gameRoot'); if (r) r.remove();
+  document.body.classList.remove('in-game');
+  if ((location.hash || '').startsWith('#/jogo')) route();
+}
+
 function applyTheme() {
   if (st.theme) document.documentElement.dataset.theme = st.theme; else delete document.documentElement.dataset.theme;
 }
 
 /* ---------- router ---------- */
 function route() {
+  if (gameCtl) closeGame();
   $('#modal').hidden = true;
   const dr = $('#drawer'); dr.hidden = true; dr.innerHTML = '';
   const h = location.hash || '#/';
   const [, a, b] = h.split('/');
   if (a !== 't') quizRun = null;
-  ({ '': vHome, learn: vLearn, c: () => vChapter(b), l: () => vLesson(b), m: () => vManual(b), t: () => vTest(b), lab: vLab, progress: vProgress, rank: vRank, me: vMe, prof: vProf }[a || ''] || vHome)();
+  ({ '': vHome, learn: vLearn, c: () => vChapter(b), l: () => vLesson(b), m: () => vManual(b), t: () => vTest(b), lab: vLab, progress: vProgress, rank: vRank, me: vMe, prof: vProf, jogo: vGame }[a || ''] || vHome)();
   renderChrome();
   const steps = a === 'l' ? view.querySelectorAll('.step') : [];
   if (steps.length > 1) steps[steps.length - 1].scrollIntoView({ block: 'start' }); else window.scrollTo(0, 0);

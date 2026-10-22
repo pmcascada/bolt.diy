@@ -6,7 +6,7 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "test": "node test/content.test.js && node test/ddl.test.js"
+    "test": "node test/content.test.js && node test/ddl.test.js && node test/game.test.js"
   },
   "engines": {
     "node": ">=18"
