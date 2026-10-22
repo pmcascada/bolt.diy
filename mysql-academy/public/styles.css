@@ -451,3 +451,6 @@ body.in-game{overflow:hidden}
 @keyframes gxin{from{opacity:0;transform:translateY(6px)}to{opacity:1}}
 .gx-story-box .gx-ctl{margin:20px 0}
 .gx-story-box .gx-go{padding:12px 22px;font-size:1rem}
+.gx-lock{position:absolute;left:50%;top:40%;transform:translateX(-50%);padding:8px 14px;border-radius:8px;background:rgba(3,8,20,.8);border:1px solid #22d3ee55;font-size:.88rem;color:#bae6fd}
+.gx-lock[hidden]{display:none}
+.gx-prompt[hidden]{display:none}
