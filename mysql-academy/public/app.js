@@ -352,6 +352,7 @@ function vLesson(id) {
     <div class="lesson-head"><div class="eyebrow">Capítulo ${C.idx + 1} · Lição ${idx + 1} de ${C.lessons.length}</div><h1>${esc(L.title)}</h1>
       <div class="row lesson-meta"><div class="grow"><div class="row small" style="justify-content:space-between;margin-bottom:6px"><span class="muted">Passo ${pos + 1} de ${total}</span><span class="muted num-t">${pctOf(pos + (lessonDone(L) ? 1 : 0), total)}%</span></div>${bar(pctOf(pos + (lessonDone(L) ? 1 : 0), total), lessonDone(L) ? 'ok' : '')}</div>
       <button class="btn sec-b sm" id="openManual">${ic('book')}Manual</button></div></div>
+    ${L.intro ? `<div class="lesson-intro">${ic('compass')}<div><b>Enquadramento</b><p>${esc(L.intro)}</p></div></div>` : ''}
     <div id="warm"></div>
     <div id="steps">${shown.map((s, k) => s.t === 'learn' ? `<section class="step learn" data-k="${k}"><div class="step-l">${ic('book')}Conceito ${++nConcept}</div><h2>${esc(s.title)}</h2>${s.html}${s.examples.map((e, j) => codeBlock(e, `<button class="btn" data-copy="${j}" aria-label="Copiar">${ic('copy')}<span class="lbl">Copiar</span></button>${e.run ? `<a class="btn" href="#/lab" data-lab="${j}" aria-label="Abrir no laboratório">${ic('terminal')}<span class="lbl">Laboratório</span></a><button class="btn run" data-run="${j}">${ic('play')}Executar</button>` : ''}`)).join('')}</section>` : `<section class="step practice" data-k="${k}" data-n="${++nEx}"></section>`).join('')}</div>
     <div id="next"></div>
@@ -692,7 +693,7 @@ function taskEl(ex, i, onPass, opt = {}) {
 function manualHtml(c) {
   return `<div class="manual">
     <section class="m-sec" id="m-cheat"><h2>Resumo de sintaxe</h2><div class="scroll"><table class="tbl cheat"><thead><tr><th>Sintaxe</th><th>Para que serve</th></tr></thead><tbody>${c.cheat.map(([k, d]) => `<tr><td><code>${esc(k)}</code></td><td>${esc(d)}</td></tr>`).join('')}</tbody></table></div></section>
-    ${c.lessons.map((l, i) => `<section class="m-sec" id="m-${i}"><h2><span class="m-no">${C2(c, i)}</span>${esc(l.title)}</h2>
+    ${c.lessons.map((l, i) => `<section class="m-sec" id="m-${i}"><h2><span class="m-no">${C2(c, i)}</span>${esc(l.title)}</h2>${l.intro ? `<p class="m-intro">${esc(l.intro)}</p>` : ''}
       ${l.steps.filter((s) => s.t === 'learn').map((s) => `<h3>${esc(s.title)}</h3><div class="prose">${s.html}</div>${s.examples.map((e) => codeBlock(e)).join('')}`).join('')}</section>`).join('')}
   </div>`;
 }

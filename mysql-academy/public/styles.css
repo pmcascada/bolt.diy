@@ -524,3 +524,9 @@ details.pj pre{max-height:360px;overflow:auto}
 .card-h .seg,#rkTools .seg{margin-bottom:0}
 .seg button{display:inline-flex;align-items:center;gap:6px}
 .seg button svg.i{width:15px;height:15px}
+.lesson-intro{display:flex;gap:12px;align-items:flex-start;margin:4px 0 22px;padding:14px 16px;border-radius:var(--r);background:var(--accent-weak);border:1px solid color-mix(in srgb,var(--accent) 25%,transparent);color:var(--text-2);font-size:.92rem}
+.lesson-intro svg.i{color:var(--accent);margin-top:2px}
+.lesson-intro b{color:var(--accent);font-size:.78rem;text-transform:uppercase;letter-spacing:.06em}
+.lesson-intro p{margin:2px 0 0}
+.m-intro{color:var(--muted);font-style:italic;margin:-4px 0 12px}
+.prose td:first-child code{white-space:nowrap}
