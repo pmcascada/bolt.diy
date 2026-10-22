@@ -1003,10 +1003,10 @@ function vMe() {
   const s = sum(), sbMode = BK.kind === 'supabase', u = BK.user;
   const prefs = `<div class="card"><h3>Preferências e dados</h3><p class="small muted">Nível ${s.level} · ${s.xp} XP · ${s.exDone} exercícios resolvidos.</p>
     <div class="row"><button class="btn sec-b" id="theme">${ic('moon')}Alternar tema</button>${u ? '' : `<button class="btn danger" id="reset">${ic('trash')}Apagar progresso local</button>`}</div>
-    <p class="small muted" style="margin-top:14px"><a href="#/prof">Área do professor</a></p></div>`;
+    ${BK.kind === 'server' ? '<p class="small muted" style="margin-top:14px"><a href="#/prof">Área do professor</a> (com a chave de professor do servidor)</p>' : ''}</div>`;
   let acct;
   if (u) {
-    acct = `<div class="who" style="margin-bottom:14px"><span class="avatar" style="width:44px;height:44px">${esc(initials(u.name))}</span><span><b>${esc(u.name)}</b><span>${esc(u.email || 'Sessão iniciada')}${u.teacher ? ' · Professor' : ''}</span></span></div>
+    acct = `<div class="who" style="margin-bottom:14px"><span class="avatar" style="width:44px;height:44px">${esc(initials(u.name))}</span><span><b>${esc(u.name)}</b><span>${esc(u.email || 'Sessão iniciada')}${u.admin ? ' · Gestor do site' : u.teacher ? ' · Professor' : ''}</span></span></div>
     <p class="small muted">O progresso é guardado na sua conta e pode ser retomado em qualquer dispositivo.</p>${online === false ? alertBox('bad', 'alert', 'Sem ligação neste momento. A sincronização será feita mais tarde.') : ''}
     ${u.teacher ? '' : `<form id="tf" class="row" style="align-items:flex-end;margin-top:10px"><label class="field" style="margin:0;flex:1">Turma (indicada pelo professor, ex.: 12.º B)<input class="txt" id="turma" maxlength="30" value="${esc(u.turma || '')}"></label><button class="btn sec-b" type="submit">Guardar turma</button></form>`}
     <div class="row" style="margin-top:14px"><button class="btn" id="sync">${ic('refresh')}Sincronizar</button><button class="btn sec-b" id="out">${ic('logout')}Terminar sessão</button>${u.teacher ? `<a class="btn sec-b" href="#/prof">${ic('users')}Área do professor</a>` : ''}</div>`;
@@ -1129,8 +1129,8 @@ async function vProf() {
   crumbs = [['Área do professor', '#/prof']];
   const head = `<div class="page-h"><div><div class="eyebrow">Acompanhamento</div><h1>Área do professor</h1><p>Evolução de todos os alunos inscritos.</p></div><div class="row" id="profTools"></div></div>`;
   if (BK.kind === 'supabase' && !(BK.user && BK.user.teacher)) {
-    view.innerHTML = head + `<div class="card locked-card"><span class="side-i">${ic('lock')}</span><div><h2>Acesso reservado</h2><p class="muted">Esta área só está disponível para contas de professor. ${BK.user ? '' : 'Inicie sessão na página <a href="#/me">Perfil</a>. '}Para atribuir o perfil de professor a uma conta, execute no Supabase (SQL Editor):</p><pre><code>update public.profiles set is_teacher = true\nwhere lower(name) = lower('Nome do Professor');</code></pre></div></div>`;
-    enhanceCode(view); return;
+    view.innerHTML = head + `<div class="card locked-card"><span class="side-i">${ic('lock')}</span><div><h2>Acesso reservado</h2><p class="muted">Esta área só está disponível para contas de professor. ${BK.user ? 'Se é professor, peça ao gestor do site que atribua esse perfil à sua conta.' : 'Se é professor, inicie sessão na página <a href="#/me">Perfil</a>.'}</p><a class="btn sec-b" href="#/">Voltar ao painel</a></div></div>`;
+    return;
   }
   if (BK.kind === 'server' && !sessionStorage.getItem('mya.teacherKey')) {
     view.innerHTML = head + `<div class="card" style="max-width:480px"><h3>Chave de professor</h3><p class="small muted">Indique a chave definida ao arrancar o servidor (<code>TEACHER_KEY=… npm start</code>).</p><form id="kf"><input class="txt" id="tk" type="password" style="width:100%;margin-bottom:12px"><button class="btn" type="submit">Entrar</button></form></div>`;
@@ -1159,15 +1159,17 @@ async function vProf() {
     ${rows.map((r, i) => `<tr class="pr" data-i="${i}"><td><span class="who"><span class="avatar">${esc(initials(r.name))}</span><b>${esc(r.name)}</b>${r.s.projectSent ? ` <span class="chip ok" title="Projeto final entregue">${ic('folder')}</span>` : ''}</span></td>${turmas.length ? `<td class="small muted">${esc(r.turma || '—')}</td>` : ''}<td>${r.s.level}</td><td class="r"><b>${r.s.xp}</b></td><td><div class="row" style="flex-wrap:nowrap">${bar(r.s.pct)}<span class="small muted num-t" style="min-width:36px">${r.s.pct}%</span></div></td>
       ${CHAPTERS.map((c) => { const p = r.s.perChapter[c.id]; return `<td class="c">${p.test.passed ? `<span class="chip ok" title="Miniteste aprovado">${p.test.best}%</span>` : p.test.attempts ? `<span class="chip bad" title="Melhor resultado no miniteste">${p.test.best}%</span>` : `<span class="small muted" title="Lições concluídas">${p.lessonsOk}/${p.lessons}</span>`}</td>`; }).join('')}
       <td class="small muted" style="white-space:nowrap">${r.updated ? new Date(r.updated).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' }) : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Ainda não há alunos inscritos.</div>'}</div>
+  ${BK.user && BK.user.admin ? '<div id="adminBox"></div>' : ''}
   <p class="small muted" style="margin-top:10px">Colunas C1–C${CHAPTERS.length}: resultado do miniteste de cada capítulo (verde = aprovado) ou lições concluídas. Clique num aluno para ver o detalhe.</p><div id="profDetail"></div>
   ${difficultyHtml(rows)}`;
+  if (BK.user && BK.user.admin) renderAdmin();
   view.querySelectorAll('tr.dr').forEach((tr) => (tr.onclick = () => { const d = view.querySelector(`tr.dx[data-for="${tr.dataset.id}"]`); d.hidden = !d.hidden; tr.classList.toggle('me', !d.hidden); }));
   if ($('#diffAll')) $('#diffAll').onclick = () => { profAll = !profAll; vProf(); };
   $('#profTools').innerHTML = `${turmas.length ? `<select class="txt sel" id="pturma" aria-label="Turma"><option value="">Todas as turmas</option>${turmas.map((t) => `<option ${t === profTurma ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>` : ''}<select class="txt sel" id="psort" aria-label="Ordenar"><option value="xp">Ordenar por XP</option><option value="name">Ordenar por nome</option><option value="recent">Mais recentes</option></select><button class="btn sec-b sm" id="prefresh">${ic('refresh')}Atualizar</button><button class="btn sec-b sm" id="pcsv">${ic('download')}Exportar CSV</button>`;
   $('#psort').value = profSort;
   $('#psort').onchange = () => { profSort = $('#psort').value; vProf(); };
   if ($('#pturma')) $('#pturma').onchange = () => { profTurma = $('#pturma').value; vProf(); };
-  $('#prefresh').onclick = () => { profRows = null; vProf(); };
+  $('#prefresh').onclick = () => { profRows = null; adminUsers = null; vProf(); };
   $('#pcsv').onclick = () => {
     const q = (v) => `"${String(v).replace(/"/g, '""')}"`;
     const head2 = ['aluno', 'turma', 'nivel', 'xp', 'conclusao_pct', 'exercicios', 'licoes', 'capitulos_concluidos', ...CHAPTERS.map((c) => `miniteste_${c.id}`), 'ultima_atividade'];
@@ -1186,6 +1188,35 @@ async function vProf() {
       <h3 style="margin-top:18px">Últimas atividades</h3>${(r.state.log || []).length ? `<div class="scroll" style="max-height:300px"><table class="tbl"><tbody>${r.state.log.slice(-30).reverse().map((e) => { const x = logLabel(e); return `<tr><td class="small muted" style="white-space:nowrap">${new Date(e.at).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' })}</td><td style="font-family:var(--mono);font-size:.8rem">${esc(x.code)}</td><td class="small">${esc(x.text)}</td><td>${e.score !== undefined ? `<span class="chip ${e.ok ? 'ok' : 'bad'}">${e.score}%</span>` : e.ok ? '<span class="chip ok">Correto</span>' : `<span class="chip bad">Incorreto</span>${e.a ? `<div class="small muted mono" style="margin-top:4px;max-width:340px;overflow-wrap:anywhere">${esc(e.a)}</div>` : ''}`}</td></tr>`; }).join('')}</tbody></table></div>` : '<p class="muted small">Sem atividade registada.</p>'}</div>`;
     $('#profDetail').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }));
+}
+/* ---------- gestor do site: atribuir o perfil de professor ---------- */
+let adminUsers = null, adminQ = '';
+async function renderAdmin() {
+  const box = $('#adminBox'); if (!box) return;
+  const paint = () => {
+    const q = adminQ.trim().toLowerCase();
+    const list = (adminUsers || []).filter((u) => !q || [u.name, u.email, u.turma].some((x) => String(x || '').toLowerCase().includes(q)));
+    box.innerHTML = `<div class="card" style="margin-top:16px"><div class="card-h"><h3>${ic('shield')}Gestão de professores</h3><span class="small muted">${(adminUsers || []).filter((u) => u.is_teacher).length} professores · ${(adminUsers || []).length} contas</span></div>
+      <p class="small muted" style="margin-top:0">Como gestor do site, pode dar ou retirar o perfil de professor a qualquer conta. Os professores veem esta área com os alunos e as dificuldades, mas não podem gerir professores. A conta tem de ser criada primeiro pela própria pessoa, na página Perfil.</p>
+      <input class="txt" id="admQ" placeholder="Procurar por nome, email ou turma" value="${esc(adminQ)}" style="width:100%;margin-bottom:10px">
+      ${adminUsers === null ? '<div class="empty">A carregar contas…</div>' : list.length ? `<div class="scroll" style="max-height:420px"><table class="tbl"><thead><tr><th>Nome</th><th>Email</th><th>Turma</th><th>Perfil</th><th></th></tr></thead><tbody>
+      ${list.map((u) => `<tr><td><b>${esc(u.name)}</b></td><td class="small">${esc(u.email || '')}</td><td class="small muted">${esc(u.turma || '—')}</td>
+        <td>${u.is_admin ? '<span class="chip acc">Gestor</span>' : u.is_teacher ? '<span class="chip ok">Professor</span>' : '<span class="chip">Aluno</span>'}</td>
+        <td class="r">${u.is_admin ? '' : `<button class="btn ${u.is_teacher ? 'sec-b' : ''} sm" data-adm="${u.id}" data-t="${u.is_teacher ? 0 : 1}">${u.is_teacher ? 'Retirar professor' : 'Tornar professor'}</button>`}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Nenhuma conta encontrada.</div>'}</div>`;
+    const qi = $('#admQ'); qi.oninput = () => { adminQ = qi.value; const pos = qi.selectionStart; paint(); const n = $('#admQ'); n.focus(); n.setSelectionRange(pos, pos); };
+    box.querySelectorAll('[data-adm]').forEach((b) => (b.onclick = async () => {
+      const u = adminUsers.find((x) => x.id === b.dataset.adm), make = b.dataset.t === '1';
+      if (!confirm(make ? `Dar o perfil de professor a ${u.name} (${u.email})?\n\nPassa a ver os dados de todos os alunos.` : `Retirar o perfil de professor a ${u.name}?`)) return;
+      b.disabled = true;
+      try { await BK.setTeacher(u.id, make); u.is_teacher = make; profRows = null; toast(make ? `${u.name} é agora professor` : `${u.name} deixou de ser professor`); vProf(); }
+      catch (e) { b.disabled = false; toast(BK.errorText(e), 'alert'); }
+    }));
+  };
+  paint();
+  if (adminUsers === null) {
+    try { adminUsers = await BK.adminUsers(); } catch (e) { adminUsers = []; toast(BK.errorText(e), 'alert'); }
+    if ($('#adminBox')) paint();
+  }
 }
 const enhanceCode = (root) => root.querySelectorAll('pre > code:not(.hl)').forEach((c) => { c.innerHTML = hl(c.textContent); c.classList.add('hl'); });
 

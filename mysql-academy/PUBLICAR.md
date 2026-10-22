@@ -71,15 +71,17 @@ O plano gratuito do Vercel (*Hobby*) destina-se a uso pessoal e não comercial.
 
 Em **Authentication** → **URL Configuration**, defina o **Site URL** com o endereço do passo 5 (ex.: `https://mysql-academy.pages.dev`) e acrescente-o também em **Redirect URLs**. É usado nos emails de recuperação da palavra-passe.
 
-## 7. Criar a conta de professor
+## 7. Criar a conta do gestor do site (e os professores)
 
-1. No site, em **Perfil** → **Criar conta**, crie a sua conta (ex.: nome *Prof. Rita*).
-2. No Supabase → **SQL Editor**, execute (com o seu nome):
+1. No site, em **Perfil** → **Criar conta**, crie a sua conta.
+2. No Supabase → **SQL Editor**, execute **uma única vez**, com o email dessa conta, para a tornar gestor do site:
 
    ```sql
-   update public.profiles set is_teacher = true where lower(name) = lower('Prof. Rita');
+   update public.profiles set is_admin = true, is_teacher = true
+   where id = (select id from auth.users where email = 'o.seu@email.pt');
    ```
 3. Volte a abrir o site: aparece no menu a **Área do professor**, com a evolução de todos os alunos (exportável em CSV). As contas de professor não entram na classificação.
+4. **Outros professores:** cada colega cria a sua conta no site; depois, o gestor abre a **Área do professor** → **Gestão de professores**, procura a conta e clica em **Tornar professor**. Os professores veem os alunos, mas só o gestor pode dar ou retirar o perfil de professor.
 
 ## Manutenção
 

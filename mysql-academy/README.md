@@ -60,7 +60,7 @@ npm test             # valida todas as soluções, o motor SQL, a pontuação e 
 
 - Com `public/config.js` vazio, as contas e a classificação usam este servidor local (nome + PIN). Com o Supabase configurado, usam o Supabase (email + palavra-passe).
 - Sem nenhum dos dois, a app funciona na mesma; o progresso fica guardado no dispositivo.
-- **Área do professor** (`#/prof`): com o Supabase, contas marcadas como professor; com o servidor local, a chave `TEACHER_KEY`.
+- **Área do professor** (`#/prof`): com o Supabase, contas com perfil de professor, atribuído pelo **gestor do site** na secção «Gestão de professores»; com o servidor local, a chave `TEACHER_KEY`.
 
 ## Estrutura
 

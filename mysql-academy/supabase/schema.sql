@@ -139,7 +139,47 @@ drop policy if exists "progress: alterar o próprio" on public.progress;
 create policy "progress: alterar o próprio" on public.progress
   for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 
+-- ------------------------------------------------------------
+-- Versão 3: gestor do site (is_admin). O gestor vê todas as contas e atribui ou retira
+-- o perfil de professor a partir da Área do professor. Os alunos não conseguem alterar
+-- is_teacher nem is_admin (só têm permissão para alterar o nome e a turma).
+-- (Corpos das funções entre plicas, para que o script também possa ser executado por ferramentas
+--  que não aceitam $$.)
+-- ------------------------------------------------------------
+alter table public.profiles add column if not exists is_admin boolean not null default false;
+
+create or replace function public.is_admin() returns boolean
+language sql stable security definer set search_path = public as
+'select coalesce((select p.is_admin from public.profiles p where p.id = auth.uid()), false)';
+
+-- Lista de todas as contas (só devolve linhas ao gestor).
+create or replace function public.admin_users()
+returns table (id uuid, name text, email text, turma text, is_teacher boolean, is_admin boolean, created_at timestamptz)
+language sql stable security definer set search_path = public as
+'select p.id, p.name, u.email::text, p.turma, p.is_teacher, p.is_admin, p.created_at
+   from public.profiles p join auth.users u on u.id = p.id
+  where public.is_admin()
+  order by lower(p.name)';
+
+-- Atribui ou retira o perfil de professor. Só o gestor; não pode retirá-lo à própria conta.
+create or replace function public.set_teacher(target uuid, make_teacher boolean) returns boolean
+language sql volatile security definer set search_path = public as
+'with changed as (
+   update public.profiles set is_teacher = make_teacher
+    where id = target and public.is_admin() and not (target = auth.uid() and not make_teacher)
+   returning 1)
+ select count(*) > 0 from changed';
+
+revoke execute on function public.is_admin() from public, anon;
+revoke execute on function public.admin_users() from public, anon;
+revoke execute on function public.set_teacher(uuid, boolean) from public, anon;
+grant execute on function public.is_admin() to authenticated;
+grant execute on function public.admin_users() to authenticated;
+grant execute on function public.set_teacher(uuid, boolean) to authenticated;
+
 -- ============================================================
--- Para dar acesso de professor a uma conta (executar à parte, com o nome certo):
---   update public.profiles set is_teacher = true where lower(name) = lower('Nome do Professor');
+-- Gestor do site: executar uma única vez, com o email da conta do gestor. A partir daí,
+-- o gestor atribui o perfil de professor a outras contas na Área do professor.
+--   update public.profiles set is_admin = true, is_teacher = true
+--   where id = (select id from auth.users where email = 'email@do.gestor');
 -- ============================================================

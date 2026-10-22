@@ -29,9 +29,9 @@
     });
     async function loadUser(session) {
       if (!session) { B.user = null; return null; }
-      const { data, error } = await sb.from('profiles').select('name, is_teacher, turma').eq('id', session.user.id).single();
+      const { data, error } = await sb.from('profiles').select('name, is_teacher, is_admin, turma').eq('id', session.user.id).single();
       if (error) throw error;
-      B.user = { id: session.user.id, email: session.user.email, name: data.name, teacher: !!data.is_teacher, turma: data.turma || '' };
+      B.user = { id: session.user.id, email: session.user.email, name: data.name, teacher: !!data.is_teacher, admin: !!data.is_admin, turma: data.turma || '' };
       return B.user;
     }
     B.init = async () => {
@@ -72,6 +72,17 @@
       const { error } = await sb.from('profiles').update({ turma: t || null }).eq('id', B.user.id);
       if (error) throw error;
       B.user.turma = t;
+    };
+    // Gestor do site: lista de contas e atribuição do perfil de professor.
+    B.adminUsers = async () => {
+      const { data, error } = await sb.rpc('admin_users');
+      if (error) throw error;
+      return data;
+    };
+    B.setTeacher = async (id, teacher) => {
+      const { data, error } = await sb.rpc('set_teacher', { target: id, make_teacher: teacher });
+      if (error) throw error;
+      if (!data) throw new Error('Não foi possível alterar o perfil desta conta.');
     };
     B.leaderboard = async () => {
       const { data, error } = await sb.rpc('leaderboard2', { lim: 300 });
