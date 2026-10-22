@@ -355,3 +355,16 @@ select.txt.sel{height:30px;padding:0 8px;font-size:.82rem;margin:0;width:auto}
 .sp-col{font:500 .82rem var(--mono);color:var(--accent);background:var(--accent-weak);border:1px solid transparent;border-radius:5px;padding:2px 7px;cursor:pointer}
 .sp-col:hover{border-color:var(--accent)}
 .reveal-row{display:flex;justify-content:flex-end;margin-top:2px}
+
+/* ---- exercícios de criação/alteração de tabelas ---- */
+.ddl-setup{margin-bottom:10px}
+.ddl-setup>div{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.ddl-setup svg.i{width:15px;height:15px}
+.ddl-setup pre{border-radius:var(--r-sm);margin:0;font-size:12.5px}
+.ddl-t+.ddl-t{margin-top:12px}
+.ddl-n{display:flex;align-items:center;gap:6px;font:600 .86rem var(--mono)}
+.ddl-n svg.i{width:15px;height:15px;color:var(--accent)}
+.ddl-x{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.ddl-x code{font-size:.74rem}
+.ddl-msgs{margin:6px 0 0;padding-left:1.1em}
+.ddl-msgs li{margin:2px 0}

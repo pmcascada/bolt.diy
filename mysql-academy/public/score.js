@@ -2,7 +2,7 @@
    para que o ranking seja recalculado a partir do progresso e não só "confiado". */
 (function (root) {
   const C = typeof require !== 'undefined' ? require('./content.js') : root.CONTENT;
-  const BASE = { quiz: 10, code: 15, query: 20 };
+  const BASE = { quiz: 10, code: 15, query: 20, ddl: 20 };
   const LESSON_BONUS = 20, CHAPTER_BONUS = 100, HINT_COST = 3;
   const TEST_WEIGHT = 3; // peso do miniteste no progresso do capítulo, equivalente a 3 exercícios
   const TITLES = ['Aprendiz', 'Explorador', 'Consultor', 'Analista', 'Arquiteto', 'Mestre', 'Lenda'];
@@ -11,8 +11,10 @@
   C.CHAPTERS.forEach((c) => c.lessons.forEach((l) => l.ex.forEach((e) => (EXS[e.id] = e))));
   const TOTAL_EX = Object.keys(EXS).length;
 
-  const exXp = (type, tries, hints) =>
-    Math.max(1, (tries <= 1 ? BASE[type] : Math.round(BASE[type] * 0.6)) - HINT_COST * (hints || 0));
+  // XP base de um exercício: o valor do tipo, ou o indicado no próprio exercício (ex.: desafios).
+  const baseOf = (ex) => (typeof ex === 'string' ? BASE[ex] : ex.xp || BASE[ex.t]);
+  const exXp = (ex, tries, hints) =>
+    Math.max(1, (tries <= 1 ? baseOf(ex) : Math.round(baseOf(ex) * 0.6)) - HINT_COST * (hints || 0));
 
   const levelOf = (xp) => Math.floor(Math.sqrt(xp / 50)) + 1;
   const levelStart = (lv) => 50 * (lv - 1) * (lv - 1);
@@ -38,7 +40,7 @@
     for (const [id, d] of Object.entries(done)) {
       const e = EXS[id]; if (!e) continue;
       exDone++; if ((d.tries || 1) <= 1) firstTry++;
-      xp += exXp(e.t, d.tries || 1, d.hints || 0);
+      xp += exXp(e, d.tries || 1, d.hints || 0);
     }
     for (const c of C.CHAPTERS) {
       let ok = 0, tot = 0, lessonsOk = 0;
@@ -63,6 +65,6 @@
     return s;
   }
 
-  const api = { BASE, HINT_COST, PASS_MARK: C.PASS_MARK, LESSON_BONUS, CHAPTER_BONUS, EXS, TOTAL_EX, exXp, levelOf, levelStart, titleOf, dayKey, streakOf, summarize };
+  const api = { BASE, baseOf, HINT_COST, PASS_MARK: C.PASS_MARK, LESSON_BONUS, CHAPTER_BONUS, EXS, TOTAL_EX, exXp, levelOf, levelStart, titleOf, dayKey, streakOf, summarize };
   if (typeof module !== 'undefined') module.exports = api; else root.SCORE = api;
 })(typeof window !== 'undefined' ? window : globalThis);

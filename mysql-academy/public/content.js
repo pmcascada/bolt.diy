@@ -3,6 +3,7 @@
    O passo seguinte só é mostrado depois de o aluno resolver o exercício.
    Tipos de exercício:
      quiz  – escolha múltipla     { q, opts, a, why }
+     ddl   – CREATE/ALTER/DROP TABLE verificado pela estrutura resultante { q, solution, setup?, loose?, xp? }
      code  – escrever um comando  { q, ok:[regex sobre o texto normalizado], solution, hint }
      query – SELECT executado na BD "escola" e comparado com a solução { q, solution, hint, ordered? }
    Cada capítulo tem ainda: cheat (resumo de sintaxe para o manual) e test (miniteste final). */
@@ -11,6 +12,8 @@ const learn = (title, html, examples = []) => ({ t: 'learn', title, html, exampl
 const quiz = (q, opts, a, why) => ({ t: 'quiz', q, opts, a, why });
 const code = (q, ok, solution, hint) => ({ t: 'code', q, ok, solution, hint });
 const query = (q, solution, hint, ordered) => ({ t: 'query', q, solution, hint, ordered: !!ordered });
+// ddl: CREATE/ALTER/DROP TABLE verificado pela estrutura obtida. opts: setup (tabelas que já existem), loose (só o essencial), xp.
+const ddl = (q, solution, hint, opts = {}) => ({ t: 'ddl', q, solution, hint, ...opts });
 const ex = (sql, note, run) => ({ sql, note, run: !!run });
 
 const CHAPTERS = [
@@ -90,7 +93,7 @@ const CHAPTERS = [
 /* =============================== 2 =============================== */
 {
   id: 'ddl', icon: 'table', title: 'Criar bases de dados e tabelas',
-  desc: 'CREATE, ALTER, DROP, chaves primárias e estrangeiras.',
+  desc: 'Tabelas, chaves primárias e estrangeiras, relações 1:N e N:M, ON DELETE e ALTER TABLE.',
   lessons: [
   { title: 'Criar e gerir bases de dados', steps: [
     learn('CREATE DATABASE', `<p>Uma base de dados é o "contentor" onde ficam as tabelas. Cria-se com:</p>
@@ -111,49 +114,211 @@ const CHAPTERS = [
   id_curso INT,
   nome VARCHAR(50),
   horas INT
-);</code></pre><p>As colunas são separadas por vírgulas e a lista fica entre parênteses.</p>`),
-    code('Crie a tabela clientes com as colunas id_cliente (INT) e nome (VARCHAR(50)). Escreva numa só linha.', ['^create table clientes\\(id_cliente int(\\(\\d+\\))?,nome varchar\\(50\\)\\)$'], 'CREATE TABLE clientes (id_cliente INT, nome VARCHAR(50));', 'CREATE TABLE clientes (id_cliente INT, nome …);'),
+);</code></pre><p>As colunas são separadas por vírgulas e a lista fica entre parênteses. Pode escrever a instrução numa só linha ou em várias, como preferir.</p>`),
+    ddl('Crie a tabela clientes com as colunas id_cliente (INT) e nome (VARCHAR(50)).', `CREATE TABLE clientes (
+  id_cliente INT,
+  nome VARCHAR(50)
+);`, 'CREATE TABLE clientes (id_cliente INT, nome …);'),
     learn('Chave primária e AUTO_INCREMENT', `<p>A <b>chave primária</b> (<code>PRIMARY KEY</code>) identifica cada linha de forma única e não aceita valores repetidos nem vazios.</p>
       <p>Com <code>AUTO_INCREMENT</code>, o MySQL atribui automaticamente o número seguinte a cada nova linha.</p>
-      <p><b>Convenção usada neste curso:</b> a chave primária chama-se <code>id_</code> seguido do nome da tabela no singular — <code>id_aluno</code>, <code>id_curso</code>, <code>id_produto</code>. As chaves estrangeiras usam o mesmo nome da chave que referenciam (ex.: <code>alunos.id_curso</code> → <code>cursos.id_curso</code>), o que torna as ligações entre tabelas fáceis de ler.</p>`,
-      [ex('CREATE TABLE produtos (\n  id_produto INT AUTO_INCREMENT PRIMARY KEY,\n  nome VARCHAR(60)\n);', 'O id_produto é gerado automaticamente: 1, 2, 3…')]),
-    code('Crie a tabela fornecedores com id_fornecedor INT AUTO_INCREMENT como chave primária e nome VARCHAR(80).', ['^create table fornecedores\\(id_fornecedor int(\\(\\d+\\))? (not null )?auto_increment primary key,nome varchar\\(80\\)\\)$', '^create table fornecedores\\(id_fornecedor int(\\(\\d+\\))? (not null )?primary key auto_increment,nome varchar\\(80\\)\\)$', '^create table fornecedores\\(id_fornecedor int(\\(\\d+\\))? (not null )?auto_increment,nome varchar\\(80\\),primary key\\(id_fornecedor\\)\\)$'], 'CREATE TABLE fornecedores (id_fornecedor INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(80));', 'id_fornecedor INT AUTO_INCREMENT PRIMARY KEY, nome …'),
-    learn('Restrições: NOT NULL, UNIQUE e DEFAULT', `<ul><li><code>NOT NULL</code> — o valor é obrigatório;</li><li><code>UNIQUE</code> — não podem existir valores repetidos;</li><li><code>DEFAULT valor</code> — valor usado quando não é indicado nenhum.</li></ul>`,
+      <p><b>Convenção usada neste curso:</b> a chave primária chama-se <code>id_</code> seguido do nome da tabela no singular — <code>id_aluno</code>, <code>id_curso</code>, <code>id_produto</code>. As chaves estrangeiras usam o mesmo nome da chave que referenciam (ex.: <code>alunos.id_curso</code> → <code>cursos.id_curso</code>), o que torna as ligações entre tabelas fáceis de ler.</p>
+      <p>A chave primária pode ser indicada junto da coluna ou no fim, com <code>PRIMARY KEY (coluna)</code>:</p>`,
+      [ex('CREATE TABLE produtos (\n  id_produto INT AUTO_INCREMENT PRIMARY KEY,\n  nome VARCHAR(60)\n);', 'Chave primária junto da coluna.'),
+       ex('CREATE TABLE produtos (\n  id_produto INT AUTO_INCREMENT,\n  nome VARCHAR(60),\n  PRIMARY KEY (id_produto)\n);', 'A mesma tabela, com a chave primária no fim.')]),
+    ddl('Crie a tabela fornecedores com id_fornecedor (inteiro, chave primária gerada automaticamente) e nome (VARCHAR(80)).', `CREATE TABLE fornecedores (
+  id_fornecedor INT AUTO_INCREMENT PRIMARY KEY,
+  nome VARCHAR(80)
+);`, 'id_fornecedor INT AUTO_INCREMENT PRIMARY KEY, nome …'),
+    learn('Restrições: NOT NULL, UNIQUE e DEFAULT', `<ul><li><code>NOT NULL</code> — o valor é obrigatório;</li><li><code>UNIQUE</code> — não podem existir valores repetidos;</li><li><code>DEFAULT valor</code> — valor usado quando não é indicado nenhum.</li></ul>
+      <p>Escolha também o tipo certo: <code>CHAR(n)</code> para códigos de tamanho fixo (NIF, ISBN, código postal), <code>VARCHAR(n)</code> para texto variável e <code>DECIMAL(p,d)</code> para valores com casas decimais.</p>`,
       [ex("CREATE TABLE alunos (\n  id_aluno INT AUTO_INCREMENT PRIMARY KEY,\n  nome VARCHAR(80) NOT NULL,\n  email VARCHAR(100) UNIQUE,\n  idade INT DEFAULT 18\n);", 'Nome obrigatório, email sem repetidos, idade 18 por omissão.')]),
     quiz('Que restrição impede que uma coluna fique vazia?', ['UNIQUE', 'DEFAULT', 'NOT NULL', 'AUTO_INCREMENT'], 2, 'NOT NULL torna o valor obrigatório.'),
-    quiz('Que restrição impede emails repetidos?', ['UNIQUE', 'DEFAULT', 'NOT NULL', 'CHECK NULL'], 0, 'UNIQUE garante que não há dois valores iguais.'),
+    quiz('Qual o tipo mais adequado para um NIF português (sempre 9 algarismos)?', ['INT', 'CHAR(9)', 'VARCHAR(255)', 'DECIMAL(9,0)'], 1, 'É um código de tamanho fixo e não se fazem contas com ele: CHAR(9).'),
+    ddl('Crie a tabela livros com: id_livro (inteiro, chave primária automática); isbn com exatamente 13 caracteres, obrigatório e sem repetições; titulo até 150 caracteres, obrigatório; ano (inteiro, opcional); preco com 6 algarismos dos quais 2 decimais, por omissão 0.', `CREATE TABLE livros (
+  id_livro INT AUTO_INCREMENT PRIMARY KEY,
+  isbn CHAR(13) NOT NULL UNIQUE,
+  titulo VARCHAR(150) NOT NULL,
+  ano INT,
+  preco DECIMAL(6,2) DEFAULT 0
+);`, 'isbn CHAR(13) NOT NULL UNIQUE · preco DECIMAL(6,2) DEFAULT 0'),
     learn('Ver a estrutura de uma tabela', `<p>Depois de criar uma tabela, pode consultar a sua estrutura (colunas, tipos, chaves):</p>`, [ex('DESCRIBE alunos;', 'Também pode escrever DESC alunos;'), ex('SHOW TABLES;', 'Lista as tabelas da base de dados ativa.')]),
     code('Escreva o comando que mostra a estrutura da tabela alunos.', ['^(describe|desc|show columns from|explain) alunos$'], 'DESCRIBE alunos;', 'DESCRIBE ou DESC'),
   ] },
-  { title: 'Chaves estrangeiras e alteração de tabelas', steps: [
-    learn('Chave estrangeira', `<p>Uma <b>chave estrangeira</b> (<code>FOREIGN KEY</code>) é uma coluna que referencia a chave primária de outra tabela. Garante a <b>integridade referencial</b>: não é possível inscrever um aluno num curso que não existe.</p>`,
+  { title: 'Chaves estrangeiras e relações 1:N', steps: [
+    learn('Relações um-para-muitos (1:N)', `<p>Um curso tem <b>muitos</b> alunos, mas cada aluno pertence a <b>um</b> curso: é uma relação <b>1:N</b>. Representa-se colocando, na tabela do lado "muitos" (<code>alunos</code>), uma <b>chave estrangeira</b> (<code>FOREIGN KEY</code>) que referencia a chave primária da tabela do lado "um" (<code>cursos</code>).</p>
+      <p>A chave estrangeira garante a <b>integridade referencial</b>: não é possível inscrever um aluno num curso que não existe.</p>`,
       [ex('CREATE TABLE alunos (\n  id_aluno INT AUTO_INCREMENT PRIMARY KEY,\n  nome VARCHAR(80) NOT NULL,\n  id_curso INT,\n  FOREIGN KEY (id_curso) REFERENCES cursos(id_curso)\n);', 'id_curso tem de existir em cursos.id_curso.')]),
-    quiz('Para que serve uma FOREIGN KEY?', ['Tornar a tabela mais rápida', 'Ligar duas tabelas e garantir a integridade referencial', 'Encriptar a coluna', 'Impedir valores NULL'], 1, 'Garante que o valor referenciado existe na outra tabela.'),
-    learn('ALTER TABLE — acrescentar colunas', `<p>Uma tabela já existente pode ser alterada sem perder os dados. Para acrescentar uma coluna:</p>`, [ex('ALTER TABLE alunos ADD COLUMN telefone VARCHAR(20);', 'Acrescenta a coluna telefone.')]),
-    code('Acrescente à tabela alunos a coluna email do tipo VARCHAR(100).', ['^alter table alunos add( column)? email varchar\\(100\\)$'], 'ALTER TABLE alunos ADD COLUMN email VARCHAR(100);', 'ALTER TABLE … ADD COLUMN …'),
-    learn('ALTER TABLE — modificar e remover', `<pre><code>ALTER TABLE alunos MODIFY nome VARCHAR(120);   -- muda o tipo
-ALTER TABLE alunos DROP COLUMN telefone;        -- remove a coluna
-RENAME TABLE alunos TO estudantes;              -- muda o nome</code></pre>`),
-    code('Remova a coluna cidade da tabela alunos.', ['^alter table alunos drop( column)? cidade$'], 'ALTER TABLE alunos DROP COLUMN cidade;', 'ALTER TABLE … DROP COLUMN …'),
-    learn('DROP TABLE', `<p>Para eliminar uma tabela inteira (estrutura e dados):</p><pre><code>DROP TABLE IF EXISTS temporaria;</code></pre>`),
-    code('Elimine a tabela temporaria.', ['^drop table (if exists )?temporaria$'], 'DROP TABLE temporaria;', 'DROP TABLE nome;'),
+    quiz('Numa relação 1:N entre clientes e encomendas (um cliente faz muitas encomendas), onde fica a chave estrangeira?', ['Em clientes: id_encomenda', 'Em encomendas: id_cliente', 'Nas duas tabelas', 'Numa terceira tabela'], 1, 'A chave estrangeira fica sempre do lado "muitos".'),
+    learn('Regras para criar tabelas relacionadas', `<ul><li>A tabela referenciada (o "pai") tem de ser criada <b>antes</b> da tabela que a referencia (o "filho").</li>
+      <li>A chave estrangeira tem de ter o <b>mesmo tipo</b> que a chave primária referenciada (INT com INT).</li>
+      <li>Se a relação for obrigatória (ex.: todas as encomendas têm cliente), a chave estrangeira é <code>NOT NULL</code>.</li></ul>
+      <p>A chave estrangeira pode ser escrita no fim da tabela (como acima) ou junto da coluna: <code>id_curso INT REFERENCES cursos(id_curso)</code>.</p>`),
+    ddl('Já existe a tabela clientes. Crie a tabela encomendas com: id_encomenda (chave primária automática), data (DATE, obrigatória) e id_cliente (obrigatório), ligada a clientes.', `CREATE TABLE encomendas (
+  id_encomenda INT AUTO_INCREMENT PRIMARY KEY,
+  data DATE NOT NULL,
+  id_cliente INT NOT NULL,
+  FOREIGN KEY (id_cliente) REFERENCES clientes(id_cliente)
+);`, 'FOREIGN KEY (id_cliente) REFERENCES clientes(id_cliente)', { setup: 'CREATE TABLE clientes (\n  id_cliente INT AUTO_INCREMENT PRIMARY KEY,\n  nome VARCHAR(80) NOT NULL\n);' }),
+    learn('O que acontece ao apagar? ON DELETE', `<p>Se um cliente com encomendas for apagado, o que deve acontecer às suas encomendas? Isso define-se com <code>ON DELETE</code> na chave estrangeira:</p>
+      <table><tr><th>Ação</th><th>Ao apagar o "pai"…</th><th>Quando usar</th></tr>
+      <tr><td><code>RESTRICT</code> (por omissão)</td><td>a operação é <b>recusada</b> enquanto existirem "filhos"</td><td>dados que não se podem perder (clientes com encomendas)</td></tr>
+      <tr><td><code>CASCADE</code></td><td>os "filhos" são <b>apagados também</b></td><td>dados que só existem com o pai (comentários de uma publicação)</td></tr>
+      <tr><td><code>SET NULL</code></td><td>a chave estrangeira dos "filhos" fica <b>NULL</b></td><td>a ligação é opcional (funcionário sem departamento); a coluna não pode ser NOT NULL</td></tr></table>
+      <p>Existe também <code>ON UPDATE</code>, com as mesmas opções, para quando a chave primária do pai muda.</p>`,
+      [ex('FOREIGN KEY (id_publicacao) REFERENCES publicacoes(id_publicacao)\n  ON DELETE CASCADE', 'Apagar uma publicação apaga os seus comentários.')]),
+    quiz('Uma encomenda tem várias linhas de encomenda. Ao apagar uma encomenda, as suas linhas devem desaparecer. Que ação usar?', ['ON DELETE RESTRICT', 'ON DELETE CASCADE', 'ON DELETE SET NULL', 'Não é possível'], 1, 'As linhas só fazem sentido com a encomenda: CASCADE.'),
+    quiz('Ao fechar um departamento, os funcionários devem manter-se, mas ficar sem departamento. Que ação usar?', ['ON DELETE CASCADE', 'ON DELETE RESTRICT', 'ON DELETE SET NULL', 'ON UPDATE CASCADE'], 2, 'SET NULL mantém o funcionário e retira a ligação.'),
+    quiz('Porque é que ON DELETE SET NULL falha numa coluna id_departamento INT NOT NULL?', ['Porque SET NULL só funciona com VARCHAR', 'Porque a coluna não aceita NULL', 'Porque falta AUTO_INCREMENT', 'Porque NOT NULL é o mesmo que CASCADE'], 1, 'SET NULL precisa de uma coluna que aceite NULL.'),
+    ddl('Já existe a tabela departamentos. Crie a tabela funcionarios com id_funcionario (chave primária automática), nome (VARCHAR(80), obrigatório) e id_departamento, de forma que, ao apagar um departamento, os seus funcionários fiquem sem departamento.', `CREATE TABLE funcionarios (
+  id_funcionario INT AUTO_INCREMENT PRIMARY KEY,
+  nome VARCHAR(80) NOT NULL,
+  id_departamento INT,
+  FOREIGN KEY (id_departamento) REFERENCES departamentos(id_departamento)
+    ON DELETE SET NULL
+);`, 'ON DELETE SET NULL (e id_departamento tem de aceitar NULL)', { setup: 'CREATE TABLE departamentos (\n  id_departamento INT AUTO_INCREMENT PRIMARY KEY,\n  nome VARCHAR(60) NOT NULL\n);' }),
+    ddl('Já existe a tabela publicacoes. Crie a tabela comentarios com id_comentario (chave primária automática), texto (TEXT, obrigatório) e id_publicacao (obrigatório). Ao apagar uma publicação, os seus comentários devem ser apagados.', `CREATE TABLE comentarios (
+  id_comentario INT AUTO_INCREMENT PRIMARY KEY,
+  texto TEXT NOT NULL,
+  id_publicacao INT NOT NULL,
+  FOREIGN KEY (id_publicacao) REFERENCES publicacoes(id_publicacao)
+    ON DELETE CASCADE
+);`, 'ON DELETE CASCADE', { setup: 'CREATE TABLE publicacoes (\n  id_publicacao INT AUTO_INCREMENT PRIMARY KEY,\n  titulo VARCHAR(100) NOT NULL\n);' }),
+  ] },
+  { title: 'Relações muitos-para-muitos (N:M)', steps: [
+    learn('O problema das relações N:M', `<p>Um aluno frequenta <b>várias</b> disciplinas e cada disciplina tem <b>vários</b> alunos: é uma relação <b>muitos-para-muitos</b> (N:M).</p>
+      <p>Não é possível representá-la com uma chave estrangeira numa das tabelas: um aluno teria de guardar vários <code>id_disciplina</code> na mesma coluna. A solução é criar uma <b>tabela de ligação</b> (ou associativa) com as duas chaves estrangeiras:</p>
+      <pre><code>alunos 1 ──── N  inscricoes  N ──── 1 disciplinas</code></pre>
+      <p>A relação N:M transforma-se em duas relações 1:N.</p>`),
+    quiz('Como se representa uma relação N:M entre alunos e disciplinas?', ['Com uma chave estrangeira id_disciplina em alunos', 'Com uma chave estrangeira id_aluno em disciplinas', 'Com uma tabela de ligação que tem id_aluno e id_disciplina', 'Juntando as duas tabelas numa só'], 2, 'A tabela de ligação tem uma chave estrangeira para cada lado.'),
+    learn('Tabela de ligação e chave primária composta', `<p>Na tabela de ligação, a chave primária é normalmente <b>composta</b> pelas duas chaves estrangeiras. Isto impede, por exemplo, inscrever o mesmo aluno duas vezes na mesma disciplina.</p>
+      <p>Os dados que pertencem à <b>relação</b> (e não a um aluno ou a uma disciplina) ficam também na tabela de ligação — por exemplo, a data de inscrição ou a nota final.</p>`,
+      [ex(`CREATE TABLE inscricoes (
+  id_aluno INT,
+  id_disciplina INT,
+  data_inscricao DATE NOT NULL,
+  nota_final INT,
+  PRIMARY KEY (id_aluno, id_disciplina),
+  FOREIGN KEY (id_aluno) REFERENCES alunos(id_aluno) ON DELETE CASCADE,
+  FOREIGN KEY (id_disciplina) REFERENCES disciplinas(id_disciplina) ON DELETE CASCADE
+);`, 'Chave primária composta e duas chaves estrangeiras.')]),
+    quiz('Porque se usa PRIMARY KEY (id_aluno, id_disciplina) na tabela inscricoes?', ['Para ordenar os alunos', 'Para impedir que o mesmo aluno se inscreva duas vezes na mesma disciplina', 'Porque o MySQL não aceita AUTO_INCREMENT', 'Para apagar as inscrições automaticamente'], 1, 'A combinação aluno + disciplina tem de ser única.'),
+    quiz('Onde deve ficar guardada a nota final de um aluno numa disciplina?', ['Na tabela alunos', 'Na tabela disciplinas', 'Na tabela de ligação inscricoes', 'Numa vista'], 2, 'A nota depende do aluno E da disciplina: pertence à relação.'),
+    ddl('Já existe a tabela alunos. Crie a tabela disciplinas (id_disciplina, chave primária automática; nome VARCHAR(60), obrigatório) e a tabela de ligação inscricoes com id_aluno, id_disciplina e data_inscricao (DATE, obrigatória). Use uma chave primária composta e, se um aluno ou uma disciplina forem apagados, as inscrições correspondentes devem ser apagadas.', `CREATE TABLE disciplinas (
+  id_disciplina INT AUTO_INCREMENT PRIMARY KEY,
+  nome VARCHAR(60) NOT NULL
+);
+
+CREATE TABLE inscricoes (
+  id_aluno INT,
+  id_disciplina INT,
+  data_inscricao DATE NOT NULL,
+  PRIMARY KEY (id_aluno, id_disciplina),
+  FOREIGN KEY (id_aluno) REFERENCES alunos(id_aluno) ON DELETE CASCADE,
+  FOREIGN KEY (id_disciplina) REFERENCES disciplinas(id_disciplina) ON DELETE CASCADE
+);`, 'Crie primeiro disciplinas; depois inscricoes com PRIMARY KEY (id_aluno, id_disciplina) e duas FOREIGN KEY … ON DELETE CASCADE.', { setup: 'CREATE TABLE alunos (\n  id_aluno INT AUTO_INCREMENT PRIMARY KEY,\n  nome VARCHAR(80) NOT NULL\n);' }),
+    ddl('Já existe a tabela livros. Um livro pode ter vários autores e um autor pode escrever vários livros. Crie a tabela autores (id_autor, chave primária automática; nome VARCHAR(100), obrigatório; nacionalidade VARCHAR(50)) e a tabela de ligação livros_autores, com chave primária composta por id_livro e id_autor.', `CREATE TABLE autores (
+  id_autor INT AUTO_INCREMENT PRIMARY KEY,
+  nome VARCHAR(100) NOT NULL,
+  nacionalidade VARCHAR(50)
+);
+
+CREATE TABLE livros_autores (
+  id_livro INT,
+  id_autor INT,
+  PRIMARY KEY (id_livro, id_autor),
+  FOREIGN KEY (id_livro) REFERENCES livros(id_livro),
+  FOREIGN KEY (id_autor) REFERENCES autores(id_autor)
+);`, 'Duas tabelas: autores e livros_autores (com duas chaves estrangeiras).', { setup: 'CREATE TABLE livros (\n  id_livro INT AUTO_INCREMENT PRIMARY KEY,\n  titulo VARCHAR(150) NOT NULL\n);' }),
+  ] },
+  { title: 'Alterar e eliminar tabelas', steps: [
+    learn('ALTER TABLE — acrescentar colunas', `<p>Uma tabela já existente pode ser alterada sem perder os dados. Para acrescentar uma coluna (por omissão fica no fim; <code>AFTER coluna</code> ou <code>FIRST</code> escolhem a posição):</p>`,
+      [ex('ALTER TABLE alunos ADD COLUMN telefone VARCHAR(20) AFTER nome;', 'Acrescenta a coluna telefone a seguir a nome.')]),
+    ddl('Acrescente à tabela alunos a coluna email (VARCHAR(100)), sem valores repetidos.', 'ALTER TABLE alunos ADD COLUMN email VARCHAR(100) UNIQUE;', 'ALTER TABLE alunos ADD COLUMN email … UNIQUE', { setup: 'CREATE TABLE alunos (\n  id_aluno INT AUTO_INCREMENT PRIMARY KEY,\n  nome VARCHAR(80) NOT NULL,\n  idade INT\n);' }),
+    learn('MODIFY, CHANGE e RENAME COLUMN', `<table><tr><th>Comando</th><th>Faz</th></tr>
+      <tr><td><code>MODIFY coluna TIPO …</code></td><td>muda o tipo e as restrições, mantendo o nome</td></tr>
+      <tr><td><code>RENAME COLUMN antigo TO novo</code></td><td>só muda o nome (MySQL 8)</td></tr>
+      <tr><td><code>CHANGE antigo novo TIPO …</code></td><td>muda o nome e a definição</td></tr></table>
+      <p class="warn"><b>Atenção:</b> com MODIFY e CHANGE é preciso repetir a definição completa da coluna — uma restrição que não seja repetida (ex.: NOT NULL) é retirada.</p>`,
+      [ex('ALTER TABLE alunos MODIFY nome VARCHAR(120) NOT NULL;', 'Aumenta o tamanho e mantém o nome obrigatório.'), ex('ALTER TABLE alunos RENAME COLUMN telefone TO telemovel;', 'Muda apenas o nome da coluna.')]),
+    ddl('Na tabela produtos, torne o nome obrigatório e aumente o seu tamanho para 120 caracteres.', 'ALTER TABLE produtos MODIFY nome VARCHAR(120) NOT NULL;', 'ALTER TABLE produtos MODIFY nome …', { setup: 'CREATE TABLE produtos (\n  id_produto INT AUTO_INCREMENT PRIMARY KEY,\n  nome VARCHAR(50),\n  preco DECIMAL(6,2)\n);' }),
+    ddl('Na tabela clientes, mude o nome da coluna tel para telefone, sem alterar o seu tipo.', 'ALTER TABLE clientes RENAME COLUMN tel TO telefone;', 'RENAME COLUMN … TO … (ou CHANGE)', { setup: 'CREATE TABLE clientes (\n  id_cliente INT AUTO_INCREMENT PRIMARY KEY,\n  nome VARCHAR(80) NOT NULL,\n  tel VARCHAR(15)\n);' }),
+    learn('Acrescentar uma chave estrangeira', `<p>Quando a relação não foi definida ao criar a tabela, acrescenta-se depois. É boa prática dar-lhe um nome (ex.: <code>fk_tabela_referenciada</code>), para a poder remover mais tarde:</p>
+      <pre><code>ALTER TABLE encomendas
+  ADD CONSTRAINT fk_encomendas_clientes
+  FOREIGN KEY (id_cliente) REFERENCES clientes(id_cliente);
+
+ALTER TABLE encomendas DROP FOREIGN KEY fk_encomendas_clientes;</code></pre>
+      <p>Os dados que já existem têm de respeitar a nova regra; caso contrário, o MySQL recusa a alteração.</p>`),
+    ddl('As tabelas cursos e alunos já existem, mas ainda não estão ligadas. Acrescente à tabela alunos a chave estrangeira fk_alunos_cursos (coluna id_curso), de forma que, ao apagar um curso, os seus alunos fiquem sem curso.', 'ALTER TABLE alunos ADD CONSTRAINT fk_alunos_cursos FOREIGN KEY (id_curso) REFERENCES cursos(id_curso) ON DELETE SET NULL;', 'ADD CONSTRAINT … FOREIGN KEY … ON DELETE SET NULL', { setup: 'CREATE TABLE cursos (\n  id_curso INT AUTO_INCREMENT PRIMARY KEY,\n  nome VARCHAR(50) NOT NULL\n);\nCREATE TABLE alunos (\n  id_aluno INT AUTO_INCREMENT PRIMARY KEY,\n  nome VARCHAR(80) NOT NULL,\n  id_curso INT\n);' }),
+    learn('Remover colunas e tabelas', `<pre><code>ALTER TABLE alunos DROP COLUMN telefone;   -- remove a coluna (e os seus dados)
+RENAME TABLE alunos TO estudantes;          -- muda o nome da tabela
+DROP TABLE IF EXISTS temporaria;            -- elimina a tabela inteira</code></pre>
+      <p>Uma tabela referenciada por uma chave estrangeira <b>não pode</b> ser eliminada enquanto a tabela "filho" existir: elimina-se primeiro o "filho" e só depois o "pai" — a ordem inversa da criação.</p>`),
+    quiz('As tabelas clientes e encomendas (com chave estrangeira para clientes) vão ser eliminadas. Qual a ordem correta?', ['Primeiro clientes, depois encomendas', 'Primeiro encomendas, depois clientes', 'Tanto faz', 'Não é possível eliminar tabelas relacionadas'], 1, 'Elimina-se primeiro a tabela que tem a chave estrangeira.'),
+    ddl('Elimine as tabelas encomendas e clientes, pela ordem correta.', 'DROP TABLE encomendas;\nDROP TABLE clientes;', 'Duas instruções DROP TABLE: primeiro o "filho".', { setup: 'CREATE TABLE clientes (\n  id_cliente INT AUTO_INCREMENT PRIMARY KEY,\n  nome VARCHAR(80) NOT NULL\n);\nCREATE TABLE encomendas (\n  id_encomenda INT AUTO_INCREMENT PRIMARY KEY,\n  id_cliente INT NOT NULL,\n  FOREIGN KEY (id_cliente) REFERENCES clientes(id_cliente)\n);' }),
+  ] },
+  { title: 'Desafio: modelar uma loja online', steps: [
+    learn('O cenário', `<p>Uma pequena loja online precisa de uma base de dados. Leia os requisitos com atenção e decida os tipos, as chaves e as restrições. Use exatamente os nomes de tabelas e colunas indicados.</p>
+      <ol>
+        <li><b>clientes</b> — <code>id_cliente</code> (gerado automaticamente), <code>nome</code> (obrigatório, até 100 caracteres), <code>email</code> (obrigatório e sem repetições), <code>nif</code> (exatamente 9 caracteres, sem repetições).</li>
+        <li><b>produtos</b> — <code>id_produto</code> (gerado automaticamente), <code>nome</code> (obrigatório), <code>preco</code> (obrigatório, com 2 casas decimais e sempre maior que 0), <code>stock</code> (inteiro, 0 por omissão).</li>
+        <li><b>encomendas</b> — <code>id_encomenda</code> (gerado automaticamente), <code>data</code> (obrigatória) e o cliente que a fez (<code>id_cliente</code>, obrigatório). Um cliente que tenha encomendas <b>não pode ser apagado</b>.</li>
+        <li><b>linhas_encomenda</b> — cada encomenda tem vários produtos e cada produto aparece em várias encomendas. Para cada produto de uma encomenda guarda-se a <code>quantidade</code> (obrigatória, maior que 0) e o <code>preco_unitario</code> (com 2 casas decimais). O mesmo produto não pode aparecer duas vezes na mesma encomenda e, se a encomenda for apagada, as suas linhas são apagadas também.</li>
+      </ol>
+      <p>Pense na ordem de criação das tabelas e no tipo de relação entre encomendas e produtos. A verificação aceita tamanhos de texto diferentes dos da solução, mas confirma os tipos, as chaves, as relações e as restrições pedidas.</p>`),
+    ddl('Escreva as instruções CREATE TABLE para as quatro tabelas da loja online (clientes, produtos, encomendas e linhas_encomenda).', `CREATE TABLE clientes (
+  id_cliente INT AUTO_INCREMENT PRIMARY KEY,
+  nome VARCHAR(100) NOT NULL,
+  email VARCHAR(100) NOT NULL UNIQUE,
+  nif CHAR(9) UNIQUE
+);
+
+CREATE TABLE produtos (
+  id_produto INT AUTO_INCREMENT PRIMARY KEY,
+  nome VARCHAR(100) NOT NULL,
+  preco DECIMAL(8,2) NOT NULL CHECK (preco > 0),
+  stock INT DEFAULT 0
+);
+
+CREATE TABLE encomendas (
+  id_encomenda INT AUTO_INCREMENT PRIMARY KEY,
+  data DATE NOT NULL,
+  id_cliente INT NOT NULL,
+  FOREIGN KEY (id_cliente) REFERENCES clientes(id_cliente) ON DELETE RESTRICT
+);
+
+CREATE TABLE linhas_encomenda (
+  id_encomenda INT,
+  id_produto INT,
+  quantidade INT NOT NULL CHECK (quantidade > 0),
+  preco_unitario DECIMAL(8,2),
+  PRIMARY KEY (id_encomenda, id_produto),
+  FOREIGN KEY (id_encomenda) REFERENCES encomendas(id_encomenda) ON DELETE CASCADE,
+  FOREIGN KEY (id_produto) REFERENCES produtos(id_produto)
+);`, 'Ordem: clientes, produtos, encomendas, linhas_encomenda. A tabela linhas_encomenda é uma tabela de ligação (N:M) com chave primária composta.', { loose: true, xp: 60 }),
   ] }],
   cheat: [
     ['CREATE DATABASE [IF NOT EXISTS] bd;', 'Criar base de dados'], ['USE bd;', 'Selecionar a base de dados ativa'], ['DROP DATABASE bd;', 'Eliminar base de dados'],
     ['CREATE TABLE t (col TIPO [restrições], …);', 'Criar tabela'], ['id_tabela INT AUTO_INCREMENT PRIMARY KEY', 'Chave primária automática (id_ + nome da tabela)'],
-    ['NOT NULL · UNIQUE · DEFAULT v', 'Restrições de coluna'], ['FOREIGN KEY (id_t2) REFERENCES t2(id_t2)', 'Chave estrangeira'],
-    ['DESCRIBE t; · SHOW TABLES;', 'Ver estrutura / listar tabelas'], ['ALTER TABLE t ADD COLUMN c TIPO;', 'Acrescentar coluna'],
-    ['ALTER TABLE t MODIFY c TIPO;', 'Alterar tipo'], ['ALTER TABLE t DROP COLUMN c;', 'Remover coluna'], ['DROP TABLE t;', 'Eliminar tabela'],
+    ['NOT NULL · UNIQUE · DEFAULT v', 'Restrições de coluna'], ['CHAR(9) · VARCHAR(100) · DECIMAL(8,2) · DATE', 'Tipos frequentes'],
+    ['FOREIGN KEY (id_t2) REFERENCES t2(id_t2)', 'Chave estrangeira (relação 1:N)'], ['… ON DELETE RESTRICT | CASCADE | SET NULL', 'O que acontece ao apagar o "pai"'],
+    ['PRIMARY KEY (id_a, id_b)', 'Chave primária composta (tabela de ligação N:M)'],
+    ['DESCRIBE t; · SHOW TABLES;', 'Ver estrutura / listar tabelas'], ['ALTER TABLE t ADD COLUMN c TIPO [AFTER x];', 'Acrescentar coluna'],
+    ['ALTER TABLE t MODIFY c TIPO …;', 'Alterar tipo/restrições'], ['ALTER TABLE t RENAME COLUMN a TO b;', 'Mudar o nome de uma coluna'], ['ALTER TABLE t CHANGE a b TIPO …;', 'Mudar nome e definição'],
+    ['ALTER TABLE t ADD CONSTRAINT fk_x FOREIGN KEY (…) REFERENCES …;', 'Acrescentar chave estrangeira'], ['ALTER TABLE t DROP FOREIGN KEY fk_x;', 'Remover chave estrangeira'],
+    ['ALTER TABLE t DROP COLUMN c;', 'Remover coluna'], ['DROP TABLE filho; DROP TABLE pai;', 'Eliminar tabelas (primeiro o "filho")'],
   ],
   test: [
     quiz('Que comando seleciona a base de dados ativa?', ['SELECT DATABASE escola', 'USE escola', 'OPEN escola', 'SET escola'], 1, 'USE nome;'),
-    quiz('O que acontece com CREATE DATABASE IF NOT EXISTS loja se loja já existir?', ['Dá erro', 'Apaga e recria', 'Não faz nada e não dá erro', 'Cria loja2'], 2, 'IF NOT EXISTS evita o erro.'),
     quiz('Qual a função de AUTO_INCREMENT?', ['Aumentar o tamanho da tabela', 'Gerar automaticamente valores sequenciais', 'Aumentar a velocidade', 'Fazer backup automático'], 1, '1, 2, 3, …'),
-    quiz('Uma chave primária pode ter valores repetidos?', ['Sim', 'Não', 'Só se for INT', 'Só com DEFAULT'], 1, 'Identifica cada linha de forma única.'),
-    quiz('Qual o comando para acrescentar uma coluna a uma tabela existente?', ['UPDATE TABLE … ADD', 'ALTER TABLE … ADD COLUMN', 'INSERT COLUMN', 'MODIFY TABLE … NEW'], 1, 'ALTER TABLE altera a estrutura.'),
-    quiz('O que garante uma FOREIGN KEY?', ['Que os valores são únicos', 'Que o valor existe na tabela referenciada', 'Que a coluna é obrigatória', 'Que a tabela é encriptada'], 1, 'Integridade referencial.'),
-    quiz('Que comando mostra as colunas e tipos de uma tabela?', ['SHOW TABLES', 'DESCRIBE tabela', 'SELECT COLUMNS', 'LIST tabela'], 1, 'DESCRIBE (ou DESC).'),
-    quiz('Qual a diferença entre DROP TABLE e ALTER TABLE … DROP COLUMN?', ['Nenhuma', 'O primeiro elimina a tabela inteira; o segundo só uma coluna', 'O segundo elimina a tabela', 'O primeiro só apaga os dados'], 1, 'DROP TABLE remove tudo.'),
+    quiz('Qual o tipo mais adequado para um código postal como 1000-001?', ['INT', 'CHAR(8)', 'DECIMAL(8,0)', 'DATE'], 1, 'Código de tamanho fixo com hífen: CHAR(8).'),
+    quiz('Numa relação 1:N, onde se coloca a chave estrangeira?', ['Na tabela do lado "um"', 'Na tabela do lado "muitos"', 'Em ambas', 'Numa tabela de ligação'], 1, 'Ex.: id_cliente fica em encomendas.'),
+    quiz('O que faz ON DELETE CASCADE?', ['Impede apagar o registo pai', 'Apaga também os registos filhos', 'Põe NULL nos filhos', 'Faz uma cópia antes de apagar'], 1, 'Os filhos são apagados com o pai.'),
+    quiz('Que ação é aplicada se não se indicar ON DELETE?', ['CASCADE', 'SET NULL', 'RESTRICT (a eliminação é recusada se existirem filhos)', 'Nenhuma: os filhos ficam órfãos'], 2, 'O MySQL protege os dados por omissão.'),
+    quiz('Como se representa uma relação muitos-para-muitos?', ['Com uma chave estrangeira em cada tabela', 'Com uma tabela de ligação com as duas chaves estrangeiras', 'Com uma coluna com vários valores', 'Com uma vista'], 1, 'A tabela de ligação divide a relação em duas relações 1:N.'),
+    quiz('Qual a chave primária habitual da tabela de ligação inscricoes(id_aluno, id_disciplina)?', ['id_aluno', 'id_disciplina', 'PRIMARY KEY (id_aluno, id_disciplina)', 'Não tem chave primária'], 2, 'Chave composta: impede inscrições repetidas.'),
+    quiz('Qual a diferença entre MODIFY e RENAME COLUMN?', ['Nenhuma', 'MODIFY altera o tipo/restrições; RENAME COLUMN só muda o nome', 'RENAME COLUMN altera o tipo', 'MODIFY apaga a coluna'], 1, 'CHANGE faz as duas coisas.'),
+    quiz('Porque não se consegue eliminar a tabela clientes antes de encomendas?', ['Porque é maior', 'Porque encomendas tem uma chave estrangeira que referencia clientes', 'Porque tem AUTO_INCREMENT', 'Porque foi criada primeiro'], 1, 'Elimina-se primeiro o "filho".'),
   ],
 },
 /* =============================== 3 =============================== */
@@ -328,10 +493,11 @@ RENAME TABLE alunos TO estudantes;              -- muda o nome</code></pre>`),
   CHECK (stock >= 0)
 );</code></pre>
       <p>O MySQL aplica as restrições CHECK a partir da versão 8.0.16.</p>`),
-    code('Crie a tabela artigos com id_artigo INT (chave primária), nome VARCHAR(60) e preco DECIMAL(8,2) com a restrição CHECK (preco > 0). Escreva numa só linha.', [
-      '^create table artigos\\(id_artigo int(\\(\\d+\\))? primary key,nome varchar\\(60\\)( ?not null)?,preco decimal\\(8,2\\)( ?not null)? ?check ?\\(preco>0\\)\\)$',
-      '^create table artigos\\(id_artigo int(\\(\\d+\\))? primary key,nome varchar\\(60\\)( ?not null)?,preco decimal\\(8,2\\)( ?not null)?,(constraint \\w+ )?check ?\\(preco>0\\)\\)$',
-    ], 'CREATE TABLE artigos (id_artigo INT PRIMARY KEY, nome VARCHAR(60), preco DECIMAL(8,2) CHECK (preco > 0));', 'preco DECIMAL(8,2) CHECK (preco > 0)'),
+    ddl('Crie a tabela artigos com id_artigo (INT, chave primária), nome (VARCHAR(60)) e preco (DECIMAL(8,2)) com uma restrição CHECK que garanta que o preço é maior que 0.', `CREATE TABLE artigos (
+  id_artigo INT PRIMARY KEY,
+  nome VARCHAR(60),
+  preco DECIMAL(8,2) CHECK (preco > 0)
+);`, 'preco DECIMAL(8,2) CHECK (preco > 0)'),
     learn('Quando a regra é violada', `<p>Experimente: a tabela é criada, mas a inserção de um preço negativo é recusada com um erro e a linha <b>não é guardada</b>.</p>`,
       [ex("CREATE TABLE precos (id_preco INT, valor DECIMAL(8,2) CHECK (valor > 0));", 'Cria uma tabela com uma regra de validação.'),
        ex("INSERT INTO precos VALUES (1, -5);", 'No MySQL: ERROR 3819 — Check constraint is violated. Experimente no laboratório.')]),
@@ -340,9 +506,7 @@ RENAME TABLE alunos TO estudantes;              -- muda o nome</code></pre>`),
       <pre><code>ALTER TABLE alunos ADD CONSTRAINT chk_idade CHECK (idade >= 16);
 ALTER TABLE alunos DROP CHECK chk_idade;</code></pre>
       <p>Ao acrescentar a restrição, as linhas que já existem também têm de a cumprir; caso contrário o ALTER TABLE falha.</p>`),
-    code('Acrescente à tabela notas uma restrição chamada chk_nota que garanta que a nota está entre 0 e 20 (use BETWEEN).', [
-      '^alter table notas add constraint chk_nota check ?\\(nota between 0 and 20\\)$',
-    ], 'ALTER TABLE notas ADD CONSTRAINT chk_nota CHECK (nota BETWEEN 0 AND 20);', 'ALTER TABLE notas ADD CONSTRAINT chk_nota CHECK (…)'),
+    ddl('Acrescente à tabela notas uma restrição chamada chk_nota que garanta que a nota está entre 0 e 20 (use BETWEEN).', 'ALTER TABLE notas ADD CONSTRAINT chk_nota CHECK (nota BETWEEN 0 AND 20);', 'ALTER TABLE notas ADD CONSTRAINT chk_nota CHECK (…)', { setup: 'CREATE TABLE notas (\n  id_aluno INT,\n  disciplina VARCHAR(50),\n  nota INT\n);' }),
   ] },
   { title: 'Índices', steps: [
     learn('Para que serve um índice', `<p>Um <b>índice</b> funciona como o índice remissivo de um livro: em vez de ler todas as páginas, salta-se diretamente para o sítio certo. Sem índice, para encontrar os alunos de Braga o MySQL tem de percorrer <b>todas</b> as linhas da tabela.</p>

@@ -1,6 +1,7 @@
 // Valida o conteúdo: soluções corretas, regex dos comandos, perguntas e exemplos executáveis.
 const { CHAPTERS, PASS_MARK } = require('../public/content.js');
 const D = require('../public/db.js');
+const DDL = require('../public/ddl.js');
 let n = 0, bad = 0;
 const fail = (...a) => { console.log(...a); bad++; };
 for (const c of CHAPTERS) {
@@ -19,6 +20,10 @@ for (const c of CHAPTERS) {
         if (s.t === 'code' && !D.checkCode(s.solution, s)) fail('regex não aceita a solução', s.id);
         if (s.t === 'query') { const r = D.check(s.solution, s); if (!r.ok || !r.rows.length) fail('consulta sem resultado', s.id); }
         if (s.t === 'quiz' && !(s.a >= 0 && s.a < s.opts.length)) fail('quiz inválido', s.id);
+        if (s.t === 'ddl') {
+          const r = DDL.check(s.solution, s); if (!r.ok) fail('solução DDL não aceite', s.id, r.msgs);
+          if (DDL.check('CREATE TABLE resposta_errada (a INT);', s).ok) fail('DDL aceita uma resposta errada', s.id);
+        }
       } catch (e) { fail('erro', s.id, e.message); }
     }
   }
