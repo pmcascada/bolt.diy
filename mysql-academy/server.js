@@ -54,22 +54,29 @@ const LESSON_IDS = new Set(require('./public/content.js').CHAPTERS.flatMap((c) =
 const ROOM_IDS = new Set(SCORE.ROOMS.map((r) => r.id));
 const int = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.round(+v) || 0));
 
+const str = (v, n) => String(v === undefined || v === null ? '' : v).slice(0, n);
+const cleanTurma = (t) => str(t, 60).trim().replace(/\s+/g, ' ').slice(0, 30);
+
 function cleanState(s) {
   s = s || {};
-  const done = {}, rev = {}, tests = {}, pos = {};
+  const done = {}, rev = {}, tests = {}, pos = {}, review = {}, real = {};
   for (const [id, d] of Object.entries(s.done || {})) {
     if (SCORE.EXS[id]) done[id] = { tries: int(d.tries, 1, 99), hints: int(d.hints, 0, 9), at: +d.at || Date.now() };
   }
   for (const id of Object.keys(s.rev || {})) if (SCORE.EXS[id]) rev[id] = 1;
   for (const [id, t] of Object.entries(s.tests || {})) {
-    if (CHAPTER_IDS.has(id)) tests[id] = { best: int(t.best, 0, 100), attempts: int(t.attempts, 0, 999), at: +t.at || 0 };
+    if (CHAPTER_IDS.has(id)) tests[id] = { best: int(t.best, 0, 100), attempts: int(t.attempts, 0, 999), at: +t.at || 0, ...(t.passAt ? { passAt: +t.passAt || 0 } : {}) };
   }
   for (const [id, p] of Object.entries(s.pos || {})) if (LESSON_IDS.has(id)) pos[id] = int(p, 0, 200);
   const game = { done: {} };
   for (const [id, d] of Object.entries((s.game && s.game.done) || {})) if (ROOM_IDS.has(id)) game.done[id] = { at: +d.at || Date.now(), hints: int(d.hints, 0, 9), rev: !!d.rev };
   const days = Array.isArray(s.days) ? s.days.filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).slice(-400) : [];
-  const log = Array.isArray(s.log) ? s.log.slice(-500).map((e) => ({ at: +e.at || 0, id: String(e.id).slice(0, 20), ok: !!e.ok, ...(e.score !== undefined ? { score: int(e.score, 0, 100) } : {}) })) : [];
-  return { done, rev, tests, pos, game, days, log };
+  const log = Array.isArray(s.log) ? s.log.slice(-500).map((e) => ({ at: +e.at || 0, id: str(e.id, 24), ok: !!e.ok, ...(e.score !== undefined ? { score: int(e.score, 0, 100) } : {}), ...(e.a !== undefined && !e.ok ? { a: str(e.a, 160) } : {}) })) : [];
+  for (const [id, r] of Object.entries(s.review || {})) if (SCORE.EXS[id]) review[id] = { box: int(r.box, 1, 5), due: +r.due || 0, ok: int(r.ok, 0, 99), last: +r.last || 0 };
+  for (const [id, r] of Object.entries(s.real || {})) if (CHAPTER_IDS.has(id) && Array.isArray(r)) real[id] = [...new Set(r.map((k) => int(k, 0, 30)))].sort((a, b) => a - b);
+  const pj = s.project || {};
+  const project = pj.at ? { title: str(pj.title, 120), script: str(pj.script, 30000), output: str(pj.output, 30000), notes: str(pj.notes, 2000), at: +pj.at || 0, sent: !!pj.sent } : {};
+  return { done, rev, tests, pos, game, days, log, review, real, project };
 }
 
 // Junta o progresso de dois dispositivos sem nunca perder trabalho já feito.
@@ -78,8 +85,11 @@ function mergeState(a, b) {
   Object.assign(a.rev, b.rev || {});
   for (const [id, t] of Object.entries(b.tests || {})) {
     const m = a.tests[id];
-    a.tests[id] = !m ? t : { best: Math.max(m.best, t.best), attempts: Math.max(m.attempts, t.attempts), at: Math.max(m.at, t.at) };
+    a.tests[id] = !m ? t : { best: Math.max(m.best, t.best), attempts: Math.max(m.attempts, t.attempts), at: Math.max(m.at, t.at), ...(m.passAt || t.passAt ? { passAt: Math.min(m.passAt || Infinity, t.passAt || Infinity) } : {}) };
   }
+  for (const [id, r] of Object.entries(b.review || {})) if (!a.review[id] || (r.last || 0) > (a.review[id].last || 0)) a.review[id] = r;
+  for (const [id, r] of Object.entries(b.real || {})) a.real[id] = [...new Set([...(a.real[id] || []), ...r])].sort((x, y) => x - y);
+  if (b.project && (b.project.at || 0) > ((a.project && a.project.at) || 0)) a.project = b.project;
   for (const [id, p] of Object.entries(b.pos || {})) a.pos[id] = Math.max(a.pos[id] || 0, p);
   for (const [id, d] of Object.entries((b.game && b.game.done) || {})) if (!a.game.done[id] || a.game.done[id].at > d.at) a.game.done[id] = d;
   a.days = [...new Set([...a.days, ...(b.days || [])])].sort().slice(-400);
@@ -90,7 +100,7 @@ function mergeState(a, b) {
 
 const publicRow = (u) => {
   const s = SCORE.summarize(u.state);
-  return { name: u.name, xp: s.xp, level: s.level, title: s.title, pct: s.pct, exDone: s.exDone, streak: s.streak, badges: s.badges.length, updated: u.updated };
+  return { name: u.name, turma: u.turma || '', xp: s.xp, weekXp: s.weekXp, level: s.level, title: s.title, pct: s.pct, exDone: s.exDone, streak: s.streak, badges: s.badges.length, updated: u.updated };
 };
 
 async function api(req, res, url) {
@@ -115,17 +125,21 @@ async function api(req, res, url) {
     if (url.pathname === '/api/register') {
       if (u) return send(res, 409, { error: 'Esse nome já existe. Escolha outro ou inicie sessão.' });
       const salt = crypto.randomBytes(16).toString('hex');
-      u = users[key(name)] = { name, salt, pinHash: hashPin(pin, salt), created: Date.now(), updated: Date.now(), state: cleanState(b.state) };
+      u = users[key(name)] = { name, turma: cleanTurma(b.turma), salt, pinHash: hashPin(pin, salt), created: Date.now(), updated: Date.now(), state: cleanState(b.state) };
     } else {
       const ok = u && crypto.timingSafeEqual(Buffer.from(hashPin(pin, u.salt)), Buffer.from(u.pinHash));
       if (!ok) { fails.get(ip).push(Date.now()); return send(res, 401, { error: 'Nome ou PIN incorretos.' }); }
     }
     u.tokenHash = sha(token); save();
-    return send(res, 200, { token, name: u.name, state: u.state });
+    return send(res, 200, { token, name: u.name, turma: u.turma || '', state: u.state });
   }
   const u = authed(req);
   if (!u) return send(res, 401, { error: 'Sessão inválida.' });
   if (req.method === 'GET' && url.pathname === '/api/progress') return send(res, 200, { state: u.state });
+  if (req.method === 'PUT' && url.pathname === '/api/turma') {
+    u.turma = cleanTurma((await body(req)).turma); save();
+    return send(res, 200, { turma: u.turma });
+  }
   if (req.method === 'PUT' && url.pathname === '/api/progress') {
     const incoming = mergeState(cleanState((await body(req)).state), u.state);
     u.state = incoming; u.updated = Date.now(); save();

@@ -5,16 +5,30 @@
      quiz  – escolha múltipla     { q, opts, a, why }
      ddl   – CREATE/ALTER/DROP TABLE verificado pela estrutura resultante { q, solution, setup?, loose?, xp? }
      code  – escrever um comando  { q, ok:[regex sobre o texto normalizado], solution, hint }
-     query – SELECT executado na BD "escola" e comparado com a solução { q, solution, hint, ordered? }
-   Cada capítulo tem ainda: cheat (resumo de sintaxe para o manual) e test (miniteste final). */
+     query – SELECT executado na BD "escola" (ou "loja") e comparado com a solução { q, solution, hint, ordered?, db?, start? }
+     dml   – INSERT/UPDATE/DELETE verificado pelo efeito nas tabelas { q, solution, hint, db?, start? }
+     order – ordenar as partes de uma instrução ou de um procedimento { q, parts, why }
+   Um quiz pode mostrar uma instrução SQL (sql) — "qual é o resultado?"; start pré-preenche a resposta ("corrija o erro").
+   Lições e exercícios acrescentados depois têm uma chave (key) própria, para não alterar os IDs já guardados.
+   Cada capítulo tem ainda: cheat (resumo de sintaxe), test (banco de perguntas do miniteste),
+   practice (exercícios práticos sorteados no miniteste) e real (tarefas para fazer num MySQL real). */
 (function (root) {
 const learn = (title, html, examples = []) => ({ t: 'learn', title, html, examples });
-const quiz = (q, opts, a, why) => ({ t: 'quiz', q, opts, a, why });
-const code = (q, ok, solution, hint) => ({ t: 'code', q, ok, solution, hint });
-const query = (q, solution, hint, ordered) => ({ t: 'query', q, solution, hint, ordered: !!ordered });
+const quiz = (q, opts, a, why, sql) => ({ t: 'quiz', q, opts, a, why, ...(sql ? { sql } : {}) });
+// "Qual é o resultado?": quiz que mostra uma instrução.
+const predict = (q, sql, opts, a, why) => quiz(q, opts, a, why, sql);
+const code = (q, ok, solution, hint, opts = {}) => ({ t: 'code', q, ok, solution, hint, ...opts });
+// opts: db ('loja'), start (texto inicial, ex.: uma consulta com um erro para corrigir), xp
+const query = (q, solution, hint, ordered, opts = {}) => ({ t: 'query', q, solution, hint, ordered: !!ordered, ...opts });
+const dml = (q, solution, hint, opts = {}) => ({ t: 'dml', q, solution, hint, ...opts });
+const order = (q, parts, why) => ({ t: 'order', q, parts, why });
+const key = (k, step) => ({ ...step, key: k });
+// Explicação com visualização passo a passo da execução de uma consulta (FROM → WHERE → … → LIMIT).
+const viz = (title, html, spec) => ({ t: 'learn', title, html, examples: [], viz: spec });
 // ddl: CREATE/ALTER/DROP TABLE verificado pela estrutura obtida. opts: setup (tabelas que já existem), loose (só o essencial), xp.
 const ddl = (q, solution, hint, opts = {}) => ({ t: 'ddl', q, solution, hint, ...opts });
-const ex = (sql, note, run) => ({ sql, note, run: !!run });
+// run: true executa na BD escola; 'loja' executa na BD loja.
+const ex = (sql, note, run) => ({ sql, note, run: !!run, ...(typeof run === 'string' ? { db: run } : {}) });
 
 const CHAPTERS = [
 /* =============================== 1 =============================== */
@@ -57,6 +71,8 @@ const CHAPTERS = [
       </table>`),
     quiz('A que família pertence o comando CREATE TABLE?', ['DDL', 'DML', 'DCL', 'DQL'], 0, 'CREATE define estruturas: é DDL (Data Definition Language).'),
     quiz('E o comando GRANT?', ['DDL', 'DML', 'DCL', 'DQL'], 2, 'GRANT e REVOKE controlam permissões: DCL (Data Control Language).'),
+    key('o1', order('Ordene os passos de uma primeira sessão no cliente mysql: entrar no servidor, ver as bases de dados, escolher a escola, listar as suas tabelas e sair.',
+      ['mysql -u root -p', 'SHOW DATABASES;', 'USE escola;', 'SHOW TABLES;', 'EXIT;'], 'Primeiro liga-se ao servidor; só depois de escolher a base de dados com USE é que SHOW TABLES lista as tabelas dela.')),
   ] },
   { title: 'Tipos de dados', steps: [
     learn('Tipos numéricos', `<p>Cada coluna tem um <b>tipo de dados</b> que define o que pode guardar.</p>
@@ -88,6 +104,26 @@ const CHAPTERS = [
     quiz('Qual o tipo indicado para valores monetários?', ['FLOAT', 'DOUBLE', 'DECIMAL', 'TEXT'], 2, 'DECIMAL é exato.'),
     quiz('Qual a diferença entre CHAR e VARCHAR?', ['Nenhuma', 'CHAR tem tamanho fixo; VARCHAR é variável', 'VARCHAR só guarda números', 'CHAR só guarda uma letra'], 1, 'CHAR(n) ocupa sempre n caracteres.'),
     quiz('Qual destas datas está no formato correto do MySQL?', ["'14/03/2025'", "'2025-03-14'", "'03-14-2025'", "'14.03.25'"], 1, 'AAAA-MM-DD.'),
+    quiz('Qual destes NÃO é um SGBD relacional?', ['MySQL', 'PostgreSQL', 'Microsoft Excel', 'MariaDB'], 2, 'O Excel é uma folha de cálculo, não um sistema de gestão de bases de dados.'),
+    quiz('O que identifica de forma única cada linha de uma tabela?', ['A primeira coluna', 'A chave primária', 'O nome da tabela', 'O tipo de dados'], 1, 'Não podem existir duas linhas com a mesma chave primária.'),
+    quiz('Qual o comando que sai do cliente mysql?', ['STOP;', 'EXIT;', 'CLOSE;', 'END;'], 1, 'EXIT; (ou QUIT;).'),
+    quiz('No modelo cliente/servidor, o MySQL Workbench é…', ['O servidor', 'Um cliente', 'Uma base de dados', 'Um tipo de dados'], 1, 'O Workbench envia pedidos SQL ao servidor, tal como o terminal mysql.'),
+    quiz('A que família pertence o SELECT?', ['DDL', 'DML', 'DCL', 'DQL'], 3, 'DQL — Data Query Language (consulta).'),
+    quiz('Que tipo guarda data e hora?', ['DATE', 'TIME', 'DATETIME', 'YEAR'], 2, 'DATETIME guarda as duas; DATE só a data e TIME só a hora.'),
+    quiz('Qual o tipo mais adequado para a quantidade em stock de um produto?', ['VARCHAR(10)', 'INT', 'DECIMAL(8,2)', 'DATE'], 1, 'Um número inteiro.'),
+    predict('O que mostra esta instrução?', 'SHOW DATABASES;', ['As tabelas da base de dados ativa', 'As bases de dados existentes no servidor', 'A estrutura de uma tabela', 'Os utilizadores do servidor'], 1, 'SHOW TABLES lista as tabelas; SHOW DATABASES lista as bases de dados.'),
+  ],
+  real: [
+    'Instalar o MySQL Community Server (ou o XAMPP/MAMP, que já o incluem) e o MySQL Workbench.',
+    'Abrir o terminal e ligar ao servidor com <code>mysql -u root -p</code>.',
+    'Executar <code>SHOW DATABASES;</code> e <code>SELECT VERSION();</code> e comparar com o que aprendeu.',
+    'Descarregar o script da BD <b>escola</b> (botão abaixo) e importá-lo com <code>mysql -u root -p &lt; escola.sql</code>.',
+    'No MySQL Workbench, abrir a ligação local e executar <code>SELECT * FROM escola.alunos;</code>.',
+  ],
+  practice: [
+    query('Mostre todas as colunas e linhas da tabela cursos.', 'SELECT * FROM cursos', 'SELECT * FROM …'),
+    code('Escreva a instrução que mostra a versão do servidor MySQL.', ['^select version\\(\\)$'], 'SELECT VERSION();', 'SELECT VERSION();'),
+    code('Escreva a instrução que lista as bases de dados existentes no servidor.', ['^show (databases|schemas)$'], 'SHOW DATABASES;', 'SHOW …'),
   ],
 },
 /* =============================== 2 =============================== */
@@ -143,6 +179,11 @@ const CHAPTERS = [
 );`, 'isbn CHAR(13) NOT NULL UNIQUE · preco DECIMAL(6,2) DEFAULT 0'),
     learn('Ver a estrutura de uma tabela', `<p>Depois de criar uma tabela, pode consultar a sua estrutura (colunas, tipos, chaves):</p>`, [ex('DESCRIBE alunos;', 'Também pode escrever DESC alunos;'), ex('SHOW TABLES;', 'Lista as tabelas da base de dados ativa.')]),
     code('Escreva o comando que mostra a estrutura da tabela alunos.', ['^(describe|desc|show columns from|explain) alunos$'], 'DESCRIBE alunos;', 'DESCRIBE ou DESC'),
+    key('f1', ddl('Corrija o erro: o MySQL recusa a instrução abaixo (ERROR 1064). Ela devia criar a tabela editoras com id_editora (chave primária automática), nome (obrigatório) e pais.', `CREATE TABLE editoras (
+  id_editora INT AUTO_INCREMENT PRIMARY KEY,
+  nome VARCHAR(80) NOT NULL,
+  pais VARCHAR(40)
+);`, 'Procure uma vírgula em falta entre duas colunas.', { start: 'CREATE TABLE editoras (\n  id_editora INT AUTO_INCREMENT PRIMARY KEY\n  nome VARCHAR(80) NOT NULL,\n  pais VARCHAR(40)\n);' })),
   ] },
   { title: 'Chaves estrangeiras e relações 1:N', steps: [
     learn('Relações um-para-muitos (1:N)', `<p>Um curso tem <b>muitos</b> alunos, mas cada aluno pertence a <b>um</b> curso: é uma relação <b>1:N</b>. Representa-se colocando, na tabela do lado "muitos" (<code>alunos</code>), uma <b>chave estrangeira</b> (<code>FOREIGN KEY</code>) que referencia a chave primária da tabela do lado "um" (<code>cursos</code>).</p>
@@ -257,6 +298,54 @@ DROP TABLE IF EXISTS temporaria;            -- elimina a tabela inteira</code></
     quiz('As tabelas clientes e encomendas (com chave estrangeira para clientes) vão ser eliminadas. Qual a ordem correta?', ['Primeiro clientes, depois encomendas', 'Primeiro encomendas, depois clientes', 'Tanto faz', 'Não é possível eliminar tabelas relacionadas'], 1, 'Elimina-se primeiro a tabela que tem a chave estrangeira.'),
     ddl('Elimine as tabelas encomendas e clientes, pela ordem correta.', 'DROP TABLE encomendas;\nDROP TABLE clientes;', 'Duas instruções DROP TABLE: primeiro o "filho".', { setup: 'CREATE TABLE clientes (\n  id_cliente INT AUTO_INCREMENT PRIMARY KEY,\n  nome VARCHAR(80) NOT NULL\n);\nCREATE TABLE encomendas (\n  id_encomenda INT AUTO_INCREMENT PRIMARY KEY,\n  id_cliente INT NOT NULL,\n  FOREIGN KEY (id_cliente) REFERENCES clientes(id_cliente)\n);' }),
   ] },
+  { key: 'norm', title: 'Do problema às tabelas: normalização', steps: [
+    learn('Ler o enunciado e encontrar as entidades', `<p>Antes de escrever <code>CREATE TABLE</code>, é preciso decidir <b>que tabelas</b> criar. Num enunciado:</p>
+      <ul><li>os <b>substantivos</b> importantes são candidatos a <b>entidades</b> (tabelas): cliente, livro, requisição…;</li>
+      <li>as <b>características</b> de cada um são os <b>atributos</b> (colunas): nome, email, título…;</li>
+      <li>os <b>verbos</b> que ligam entidades indicam <b>relações</b>: «um leitor <i>requisita</i> livros».</li></ul>
+      <p>Para cada relação pergunta-se nos dois sentidos: «um leitor pode requisitar <b>quantos</b> livros?» e «um livro pode ser requisitado por <b>quantos</b> leitores?». As respostas dão a cardinalidade: 1:1, 1:N ou N:M.</p>
+      <p><b>Exemplo:</b> «Uma clínica regista os seus médicos (nome, especialidade) e os pacientes (nome, NIF). Cada consulta tem data e hora, um médico e um paciente.» → entidades <code>medicos</code>, <code>pacientes</code> e <code>consultas</code>; cada consulta liga um médico a um paciente.</p>`),
+    quiz('«Uma biblioteca regista os leitores (nome, email) e os livros (título, autor). Cada requisição tem uma data, um leitor e um livro.» Que tabelas deve criar?', ['Só requisicoes, com todas as colunas', 'leitores, livros e requisicoes', 'leitores e livros, com a data em livros', 'Uma tabela por cada coluna'], 1, 'Três entidades: a requisição liga um leitor a um livro e tem a sua própria data.'),
+    learn('Porque não guardar tudo numa só tabela', `<p>Imagine a biblioteca a registar tudo numa única folha:</p>
+      <table><tr><th>id_requisicao</th><th>data</th><th>nome_leitor</th><th>email_leitor</th><th>titulo</th><th>autor</th></tr>
+      <tr><td>1</td><td>2025-03-02</td><td>Rita Sousa</td><td>rita@mail.pt</td><td>Os Maias</td><td>Eça de Queirós</td></tr>
+      <tr><td>2</td><td>2025-03-09</td><td>Rita Sousa</td><td>rita@mail.pt</td><td>Mensagem</td><td>Fernando Pessoa</td></tr>
+      <tr><td>3</td><td>2025-03-10</td><td>Luís Mota</td><td>luis@mail.pt</td><td>Os Maias</td><td>Eça de Queirós</td></tr></table>
+      <p>Os dados repetem-se, e isso causa <b>anomalias</b>:</p>
+      <ul><li><b>de atualização</b> — se a Rita mudar de email, é preciso alterar várias linhas (e basta esquecer uma para ficar incoerente);</li>
+      <li><b>de inserção</b> — não é possível registar um livro novo enquanto ninguém o requisitar;</li>
+      <li><b>de eliminação</b> — apagar a única requisição do Luís apaga também os dados do Luís.</li></ul>
+      <p>A <b>normalização</b> resolve isto: cada facto fica guardado <b>uma só vez</b>, na tabela a que pertence.</p>`),
+    quiz('Na folha acima, a Rita mudou de email. Que problema surge?', ['Nenhum', 'É preciso alterar várias linhas e é fácil deixar dados incoerentes', 'O MySQL não permite alterar emails', 'Perdem-se as requisições'], 1, 'É a anomalia de atualização: o mesmo facto está repetido.'),
+    learn('As formas normais (1FN, 2FN e 3FN)', `<p>As <b>formas normais</b> são regras que, aplicadas por ordem, eliminam as repetições:</p>
+      <table><tr><th>Forma</th><th>Regra</th><th>Exemplo de violação → correção</th></tr>
+      <tr><td><b>1FN</b></td><td>Cada coluna guarda um <b>só valor</b> (atómico); não há listas nem colunas repetidas.</td><td><code>telefones = '912…, 935…'</code> → tabela <code>telefones(id_cliente, numero)</code></td></tr>
+      <tr><td><b>2FN</b></td><td>Numa chave composta, cada coluna depende da <b>chave inteira</b>, não de parte dela.</td><td><code>inscricoes(id_aluno, id_disciplina, nome_disciplina)</code>: o nome só depende de id_disciplina → fica em <code>disciplinas</code></td></tr>
+      <tr><td><b>3FN</b></td><td>Nenhuma coluna depende de <b>outra coluna que não é chave</b>.</td><td><code>clientes(…, codigo_postal, localidade)</code>: a localidade depende do código postal → tabela <code>codigos_postais</code></td></tr></table>
+      <p>Resumo prático: <i>cada coluna deve depender da chave, da chave inteira e de nada mais além da chave</i>.</p>`),
+    quiz('A tabela alunos tem a coluna disciplinas com o valor «Matemática, Física, Química». Que forma normal é violada?', ['1FN — a coluna guarda vários valores', '2FN', '3FN', 'Nenhuma'], 0, 'Uma coluna deve guardar um só valor: as disciplinas vão para uma tabela de ligação.'),
+    quiz('Na tabela encomendas(id_encomenda, data, id_cliente, nome_cliente), o nome_cliente depende de id_cliente, que não é a chave. Que forma normal é violada?', ['1FN', '2FN', '3FN', 'Nenhuma'], 2, 'É uma dependência entre colunas que não são chave: o nome fica só na tabela clientes.'),
+    ddl('Normalize a folha da biblioteca apresentada acima. Crie: leitores (id_leitor, chave primária automática; nome, obrigatório; email, obrigatório e sem repetições), livros (id_livro, chave primária automática; titulo, obrigatório; autor) e requisicoes (id_requisicao, chave primária automática; data, obrigatória; e as ligações obrigatórias ao leitor e ao livro).', `CREATE TABLE leitores (
+  id_leitor INT AUTO_INCREMENT PRIMARY KEY,
+  nome VARCHAR(80) NOT NULL,
+  email VARCHAR(100) NOT NULL UNIQUE
+);
+
+CREATE TABLE livros (
+  id_livro INT AUTO_INCREMENT PRIMARY KEY,
+  titulo VARCHAR(150) NOT NULL,
+  autor VARCHAR(100)
+);
+
+CREATE TABLE requisicoes (
+  id_requisicao INT AUTO_INCREMENT PRIMARY KEY,
+  data DATE NOT NULL,
+  id_leitor INT NOT NULL,
+  id_livro INT NOT NULL,
+  FOREIGN KEY (id_leitor) REFERENCES leitores(id_leitor),
+  FOREIGN KEY (id_livro) REFERENCES livros(id_livro)
+);`, 'Três tabelas: primeiro leitores e livros; depois requisicoes, com duas chaves estrangeiras NOT NULL.', { loose: true, xp: 40 }),
+  ] },
   { title: 'Desafio: modelar uma loja online', steps: [
     learn('O cenário', `<p>Uma pequena loja online precisa de uma base de dados. Leia os requisitos com atenção e decida os tipos, as chaves e as restrições. Use exatamente os nomes de tabelas e colunas indicados.</p>
       <ol>
@@ -319,6 +408,29 @@ CREATE TABLE linhas_encomenda (
     quiz('Qual a chave primária habitual da tabela de ligação inscricoes(id_aluno, id_disciplina)?', ['id_aluno', 'id_disciplina', 'PRIMARY KEY (id_aluno, id_disciplina)', 'Não tem chave primária'], 2, 'Chave composta: impede inscrições repetidas.'),
     quiz('Qual a diferença entre MODIFY e RENAME COLUMN?', ['Nenhuma', 'MODIFY altera o tipo/restrições; RENAME COLUMN só muda o nome', 'RENAME COLUMN altera o tipo', 'MODIFY apaga a coluna'], 1, 'CHANGE faz as duas coisas.'),
     quiz('Porque não se consegue eliminar a tabela clientes antes de encomendas?', ['Porque é maior', 'Porque encomendas tem uma chave estrangeira que referencia clientes', 'Porque tem AUTO_INCREMENT', 'Porque foi criada primeiro'], 1, 'Elimina-se primeiro o "filho".'),
+    quiz('Que problema resolve a normalização?', ['Torna as consultas mais curtas', 'Elimina dados repetidos e as anomalias que eles causam', 'Cifra os dados', 'Cria índices automaticamente'], 1, 'Cada facto fica guardado uma só vez.'),
+    quiz('Uma coluna telefones com o valor «912000000, 935000000» viola…', ['a 1FN', 'a 2FN', 'a 3FN', 'nenhuma forma normal'], 0, 'A 1FN exige valores atómicos.'),
+    quiz('Que restrição deve ter uma chave estrangeira obrigatória?', ['UNIQUE', 'NOT NULL', 'DEFAULT 0', 'AUTO_INCREMENT'], 1, 'Se a relação é obrigatória, a coluna não aceita NULL.'),
+    quiz('Que comando acrescenta uma coluna a uma tabela existente?', ['UPDATE TABLE … ADD', 'ALTER TABLE … ADD COLUMN', 'INSERT COLUMN', 'MODIFY TABLE'], 1, 'ALTER TABLE t ADD COLUMN c TIPO;'),
+    quiz('Que tipo de dados usa normalmente uma chave estrangeira que referencia id_cliente INT?', ['VARCHAR(10)', 'INT', 'DECIMAL', 'O tipo não importa'], 1, 'Tem de ser do mesmo tipo da chave referenciada.'),
+    predict('O que acontece ao executar esta instrução se a tabela clientes ainda não existir?', 'CREATE TABLE encomendas (\n  id_encomenda INT AUTO_INCREMENT PRIMARY KEY,\n  id_cliente INT NOT NULL,\n  FOREIGN KEY (id_cliente) REFERENCES clientes(id_cliente)\n);', ['A tabela é criada sem chave estrangeira', 'O MySQL recusa: a tabela referenciada tem de existir primeiro', 'A tabela clientes é criada automaticamente', 'A chave estrangeira fica desativada'], 1, 'O "pai" cria-se antes do "filho" (ERROR 1824).'),
+  ],
+  real: [
+    'Criar a base de dados <code>pratica</code> com <code>CREATE DATABASE pratica CHARACTER SET utf8mb4;</code> e ativá-la com <code>USE</code>.',
+    'Criar as tabelas <code>clientes</code> e <code>encomendas</code> (com chave estrangeira) e confirmar com <code>DESCRIBE</code> e <code>SHOW CREATE TABLE encomendas;</code>.',
+    'Tentar inserir uma encomenda de um cliente que não existe e ler o erro <b>1452</b> (integridade referencial).',
+    'Tentar eliminar <code>clientes</code> antes de <code>encomendas</code> e ler o erro <b>3730</b>; depois eliminar pela ordem certa.',
+    'Desenhar o diagrama da BD no MySQL Workbench (Database → Reverse Engineer) e verificar as relações.',
+  ],
+  practice: [
+    ddl('Já existe a tabela categorias. Crie a tabela artigos com id_artigo (chave primária automática), nome (VARCHAR(80), obrigatório), preco (DECIMAL(8,2)) e id_categoria (obrigatório), ligada a categorias.', `CREATE TABLE artigos (
+  id_artigo INT AUTO_INCREMENT PRIMARY KEY,
+  nome VARCHAR(80) NOT NULL,
+  preco DECIMAL(8,2),
+  id_categoria INT NOT NULL,
+  FOREIGN KEY (id_categoria) REFERENCES categorias(id_categoria)
+);`, 'FOREIGN KEY (id_categoria) REFERENCES categorias(id_categoria)', { setup: 'CREATE TABLE categorias (\n  id_categoria INT AUTO_INCREMENT PRIMARY KEY,\n  nome VARCHAR(50) NOT NULL\n);' }),
+    ddl('Acrescente à tabela clientes a coluna data_nascimento (DATE).', 'ALTER TABLE clientes ADD COLUMN data_nascimento DATE;', 'ALTER TABLE … ADD COLUMN …', { setup: 'CREATE TABLE clientes (\n  id_cliente INT AUTO_INCREMENT PRIMARY KEY,\n  nome VARCHAR(80) NOT NULL\n);' }),
   ],
 },
 /* =============================== 3 =============================== */
@@ -329,31 +441,49 @@ CREATE TABLE linhas_encomenda (
   { title: 'INSERT — inserir dados', steps: [
     learn('Inserir uma linha', `<p>Adicionam-se linhas a uma tabela com <code>INSERT INTO</code>, indicando as colunas e os respetivos valores, pela mesma ordem:</p>`,
       [ex("INSERT INTO cursos (nome, horas)\nVALUES ('Marketing', 700);", 'O id_curso é gerado pelo AUTO_INCREMENT.')]),
-    code("Insira na tabela cursos (colunas nome e horas) o curso 'Direito' com 1000 horas.", ["^insert into cursos\\(nome,horas\\) ?values\\('direito',1000\\)$"], "INSERT INTO cursos (nome, horas) VALUES ('Direito', 1000);", "INSERT INTO cursos (nome, horas) VALUES ('…', …);"),
+    dml("Insira na tabela cursos o curso 'Direito' com 1000 horas (o id_curso é gerado automaticamente).", "INSERT INTO cursos (nome, horas) VALUES ('Direito', 1000);", "INSERT INTO cursos (nome, horas) VALUES ('…', …);"),
     learn('Texto, números e datas', `<p>Texto e datas escrevem-se entre <b>plicas</b> (<code>'Ana'</code>, <code>'2025-09-15'</code>); números escrevem-se sem plicas. Uma coluna sem valor indica-se com <code>NULL</code>.</p>
       <p>Indicar a lista de colunas é uma boa prática: o código fica claro e continua a funcionar se a estrutura da tabela mudar.</p>`),
     quiz('Como se escreve um valor de texto num INSERT?', ['Sem delimitadores', "Entre plicas: 'texto'", 'Entre parênteses retos', 'Com cardinal: #texto'], 1, 'Texto e datas usam plicas.'),
     learn('Inserir várias linhas', `<p>É possível inserir várias linhas numa só instrução, separando cada conjunto de valores por vírgulas:</p>`,
       [ex("INSERT INTO cursos (nome, horas) VALUES\n  ('Turismo', 600),\n  ('Música', 500);", 'Duas linhas numa só instrução.')]),
-    code("Numa só instrução, insira em cursos (nome, horas) os cursos 'Artes' com 600 horas e 'Teatro' com 450 horas.", ["^insert into cursos\\(nome,horas\\) ?values ?\\('artes',600\\),\\('teatro',450\\)$"], "INSERT INTO cursos (nome, horas) VALUES ('Artes', 600), ('Teatro', 450);", 'VALUES (…), (…);'),
+    dml("Numa só instrução, insira em cursos os cursos 'Artes' com 600 horas e 'Teatro' com 450 horas.", "INSERT INTO cursos (nome, horas) VALUES ('Artes', 600), ('Teatro', 450);", 'VALUES (…), (…);'),
+    key('m1', dml("O aluno João Ramos (id_aluno 10) ainda não tem notas. Registe-lhe 14 a 'Bases de Dados' e 12 a 'Matemática'.", "INSERT INTO notas (id_aluno, disciplina, nota) VALUES (10, 'Bases de Dados', 14), (10, 'Matemática', 12);", 'Duas linhas na tabela notas: (10, …, …), (10, …, …)')),
   ] },
   { title: 'UPDATE — alterar dados', steps: [
     learn('UPDATE com WHERE', `<p><code>UPDATE</code> modifica linhas existentes. <code>SET</code> indica as novas colunas/valores e <code>WHERE</code> escolhe <b>quais</b> linhas alterar:</p>`,
       [ex("UPDATE alunos\nSET cidade = 'Évora'\nWHERE id_aluno = 3;", 'Só altera a linha com id_aluno 3.')]),
-    code('Altere a idade do aluno com id_aluno 5 para 22.', ['^update alunos set idade=22 where id_aluno=5$'], 'UPDATE alunos SET idade = 22 WHERE id_aluno = 5;', 'UPDATE alunos SET … WHERE …'),
+    dml('Altere a idade do aluno com id_aluno 5 para 22.', 'UPDATE alunos SET idade = 22 WHERE id_aluno = 5;', 'UPDATE alunos SET … WHERE …'),
     learn('Cuidado com o WHERE', `<p class="warn"><b>Sem WHERE, todas as linhas da tabela são alteradas.</b></p>
       <p>Boa prática: antes de um UPDATE importante, execute um <code>SELECT</code> com o mesmo WHERE para confirmar quais as linhas afetadas. O MySQL Workbench tem o modo <i>safe updates</i>, que recusa UPDATE/DELETE sem WHERE sobre uma chave.</p>`),
     quiz('O que acontece num UPDATE sem WHERE?', ['Dá sempre erro', 'Nada é alterado', 'Todas as linhas da tabela são alteradas', 'Só a primeira linha é alterada'], 2, 'Sem WHERE o UPDATE atinge a tabela inteira.'),
     learn('Expressões e várias colunas', `<p>O novo valor pode ser calculado a partir do atual, e podem alterar-se várias colunas separadas por vírgulas:</p>`,
       [ex("UPDATE notas SET nota = nota + 1\nWHERE disciplina = 'Programação';", 'Soma 1 valor a todas as notas de Programação.'), ex("UPDATE alunos SET idade = 21, cidade = 'Faro' WHERE id_aluno = 1;", 'Duas colunas de uma vez.')]),
-    code('Aumente em 100 as horas de todos os cursos.', ['^update cursos set horas=horas\\+100$'], 'UPDATE cursos SET horas = horas + 100;', 'SET horas = horas + 100'),
+    dml('Aumente em 100 as horas de todos os cursos.', 'UPDATE cursos SET horas = horas + 100;', 'SET horas = horas + 100'),
+    key('p1', predict('Quantas linhas altera esta instrução na BD escola?', "UPDATE alunos SET cidade = 'Faro'\nWHERE idade > 22;", ['Nenhuma', '3', '5', 'Todas (10)'], 1, 'Só os alunos com mais de 22 anos: Diogo (24), Filipe (23) e Hugo (25).')),
+    key('f1', dml('Um colega queria mudar para 1000 as horas do curso de Gestão, mas a instrução abaixo alteraria todos os cursos. Corrija-a antes de a executar.', 'UPDATE cursos SET horas = 1000 WHERE id_curso = 2;', "Falta o WHERE: só o curso de Gestão (id_curso 2 ou nome = 'Gestão').", { start: 'UPDATE cursos SET horas = 1000;' })),
   ] },
   { title: 'DELETE e TRUNCATE', steps: [
     learn('DELETE', `<p><code>DELETE</code> remove linhas. Tal como no UPDATE, o <code>WHERE</code> indica quais — sem ele, a tabela fica vazia!</p>`, [ex('DELETE FROM alunos WHERE id_aluno = 10;', 'Remove apenas o aluno com id_aluno 10.')]),
-    code('Elimine da tabela alunos o aluno com id_aluno 7.', ['^delete from alunos where id_aluno=7$'], 'DELETE FROM alunos WHERE id_aluno = 7;', 'DELETE FROM … WHERE …'),
+    dml('Elimine da tabela alunos o aluno com id_aluno 7.', 'DELETE FROM alunos WHERE id_aluno = 7;', 'DELETE FROM … WHERE …'),
     learn('TRUNCATE', `<p><code>TRUNCATE TABLE t;</code> esvazia a tabela inteira de forma muito rápida e reinicia o contador <code>AUTO_INCREMENT</code>. Não aceita WHERE e mantém a estrutura da tabela.</p>`),
     quiz('Qual a diferença principal entre DELETE e TRUNCATE?', ['Não há diferença', 'TRUNCATE esvazia a tabela inteira rapidamente; DELETE aceita WHERE', 'TRUNCATE elimina também a estrutura', 'DELETE é mais rápido em tabelas grandes'], 1, 'TRUNCATE não aceita WHERE.'),
     code('Esvazie completamente a tabela registos, da forma mais rápida.', ['^truncate( table)? registos$'], 'TRUNCATE TABLE registos;', 'TRUNCATE TABLE …'),
+    key('m1', dml('As notas negativas (inferiores a 10) foram anuladas. Elimine-as da tabela notas.', 'DELETE FROM notas WHERE nota < 10;', 'DELETE FROM notas WHERE nota < …')),
+  ] },
+  { key: 'loja', title: 'Manter os dados de uma loja', steps: [
+    learn('A base de dados loja', `<p>Até aqui trabalhou com a pequena BD <b>escola</b>. A partir de agora vai também usar a BD <b>loja</b>, mais realista: 30 clientes, 18 produtos, 80 encomendas de 2024 e 2025 e as respetivas linhas.</p>
+      <ul><li><code>clientes(id_cliente, nome, email, cidade, data_registo)</code></li><li><code>produtos(id_produto, nome, categoria, preco, stock)</code></li>
+      <li><code>encomendas(id_encomenda, id_cliente, data, estado)</code></li><li><code>linhas_encomenda(id_encomenda, id_produto, quantidade, preco_unitario)</code></li></ul>
+      <p>Use o botão <b>Estrutura das tabelas</b> nos exercícios para ver as colunas e os dados. No laboratório pode escolher a BD loja.</p>`,
+      [ex("SELECT * FROM produtos WHERE categoria = 'Livros';", 'Os livros à venda.', 'loja')]),
+    dml('A editora aumentou 5% o preço de todos os livros (categoria Livros). Atualize a tabela produtos.', "UPDATE produtos SET preco = preco * 1.05 WHERE categoria = 'Livros';", "SET preco = preco * 1.05 WHERE categoria = 'Livros'", { db: 'loja' }),
+    dml("A loja passou a vender o produto 'Mochila', da categoria Desporto, a 35 €, com 20 unidades em stock. Registe-o (o id_produto é automático).", "INSERT INTO produtos (nome, categoria, preco, stock) VALUES ('Mochila', 'Desporto', 35, 20);", 'INSERT INTO produtos (nome, categoria, preco, stock) VALUES (…);', { db: 'loja' }),
+    learn('Apagar dados relacionados', `<p>Numa BD real, as linhas de uma encomenda referenciam a encomenda (chave estrangeira). Para apagar encomendas é preciso apagar <b>primeiro</b> as suas linhas — ou ter definido <code>ON DELETE CASCADE</code>.</p>
+      <p>Uma subconsulta escolhe as linhas a apagar a partir de outra tabela:</p>`,
+      [ex("DELETE FROM linhas_encomenda\nWHERE id_encomenda IN (SELECT id_encomenda FROM encomendas WHERE estado = 'cancelada');", 'Apaga as linhas das encomendas canceladas (na BD loja).', 'loja')]),
+    dml('Elimine da BD as encomendas canceladas, incluindo as suas linhas. Escreva as duas instruções pela ordem certa, separadas por ponto e vírgula.', "DELETE FROM linhas_encomenda WHERE id_encomenda IN (SELECT id_encomenda FROM encomendas WHERE estado = 'cancelada');\nDELETE FROM encomendas WHERE estado = 'cancelada';", 'Primeiro as linhas (com uma subconsulta), depois as encomendas.', { db: 'loja', xp: 25 }),
+    dml("As encomendas no estado 'enviada' feitas antes de 1 de julho de 2025 já chegaram ao destino. Atualize o seu estado para 'entregue'.", "UPDATE encomendas SET estado = 'entregue' WHERE estado = 'enviada' AND data < '2025-07-01';", "Duas condições: o estado e a data (as datas comparam-se entre plicas: '2025-07-01').", { db: 'loja' }),
   ] }],
   cheat: [
     ["INSERT INTO t (c1, c2) VALUES (v1, v2);", 'Inserir uma linha'], ["INSERT INTO t (c1, c2) VALUES (…), (…);", 'Inserir várias linhas'],
@@ -369,6 +499,26 @@ CREATE TABLE linhas_encomenda (
     quiz('Qual destes comandos aceita WHERE?', ['TRUNCATE', 'DELETE', 'DROP TABLE', 'CREATE TABLE'], 1, 'Só o DELETE filtra linhas.'),
     quiz('Que comando esvazia toda a tabela de forma rápida e reinicia o AUTO_INCREMENT?', ['DELETE FROM t WHERE 1', 'DROP TABLE t', 'TRUNCATE TABLE t', 'UPDATE t SET coluna = 0'], 2, 'TRUNCATE mantém a estrutura mas apaga todas as linhas.'),
     quiz('Antes de executar um UPDATE ou DELETE importante, qual é a boa prática?', ['Desligar o servidor', 'Testar primeiro o WHERE com um SELECT', 'Apagar os índices', 'Usar sempre TRUNCATE'], 1, 'O SELECT mostra exatamente que linhas vão ser afetadas.'),
+    predict('Quantas linhas ficam na tabela alunos (10 linhas) depois desta instrução?', 'DELETE FROM alunos WHERE cidade = \'Lisboa\';', ['0', '6', '4', '10'], 1, 'Há 4 alunos de Lisboa: ficam 6.'),
+    quiz('Que instrução regista um aluno sem indicar o id_aluno (AUTO_INCREMENT)?', ["INSERT INTO alunos VALUES ('Rita', 20)", "INSERT INTO alunos (nome, idade) VALUES ('Rita', 20)", "INSERT alunos SET id_aluno = AUTO", "UPDATE alunos ADD ('Rita', 20)"], 1, 'Indica-se a lista de colunas; o id é gerado automaticamente.'),
+    quiz('Como se alteram duas colunas na mesma instrução?', ['UPDATE t SET a = 1 AND b = 2', 'UPDATE t SET a = 1, b = 2', 'UPDATE t SET (a, b) = 1, 2', 'São precisas duas instruções'], 1, 'As atribuições separam-se por vírgulas.'),
+    quiz('Porque é que o MySQL pode recusar DELETE FROM encomendas WHERE id_encomenda = 5?', ['Porque falta LIMIT', 'Porque existem linhas de encomenda que a referenciam (chave estrangeira)', 'Porque DELETE não aceita WHERE', 'Porque a tabela tem AUTO_INCREMENT'], 1, 'A integridade referencial impede deixar linhas "órfãs" (a não ser com ON DELETE CASCADE).'),
+    quiz('Que instrução apaga apenas os produtos sem stock?', ['DELETE produtos WHERE stock = 0', 'DELETE FROM produtos WHERE stock = 0', 'DROP produtos WHERE stock = 0', 'TRUNCATE produtos WHERE stock = 0'], 1, 'DELETE FROM … WHERE …'),
+    predict('O que acontece a esta instrução?', "UPDATE cursos SET horas = horas * 2\nWHERE nome = 'Gestão';", ['Duplica as horas de todos os cursos', 'Duplica as horas apenas do curso de Gestão', 'Dá erro: não se pode usar a própria coluna', 'Põe as horas a 2'], 1, 'O novo valor é calculado a partir do atual, só nas linhas do WHERE.'),
+    quiz('Como se insere um valor desconhecido numa coluna que aceita nulos?', ["''", '0', 'NULL', "'NULL'"], 2, "NULL sem plicas; 'NULL' seria o texto NULL."),
+    quiz('Que cuidado ter antes de um DELETE com WHERE?', ['Nenhum', 'Executar primeiro um SELECT com o mesmo WHERE para ver as linhas afetadas', 'Fazer TRUNCATE', 'Desativar as chaves'], 1, 'Assim confirma exatamente o que vai ser apagado.'),
+  ],
+  real: [
+    'Importar a BD <b>loja</b> (botão abaixo) e confirmar com <code>SELECT COUNT(*) FROM loja.encomendas;</code>.',
+    'Inserir dois clientes e confirmar o <code>id_cliente</code> gerado com <code>SELECT LAST_INSERT_ID();</code>.',
+    'No MySQL Workbench, tentar um <code>UPDATE</code> sem WHERE e observar o aviso do modo <i>safe updates</i> (Error 1175).',
+    'Antes de cada UPDATE/DELETE, executar um SELECT com o mesmo WHERE e comparar o número de linhas afetadas.',
+    'Tentar apagar uma encomenda que tem linhas e ler o erro <b>1451</b>; depois apagar pela ordem correta.',
+  ],
+  practice: [
+    dml("Registe o curso 'Psicologia' com 1100 horas.", "INSERT INTO cursos (nome, horas) VALUES ('Psicologia', 1100);", "INSERT INTO cursos (nome, horas) VALUES (…);"),
+    dml("Os alunos do Porto mudaram-se para Gaia. Atualize a cidade.", "UPDATE alunos SET cidade = 'Gaia' WHERE cidade = 'Porto';", "UPDATE alunos SET cidade = … WHERE cidade = …"),
+    dml("Elimine as notas da disciplina de Programação.", "DELETE FROM notas WHERE disciplina = 'Programação';", "DELETE FROM notas WHERE …"),
   ],
 },
 /* =============================== 4 =============================== */
@@ -420,6 +570,7 @@ CREATE TABLE linhas_encomenda (
     query('Mostre o nome dos 2 alunos mais velhos.', 'SELECT nome FROM alunos ORDER BY idade DESC LIMIT 2', 'ORDER BY idade DESC LIMIT 2', true),
     learn('DISTINCT', `<p><code>DISTINCT</code> elimina as linhas repetidas do resultado:</p>`, [ex('SELECT DISTINCT disciplina FROM notas;', 'Cada disciplina aparece uma só vez.', true)]),
     query('Mostre, sem repetições, as cidades onde vivem os alunos.', 'SELECT DISTINCT cidade FROM alunos', 'SELECT DISTINCT …'),
+    key('p1', predict('Quantas linhas devolve esta consulta?', 'SELECT DISTINCT cidade FROM alunos;', ['10', '4', '3', '1'], 1, 'Há alunos de 4 cidades diferentes: Lisboa, Porto, Braga e Coimbra.')),
   ] },
   { title: 'Funções de agregação e GROUP BY', steps: [
     learn('Funções de agregação', `<p>As funções de agregação resumem várias linhas num único valor:</p>
@@ -433,7 +584,13 @@ CREATE TABLE linhas_encomenda (
     learn('HAVING', `<p><code>WHERE</code> filtra <b>linhas</b> antes de agrupar; <code>HAVING</code> filtra <b>grupos</b> depois de agrupar, normalmente usando a agregação.</p>
       <p>Ordem das cláusulas: <code>SELECT → FROM → WHERE → GROUP BY → HAVING → ORDER BY → LIMIT</code>.</p>`,
       [ex('SELECT disciplina, AVG(nota) AS media\nFROM notas GROUP BY disciplina\nHAVING AVG(nota) > 13;', 'Só as disciplinas com média superior a 13.', true)]),
+    viz('Como o MySQL executa uma consulta', `<p>As cláusulas escrevem-se pela ordem <code>SELECT … FROM … WHERE … GROUP BY … HAVING … ORDER BY … LIMIT</code>, mas o MySQL <b>executa-as por outra ordem</b>: primeiro lê a tabela (FROM), filtra as linhas (WHERE), forma os grupos (GROUP BY), filtra os grupos (HAVING), calcula as colunas (SELECT), ordena (ORDER BY) e só no fim limita (LIMIT).</p>
+      <p>Avance passo a passo e veja o que acontece aos dados em cada fase:</p>`,
+      { select: 'cidade, COUNT(*) AS qtd, AVG(idade) AS media', from: 'alunos', where: 'idade >= 20', group: 'cidade', having: 'COUNT(*) >= 2', order: 'qtd DESC, cidade', limit: 2 }),
     query('Mostre as cidades com 3 ou mais alunos.', 'SELECT cidade FROM alunos GROUP BY cidade HAVING COUNT(*) >= 3', 'GROUP BY cidade HAVING COUNT(*) >= 3'),
+    key('o1', order('Ordene as cláusulas desta consulta, que mostra as 3 disciplinas com melhor média, considerando só as notas positivas e as disciplinas com pelo menos 3 notas.',
+      ['SELECT disciplina, AVG(nota) AS media', 'FROM notas', 'WHERE nota >= 10', 'GROUP BY disciplina', 'HAVING COUNT(*) >= 3', 'ORDER BY media DESC', 'LIMIT 3'], 'A ordem de escrita é sempre SELECT, FROM, WHERE, GROUP BY, HAVING, ORDER BY, LIMIT.')),
+    key('p1', predict('Quantas linhas devolve esta consulta?', 'SELECT cidade, COUNT(*)\nFROM alunos\nWHERE idade > 21\nGROUP BY cidade;', ['5', '3', '4', '1'], 1, 'Com mais de 21 anos há alunos do Porto, de Braga e de Lisboa: 3 grupos, 3 linhas.')),
   ] },
   { title: 'Juntar tabelas com JOIN', steps: [
     learn('INNER JOIN', `<p>Os dados estão repartidos por várias tabelas. O <code>JOIN</code> volta a juntá-los através das colunas relacionadas. O <code>INNER JOIN</code> devolve apenas as combinações que têm correspondência nas duas tabelas:</p>
@@ -449,6 +606,7 @@ CREATE TABLE linhas_encomenda (
     learn('JOIN com GROUP BY', `<p>JOIN e agregações combinam-se naturalmente — por exemplo, a média de cada aluno:</p>`,
       [ex('SELECT a.nome, AVG(n.nota) AS media\nFROM alunos a JOIN notas n ON n.id_aluno = a.id_aluno\nGROUP BY a.nome;', 'Média de notas por aluno.', true)]),
     query('Mostre o nome de cada curso e o número de alunos inscritos.', 'SELECT c.nome, COUNT(*) FROM cursos c INNER JOIN alunos a ON a.id_curso = c.id_curso GROUP BY c.nome', 'JOIN + GROUP BY c.nome'),
+    key('f1', query('Corrija a consulta abaixo: devia mostrar o nome dos alunos e as notas iguais ou superiores a 15, mas as duas tabelas têm a coluna id_aluno e a junção fica ambígua. Use aliases (a, n).', 'SELECT a.nome, n.nota FROM alunos a JOIN notas n ON n.id_aluno = a.id_aluno WHERE n.nota >= 15', 'FROM alunos a JOIN notas n ON n.id_aluno = a.id_aluno', false, { start: 'SELECT nome, nota\nFROM alunos JOIN notas ON id_aluno = id_aluno\nWHERE nota >= 15;' })),
   ] },
   { title: 'Subconsultas', steps: [
     learn('Subconsulta escalar', `<p>Uma <b>subconsulta</b> é um SELECT dentro de outro. Quando devolve um único valor, pode ser usada numa comparação:</p>`,
@@ -457,6 +615,63 @@ CREATE TABLE linhas_encomenda (
     learn('Subconsulta com IN', `<p>Quando a subconsulta devolve uma lista de valores, usa-se com <code>IN</code>:</p>`,
       [ex("SELECT nome FROM alunos\nWHERE id_aluno IN (SELECT id_aluno FROM notas WHERE disciplina = 'Programação');", 'Alunos com nota a Programação.', true)]),
     query('Mostre o nome dos alunos que têm alguma nota igual ou superior a 17 (use IN com subconsulta).', 'SELECT nome FROM alunos WHERE id_aluno IN (SELECT id_aluno FROM notas WHERE nota >= 17)', 'WHERE id_aluno IN (SELECT id_aluno FROM notas …)'),
+  ] },
+  { key: 'func', title: 'Funções de texto, números e datas', steps: [
+    learn('Funções de texto', `<p>As funções transformam os valores de cada linha:</p>
+      <table><tr><th>Função</th><th>Exemplo</th><th>Resultado</th></tr>
+      <tr><td><code>UPPER(t)</code> / <code>LOWER(t)</code></td><td><code>UPPER('Ana')</code></td><td>ANA</td></tr>
+      <tr><td><code>LENGTH(t)</code></td><td><code>LENGTH('Porto')</code></td><td>5</td></tr>
+      <tr><td><code>CONCAT(a, b, …)</code></td><td><code>CONCAT(nome, ' (', cidade, ')')</code></td><td>Ana Silva (Lisboa)</td></tr>
+      <tr><td><code>LEFT(t, n)</code></td><td><code>LEFT('Lisboa', 3)</code></td><td>Lis</td></tr>
+      <tr><td><code>SUBSTRING(t, início, n)</code></td><td><code>SUBSTRING('Bases', 2, 3)</code></td><td>ase</td></tr>
+      <tr><td><code>TRIM(t)</code> / <code>REPLACE(t, a, b)</code></td><td><code>REPLACE('a-b', '-', '/')</code></td><td>a/b</td></tr></table>`,
+      [ex("SELECT CONCAT(nome, ' (', cidade, ')') AS aluno, LENGTH(nome) AS letras\nFROM alunos;", 'Junta duas colunas e conta as letras do nome.', true)]),
+    query('Mostre o nome de cada curso em maiúsculas e as primeiras 3 letras do nome (como sigla).', 'SELECT UPPER(nome), LEFT(nome, 3) FROM cursos', 'UPPER(nome), LEFT(nome, 3)'),
+    learn('Funções numéricas', `<p><code>ROUND(x, d)</code> arredonda a <i>d</i> casas decimais; <code>FLOOR</code> e <code>CEIL</code> arredondam para baixo e para cima. As médias costumam ser arredondadas:</p>`,
+      [ex('SELECT disciplina, ROUND(AVG(nota), 1) AS media\nFROM notas GROUP BY disciplina;', 'Média com uma casa decimal.', true)]),
+    query('Na BD loja, mostre o nome e o preço com IVA (23%) de cada produto, arredondado a 2 casas decimais, com o nome preco_iva.', 'SELECT nome, ROUND(preco * 1.23, 2) AS preco_iva FROM produtos', 'ROUND(preco * 1.23, 2)', false, { db: 'loja' }),
+    learn('Funções de datas', `<p>As datas guardam-se como <code>'AAAA-MM-DD'</code> e comparam-se como texto (<code>data &gt;= '2025-01-01'</code>). Funções úteis:</p>
+      <table><tr><th>Função</th><th>Devolve</th></tr>
+      <tr><td><code>CURDATE()</code></td><td>a data de hoje</td></tr>
+      <tr><td><code>YEAR(d)</code>, <code>MONTH(d)</code>, <code>DAY(d)</code></td><td>o ano, o mês e o dia</td></tr>
+      <tr><td><code>DATEDIFF(d1, d2)</code></td><td>o número de dias entre d2 e d1</td></tr>
+      <tr><td><code>DATE_FORMAT(d, '%d/%m/%Y')</code></td><td>a data no formato português, ex.: 14/03/2025</td></tr></table>`,
+      [ex("SELECT id_encomenda, DATE_FORMAT(data, '%d/%m/%Y') AS data_pt,\n       DATEDIFF('2025-12-31', data) AS dias_ate_fim_2025\nFROM encomendas\nWHERE YEAR(data) = 2025;", 'Na BD loja: encomendas de 2025.', 'loja')]),
+    query('Na BD loja, quantas encomendas foram feitas em cada ano? Mostre o ano e o número de encomendas.', 'SELECT YEAR(data), COUNT(*) FROM encomendas GROUP BY YEAR(data)', 'SELECT YEAR(data), COUNT(*) … GROUP BY YEAR(data)', false, { db: 'loja' }),
+    query("Na BD loja, mostre o id_encomenda e a data no formato dia/mês/ano das encomendas do cliente 3.", "SELECT id_encomenda, DATE_FORMAT(data, '%d/%m/%Y') FROM encomendas WHERE id_cliente = 3", "DATE_FORMAT(data, '%d/%m/%Y')", false, { db: 'loja' }),
+  ] },
+  { key: 'case', title: 'CASE e valores nulos (IFNULL, COALESCE)', steps: [
+    learn('CASE — decidir dentro da consulta', `<p><code>CASE</code> devolve um valor diferente consoante uma condição — é o "se… então… senão" do SQL:</p>`,
+      [ex("SELECT nome, nota,\n  CASE WHEN nota >= 18 THEN 'Excelente'\n       WHEN nota >= 10 THEN 'Aprovado'\n       ELSE 'Reprovado' END AS resultado\nFROM alunos a JOIN notas n ON n.id_aluno = a.id_aluno;", 'As condições são avaliadas por ordem; a primeira verdadeira ganha.', true)]),
+    query("Na BD loja, mostre o nome de cada produto e uma coluna gama: 'alta' se o preço for 100 € ou mais, 'média' se for 30 € ou mais e 'baixa' nos restantes.", "SELECT nome, CASE WHEN preco >= 100 THEN 'alta' WHEN preco >= 30 THEN 'média' ELSE 'baixa' END AS gama FROM produtos", "CASE WHEN preco >= 100 THEN 'alta' WHEN … ELSE 'baixa' END", false, { db: 'loja' }),
+    learn('NULL nas contas e nas funções', `<p><code>NULL</code> significa "valor desconhecido". Qualquer conta com NULL dá NULL, e <code>COUNT(coluna)</code> não conta os nulos (ao contrário de <code>COUNT(*)</code>).</p>
+      <p><code>IFNULL(x, valor)</code> e <code>COALESCE(x, y, …)</code> substituem os nulos por um valor:</p>`,
+      [ex("SELECT nome, IFNULL(email, '(sem email)') AS contacto FROM clientes;", 'Na BD loja: alguns clientes não indicaram email.', 'loja')]),
+    predict('Na BD loja há 30 clientes e 3 não têm email. Quanto devolvem estas duas colunas?', 'SELECT COUNT(*), COUNT(email) FROM clientes;', ['30 e 30', '30 e 27', '27 e 27', '27 e 30'], 1, 'COUNT(*) conta linhas; COUNT(email) ignora os NULL.'),
+    query("Na BD loja, mostre o nome e o email de cada cliente de Lisboa; quando o email for desconhecido, mostre 'sem email'.", "SELECT nome, IFNULL(email, 'sem email') FROM clientes WHERE cidade = 'Lisboa'", "IFNULL(email, 'sem email')", false, { db: 'loja' }),
+  ] },
+  { key: 'join3', title: 'Juntar três tabelas e UNION', steps: [
+    learn('JOIN de três tabelas', `<p>Para responder a muitas perguntas é preciso atravessar várias tabelas. Na BD loja, para saber <b>que produtos</b> comprou <b>cada cliente</b> passa-se por <code>clientes → encomendas → linhas_encomenda → produtos</code>. Cada <code>JOIN</code> acrescenta uma tabela e a sua condição de ligação:</p>`,
+      [ex("SELECT c.nome AS cliente, e.data, l.quantidade\nFROM clientes c\nJOIN encomendas e ON e.id_cliente = c.id_cliente\nJOIN linhas_encomenda l ON l.id_encomenda = e.id_encomenda\nWHERE c.id_cliente = 1;", 'Três tabelas: o cliente, as suas encomendas e as linhas de cada encomenda.', 'loja')]),
+    query('Na BD loja, mostre o nome do produto e a quantidade de cada linha da encomenda 1.', 'SELECT p.nome, l.quantidade FROM linhas_encomenda l JOIN produtos p ON p.id_produto = l.id_produto WHERE l.id_encomenda = 1', 'JOIN produtos p ON p.id_produto = l.id_produto', false, { db: 'loja' }),
+    query('Na BD loja, mostre o nome de cada cliente e o valor total gasto (soma de quantidade × preço unitário), considerando todas as encomendas. Chame total à soma.', 'SELECT c.nome, SUM(l.quantidade * l.preco_unitario) AS total FROM clientes c JOIN encomendas e ON e.id_cliente = c.id_cliente JOIN linhas_encomenda l ON l.id_encomenda = e.id_encomenda GROUP BY c.nome', 'Três tabelas e SUM(l.quantidade * l.preco_unitario) … GROUP BY c.nome', false, { db: 'loja', xp: 30 }),
+    learn('UNION e UNION ALL', `<p><code>UNION</code> junta, <b>uma por baixo da outra</b>, as linhas de duas consultas com o mesmo número de colunas. Elimina as linhas repetidas; <code>UNION ALL</code> mantém-nas (e é mais rápido).</p>`,
+      [ex("SELECT nome, 'aluno' AS tipo FROM alunos WHERE cidade = 'Braga'\nUNION\nSELECT nome, 'curso' FROM cursos;", 'Alunos de Braga e cursos, numa só lista.', true)]),
+    predict('Quantas linhas devolve esta consulta?', "SELECT cidade FROM alunos WHERE idade > 22\nUNION\nSELECT cidade FROM alunos WHERE idade < 20;", ['5', '3', '2', '4'], 2, 'Acima de 22: Braga, Lisboa, Braga; abaixo de 20: Lisboa, Lisboa. O UNION elimina os repetidos: Braga e Lisboa.'),
+    query("Mostre, numa só lista sem repetições, as cidades dos alunos da BD escola com mais de 22 anos e as dos alunos com menos de 20 anos (use UNION).", "SELECT cidade FROM alunos WHERE idade > 22 UNION SELECT cidade FROM alunos WHERE idade < 20", '… UNION …'),
+  ] },
+  { key: 'neg', title: 'Perguntas de negócio (BD loja)', steps: [
+    learn('Da pergunta à consulta', `<p>No mundo real ninguém pede «faça um JOIN com GROUP BY». Pedem-se respostas: <i>«quais os nossos melhores clientes?»</i>. O trabalho é traduzir a pergunta:</p>
+      <ol><li><b>Que dados</b> respondem à pergunta? → colunas e tabelas (<code>SELECT</code>, <code>FROM</code>, <code>JOIN</code>);</li>
+      <li><b>Que linhas</b> interessam? → <code>WHERE</code>;</li><li>É preciso <b>resumir</b>? por quê? → <code>GROUP BY</code> e agregações, <code>HAVING</code>;</li>
+      <li>Como <b>apresentar</b>? → <code>ORDER BY</code>, <code>LIMIT</code>, aliases.</li></ol>
+      <p>Nesta lição, os enunciados são perguntas da direção da loja. Use a estrutura das tabelas e experimente: o resultado esperado é comparado com o seu.</p>`),
+    query('A direção quer saber quantos clientes tem em cada cidade, da cidade com mais clientes para a com menos.', 'SELECT cidade, COUNT(*) AS clientes FROM clientes GROUP BY cidade ORDER BY clientes DESC, cidade', 'Agrupe por cidade e ordene pela contagem (empates por cidade).', true, { db: 'loja', xp: 25 }),
+    query('Que produtos nunca foram vendidos? Mostre o nome.', 'SELECT nome FROM produtos WHERE id_produto NOT IN (SELECT id_produto FROM linhas_encomenda)', 'Os produtos cujo id não aparece em linhas_encomenda (NOT IN ou LEFT JOIN … IS NULL).', false, { db: 'loja', xp: 25 }),
+    query('Quais são os 3 produtos que mais unidades venderam em encomendas que não foram canceladas? Mostre o nome e o total de unidades.', "SELECT p.nome, SUM(l.quantidade) AS unidades FROM produtos p JOIN linhas_encomenda l ON l.id_produto = p.id_produto JOIN encomendas e ON e.id_encomenda = l.id_encomenda WHERE e.estado <> 'cancelada' GROUP BY p.nome ORDER BY unidades DESC LIMIT 3", 'produtos → linhas_encomenda → encomendas; filtre o estado, some a quantidade, ordene e limite.', true, { db: 'loja', xp: 35 }),
+    query('Qual foi a faturação (soma de quantidade × preço unitário) de cada mês de 2025, sem contar as encomendas canceladas? Mostre o mês e o valor, por ordem do mês.', "SELECT MONTH(e.data) AS mes, SUM(l.quantidade * l.preco_unitario) AS faturacao FROM encomendas e JOIN linhas_encomenda l ON l.id_encomenda = e.id_encomenda WHERE YEAR(e.data) = 2025 AND e.estado <> 'cancelada' GROUP BY MONTH(e.data) ORDER BY mes", 'GROUP BY MONTH(e.data), com WHERE no ano e no estado.', true, { db: 'loja', xp: 35 }),
+    query('Que clientes já fizeram mais de 4 encomendas? Mostre o nome e o número de encomendas.', 'SELECT c.nome, COUNT(*) AS encomendas FROM clientes c JOIN encomendas e ON e.id_cliente = c.id_cliente GROUP BY c.nome HAVING COUNT(*) > 4', 'JOIN + GROUP BY + HAVING COUNT(*) > 4', false, { db: 'loja', xp: 30 }),
+    query('Que clientes se registaram mas nunca fizeram nenhuma encomenda? Mostre o nome e a cidade.', 'SELECT c.nome, c.cidade FROM clientes c LEFT JOIN encomendas e ON e.id_cliente = c.id_cliente WHERE e.id_encomenda IS NULL', 'LEFT JOIN encomendas … WHERE e.id_encomenda IS NULL', false, { db: 'loja', xp: 30 }),
   ] }],
   cheat: [
     ['SELECT * FROM t;', 'Todas as colunas'], ['SELECT c1, c2 AS alias FROM t;', 'Colunas escolhidas e alias'],
@@ -475,6 +690,27 @@ CREATE TABLE linhas_encomenda (
     quiz('Que função conta linhas?', ['SUM()', 'COUNT()', 'TOTAL()', 'NUM()'], 1, 'COUNT(*).'),
     quiz('O que devolve um LEFT JOIN entre alunos e notas?', ['Só alunos com notas', 'Todos os alunos, com NULL nas notas em falta', 'Só as notas', 'Apenas as linhas sem correspondência'], 1, 'Mantém todas as linhas da esquerda.'),
     quiz('Como se testa se uma coluna não tem valor?', ['= NULL', 'IS NULL', "= ''", '== NULL'], 1, 'NULL compara-se com IS NULL.'),
+    predict('Quantas linhas devolve esta consulta na BD escola?', "SELECT nome FROM alunos\nWHERE cidade = 'Porto' OR idade < 20;", ['3', '5', '2', '10'], 1, 'Porto: Bruno, Eva, Inês; menos de 20: Carla e João. Total: 5.'),
+    quiz('Qual a ordem correta das cláusulas?', ['SELECT, WHERE, FROM, ORDER BY', 'SELECT, FROM, WHERE, GROUP BY, HAVING, ORDER BY', 'FROM, SELECT, HAVING, WHERE', 'SELECT, FROM, HAVING, GROUP BY'], 1, 'E LIMIT no fim.'),
+    quiz('Que função devolve o número de dias entre duas datas?', ['DAYS()', 'DATEDIFF()', 'YEAR()', 'DATE_FORMAT()'], 1, "DATEDIFF('2025-12-31', data)"),
+    quiz('O que devolve COUNT(email) numa tabela com 30 linhas, 3 delas com email NULL?', ['30', '27', '3', 'NULL'], 1, 'COUNT(coluna) ignora os nulos.'),
+    quiz('Qual a diferença entre UNION e UNION ALL?', ['Nenhuma', 'UNION elimina as linhas repetidas; UNION ALL mantém-nas', 'UNION ALL junta colunas', 'UNION só funciona com duas tabelas iguais'], 1, 'UNION ALL é mais rápido por não eliminar repetidos.'),
+    quiz('Como se mostra um texto alternativo quando o email é NULL?', ["WHERE email = NULL", "IFNULL(email, 'sem email')", "email OR 'sem email'", "CASE email NULL"], 1, 'IFNULL ou COALESCE.'),
+    quiz('Para listar os produtos de cada cliente na BD loja, quantos JOIN são precisos (clientes, encomendas, linhas_encomenda, produtos)?', ['1', '2', '3', '4'], 2, 'Quatro tabelas, três junções.'),
+    predict('Qual é o resultado desta expressão?', "SELECT CONCAT(LEFT('Lisboa', 3), '-', UPPER('pt'));", ["'Lis-PT'", "'Lisboa-pt'", "'LIS-pt'", 'Erro'], 0, 'LEFT devolve «Lis» e UPPER devolve «PT».'),
+  ],
+  real: [
+    'Importar a BD <b>loja</b> e executar no MySQL Workbench três consultas da lição «Perguntas de negócio».',
+    'Usar <code>EXPLAIN</code> antes de uma consulta com JOIN e identificar as tabelas lidas.',
+    'Exportar o resultado de uma consulta para CSV no Workbench (botão <i>Export</i> da grelha de resultados).',
+    'Escrever uma consulta com <code>DATE_FORMAT</code> e <code>DATEDIFF</code> sobre as encomendas e comparar com o simulador.',
+  ],
+  practice: [
+    query('Mostre o nome e a idade dos alunos de Lisboa, do mais velho para o mais novo.', "SELECT nome, idade FROM alunos WHERE cidade = 'Lisboa' ORDER BY idade DESC", "WHERE cidade = 'Lisboa' ORDER BY idade DESC", true),
+    query('Mostre cada disciplina e o número de notas registadas, só para as disciplinas com mais de 4 notas.', 'SELECT disciplina, COUNT(*) FROM notas GROUP BY disciplina HAVING COUNT(*) > 4', 'GROUP BY disciplina HAVING COUNT(*) > 4'),
+    query('Mostre o nome dos alunos do curso de Gestão (use JOIN).', "SELECT a.nome FROM alunos a JOIN cursos c ON c.id_curso = a.id_curso WHERE c.nome = 'Gestão'", "JOIN cursos … WHERE c.nome = 'Gestão'"),
+    query('Na BD loja, mostre a categoria e o preço médio dos produtos de cada categoria, arredondado a 2 casas decimais.', 'SELECT categoria, ROUND(AVG(preco), 2) FROM produtos GROUP BY categoria', 'ROUND(AVG(preco), 2) … GROUP BY categoria', false, { db: 'loja' }),
+    query('Na BD loja, quantas encomendas existem em cada estado?', 'SELECT estado, COUNT(*) FROM encomendas GROUP BY estado', 'GROUP BY estado', false, { db: 'loja' }),
   ],
 },
 /* ========================= restrições, índices e vistas ========================= */
@@ -548,6 +784,7 @@ DROP VIEW v_alunos_porto;
 GRANT SELECT ON escola.v_alunos_cursos TO 'rececao'@'localhost';</code></pre>
       <p>Com o <code>GRANT</code> sobre a vista, o utilizador vê apenas as colunas da vista, sem acesso às tabelas originais. Vistas simples (uma só tabela, sem agregações) também permitem UPDATE; as restantes são só de leitura.</p>`),
     code('Elimine a vista v_alunos_porto.', ['^drop view (if exists )?v_alunos_porto$'], 'DROP VIEW v_alunos_porto;', 'DROP VIEW nome;'),
+    key('f1', code('Corrija o erro: esta instrução devia criar a vista v_cursos_longos com o nome dos cursos com mais de 850 horas, mas o MySQL recusa-a.', ["^create (or replace )?view v_cursos_longos as select nome from cursos where horas>850$"], 'CREATE VIEW v_cursos_longos AS SELECT nome FROM cursos WHERE horas > 850;', 'Falta uma palavra-chave entre o nome da vista e o SELECT.', { start: 'CREATE VIEW v_cursos_longos\nSELECT nome FROM cursos WHERE horas > 850;' })),
   ] }],
   cheat: [
     ['col TIPO CHECK (condição)', 'Validar valores de uma coluna'], ['ALTER TABLE t ADD CONSTRAINT nome CHECK (…);', 'Acrescentar restrição com nome'], ['ALTER TABLE t DROP CHECK nome;', 'Remover restrição'],
@@ -563,6 +800,25 @@ GRANT SELECT ON escola.v_alunos_cursos TO 'rececao'@'localhost';</code></pre>
     quiz('Que comando mostra se o MySQL vai usar um índice numa consulta?', ['SHOW TABLES', 'DESCRIBE', 'EXPLAIN', 'ANALYZE INDEX'], 2, 'EXPLAIN mostra o plano de execução.'),
     quiz('O que é uma vista (VIEW)?', ['Uma cópia de segurança', 'Uma consulta guardada que se usa como uma tabela', 'Um tipo de índice', 'Um utilizador só de leitura'], 1, 'É uma tabela virtual.'),
     quiz('Como se dá acesso a apenas algumas colunas de uma tabela a um utilizador?', ['Com um índice nessas colunas', 'Criando uma vista com essas colunas e dando GRANT SELECT sobre a vista', 'Com CHECK nas colunas', 'Não é possível'], 1, 'As vistas são úteis para a segurança.'),
+    quiz('Que instrução cria um índice único na coluna email da tabela clientes?', ['CREATE INDEX UNIQUE email ON clientes', 'CREATE UNIQUE INDEX idx_clientes_email ON clientes (email)', 'ALTER clientes UNIQUE email', 'CREATE KEY email'], 1, 'CREATE UNIQUE INDEX nome ON tabela (coluna);'),
+    quiz('O que acontece ao acrescentar uma restrição CHECK que as linhas existentes não cumprem?', ['As linhas são apagadas', 'O ALTER TABLE falha', 'A restrição só se aplica a linhas novas', 'Os valores são corrigidos'], 1, 'Os dados existentes também têm de a cumprir.'),
+    quiz('A chave primária precisa de um índice criado à mão?', ['Sim, sempre', 'Não, o MySQL cria-o automaticamente', 'Só em tabelas grandes', 'Só se for composta'], 1, 'A PRIMARY KEY tem sempre um índice.'),
+    quiz('Como se altera a consulta de uma vista existente?', ['UPDATE VIEW', 'CREATE OR REPLACE VIEW', 'ALTER TABLE', 'MODIFY VIEW'], 1, 'Ou ALTER VIEW.'),
+    quiz('Uma vista com GROUP BY permite UPDATE?', ['Sim', 'Não, é só de leitura', 'Só com CHECK', 'Só com índice'], 1, 'Vistas com agregações não são atualizáveis.'),
+    predict('O que acontece a este INSERT?', 'CREATE TABLE stock (id_stock INT, qtd INT CHECK (qtd >= 0));\nINSERT INTO stock VALUES (1, -3);', ['A linha é guardada com qtd 0', 'É recusado (ERROR 3819) e a linha não é guardada', 'É guardado com um aviso', 'A restrição é ignorada'], 1, 'O CHECK recusa os valores que não cumprem a condição.'),
+    quiz('Em que coluna de uma tabela de encomendas com milhões de linhas é mais útil um índice?', ['estado (4 valores possíveis)', 'id_cliente, usada em JOIN e WHERE', 'observacoes (texto livre)', 'Nenhuma'], 1, 'Colunas de junção e pesquisa frequentes beneficiam mais.'),
+    quiz('Qual destas é uma vantagem das vistas?', ['Ocupam menos espaço que as tabelas', 'Escondem a complexidade e limitam o acesso a colunas', 'Tornam os INSERT mais rápidos', 'Substituem os backups'], 1, 'Simplicidade e segurança.'),
+  ],
+  real: [
+    'Criar a tabela <code>stock</code> com um CHECK e provocar o erro <b>3819</b> com um valor inválido.',
+    'Executar <code>EXPLAIN SELECT * FROM loja.encomendas WHERE id_cliente = 5;</code> antes e depois de criar um índice em <code>id_cliente</code> e comparar a coluna <i>key</i> e o número de linhas lidas.',
+    'Criar uma vista na BD loja (ex.: faturação por cliente) e consultá-la como uma tabela.',
+    'Ver a definição da vista com <code>SHOW CREATE VIEW</code>.',
+  ],
+  practice: [
+    query("Usando a vista v_alunos_cursos, mostre o nome (aluno) e o curso dos alunos com 22 anos ou mais.", "SELECT aluno, curso FROM v_alunos_cursos WHERE idade >= 22", 'SELECT aluno, curso FROM v_alunos_cursos WHERE …'),
+    code('Crie um índice chamado idx_alunos_nome na coluna nome da tabela alunos.', ['^create index idx_alunos_nome on alunos ?\\(nome\\)$'], 'CREATE INDEX idx_alunos_nome ON alunos (nome);', 'CREATE INDEX nome ON tabela (coluna);'),
+    code("Crie a vista v_notas_altas com todas as colunas das notas iguais ou superiores a 15.", ["^create (or replace )?view v_notas_altas as select \\* from notas where nota>=15$"], 'CREATE VIEW v_notas_altas AS SELECT * FROM notas WHERE nota >= 15;', 'CREATE VIEW … AS SELECT …'),
   ],
 },
 /* =============================== 5 =============================== */
@@ -608,6 +864,9 @@ SET DEFAULT ROLE 'leitor' TO 'rui'@'localhost';</code></pre>`),
     learn('Boas práticas de segurança', `<ul><li>Palavras-passe fortes e únicas; nunca as guardar no código-fonte.</li><li>Não expor o MySQL (porta 3306) à Internet; restringir o anfitrião das contas.</li><li>Uma conta por aplicação, com privilégios mínimos; evitar <code>GRANT ALL</code> e <code>'%'</code> sem necessidade.</li><li>Rever periodicamente as contas e privilégios e remover as inativas.</li><li>Usar ligações cifradas (TLS).</li>
       <li>Nas aplicações, usar <b>prepared statements</b> (consultas parametrizadas) para evitar <b>SQL Injection</b> — ataque em que texto introduzido pelo utilizador é interpretado como SQL.</li></ul>`),
     quiz('Como se protege uma aplicação contra SQL Injection?', ['Usando prepared statements / consultas parametrizadas', 'Escondendo os nomes das tabelas', 'Usando sempre o utilizador root', 'Desligando o servidor à noite'], 0, 'Os parâmetros nunca são interpretados como código SQL.'),
+    key('o1', order('A nova funcionária Marta precisa apenas de consultar a BD escola. Ordene os passos para lhe dar acesso através de um role.',
+      ["CREATE ROLE 'leitor';", "GRANT SELECT ON escola.* TO 'leitor';", "CREATE USER 'marta'@'localhost' IDENTIFIED BY 'M4rta#2025';", "GRANT 'leitor' TO 'marta'@'localhost';", "SET DEFAULT ROLE 'leitor' TO 'marta'@'localhost';"],
+      'O role e o utilizador têm de existir antes de se ligarem; o SET DEFAULT ROLE ativa o role quando ela inicia sessão.')),
   ] }],
   cheat: [
     ["CREATE USER 'u'@'host' IDENTIFIED BY 'pw';", 'Criar utilizador'], ["ALTER USER 'u'@'host' IDENTIFIED BY 'pw';", 'Mudar palavra-passe'], ["DROP USER 'u'@'host';", 'Eliminar utilizador'],
@@ -623,6 +882,25 @@ SET DEFAULT ROLE 'leitor' TO 'rui'@'localhost';</code></pre>`),
     quiz('O que é um role no MySQL 8?', ['Um tipo de tabela', 'Um conjunto de privilégios com nome, atribuível a vários utilizadores', 'Um backup', 'Uma palavra-passe'], 1, 'Funciona como um grupo.'),
     quiz('O que faz WITH GRANT OPTION?', ['Encripta o privilégio', 'Permite ao utilizador passar os seus privilégios a outros', 'Remove privilégios', 'Dá acesso remoto'], 1, 'Deve ser usado com cuidado.'),
     quiz('O que é SQL Injection?', ['Um tipo de índice', 'Ataque em que dados introduzidos são executados como SQL', 'Um método de backup', 'Uma função de agregação'], 1, 'Previne-se com prepared statements.'),
+    quiz("Qual instrução cria uma conta que só liga a partir da rede 192.168.1.x?", ["CREATE USER 'rui'@'%'", "CREATE USER 'rui'@'192.168.1.%' IDENTIFIED BY '…'", "CREATE USER 'rui' NETWORK 192.168.1", "GRANT NETWORK TO 'rui'"], 1, 'O anfitrião aceita o carácter universal %.'),
+    quiz('Que privilégio permite apenas consultar dados?', ['INSERT', 'SELECT', 'UPDATE', 'ALL PRIVILEGES'], 1, 'SELECT.'),
+    quiz('O que faz SET DEFAULT ROLE?', ['Cria um role', 'Ativa automaticamente um role quando o utilizador inicia sessão', 'Apaga os roles', 'Muda a palavra-passe'], 1, 'Sem isso o role tem de ser ativado com SET ROLE.'),
+    quiz('Como se muda a palavra-passe de um utilizador?', ["UPDATE USER … PASSWORD", "ALTER USER 'u'@'h' IDENTIFIED BY 'nova'", "SET USER PASSWORD", "GRANT PASSWORD"], 1, 'ALTER USER … IDENTIFIED BY.'),
+    quiz("Que objeto dá acesso apenas à tabela alunos da BD escola?", ['escola.*', '*.alunos', 'escola.alunos', 'alunos.*'], 2, 'bd.tabela.'),
+    predict('Depois destas instruções, o que pode fazer a ana na tabela escola.alunos?', "GRANT SELECT, INSERT, UPDATE ON escola.alunos TO 'ana'@'localhost';\nREVOKE UPDATE ON escola.alunos FROM 'ana'@'localhost';", ['Nada', 'Consultar e inserir', 'Consultar, inserir e alterar', 'Só alterar'], 1, 'O UPDATE foi retirado; ficam SELECT e INSERT.'),
+    quiz('Porque se deve evitar GRANT ALL ON *.* a contas de aplicações?', ['Porque é mais lento', 'Porque dá poder total sobre todo o servidor', 'Porque não funciona', 'Porque apaga os roles'], 1, 'Viola o menor privilégio.'),
+    quiz('Que tipo de ligação protege as palavras-passe que viajam na rede?', ['Ligações cifradas (TLS)', 'Ligações por UDP', 'Ligações anónimas', 'Nenhuma'], 0, 'TLS cifra a comunicação.'),
+  ],
+  real: [
+    'Criar um utilizador com privilégios só de leitura na BD escola e entrar com ele (<code>mysql -u nome -p</code>).',
+    'Com esse utilizador, tentar um DELETE e ler o erro <b>1142</b> (privilégio negado).',
+    'Criar um role, atribuí-lo, e confirmar com <code>SHOW GRANTS FOR … USING …;</code>.',
+    'Listar as contas com <code>SELECT user, host FROM mysql.user;</code> e eliminar a conta de teste.',
+  ],
+  practice: [
+    code("Crie o utilizador 'rita' que liga a partir de qualquer anfitrião, com a palavra-passe 'R1ta#2025'.", ["^create user (if not exists )?'rita'@'%' identified by 'r1ta#2025'$"], "CREATE USER 'rita'@'%' IDENTIFIED BY 'R1ta#2025';", "CREATE USER 'nome'@'%' IDENTIFIED BY '…';"),
+    code("Dê a 'rita'@'%' os privilégios SELECT e INSERT na tabela notas da BD escola.", ["^grant select,insert on escola\\.notas to 'rita'@'%'$", "^grant insert,select on escola\\.notas to 'rita'@'%'$"], "GRANT SELECT, INSERT ON escola.notas TO 'rita'@'%';", 'GRANT …, … ON escola.notas TO …'),
+    code("Retire a 'rita'@'%' o privilégio INSERT na tabela notas da BD escola.", ["^revoke insert on escola\\.notas from 'rita'@'%'$"], "REVOKE INSERT ON escola.notas FROM 'rita'@'%';", 'REVOKE … FROM …'),
   ],
 },
 /* =============================== 6 =============================== */
@@ -657,6 +935,9 @@ SOURCE /caminho/escola.sql;</code></pre><p>Ficheiros comprimidos restauram-se co
     code('Dentro do cliente mysql, escreva o comando que executa o ficheiro escola.sql.', ['^source escola\\.sql$', '^\\\\\\. escola\\.sql$'], 'SOURCE escola.sql;', 'SOURCE ficheiro;'),
     learn('Testar os backups', `<p class="warn">Um backup só tem valor se o restauro funcionar.</p><p>Teste regularmente o restauro num servidor de testes, documente o procedimento e meça quanto tempo demora — isso é essencial para planear a recuperação.</p>`),
     quiz('Porque se deve testar o restauro regularmente?', ['Para gastar espaço', 'Para garantir que o backup é válido e utilizável', 'Porque o MySQL o exige', 'Para apagar backups antigos'], 1, 'Um backup nunca testado é apenas uma esperança.'),
+    key('o1', order('Ordene os passos para testar um backup da BD escola sem tocar na base de dados original.',
+      ['mysqldump -u root -p escola > escola.sql', 'mysql -u root -p -e "CREATE DATABASE escola_teste"', 'mysql -u root -p escola_teste < escola.sql', 'mysql -u root -p escola_teste -e "SELECT COUNT(*) FROM alunos"'],
+      'Faz-se a cópia, cria-se uma BD vazia de teste, restaura-se lá o ficheiro e confirma-se que os dados estão completos.')),
   ] },
   { title: 'Estratégias de backup', steps: [
     learn('Backups físicos', `<p>Em bases de dados grandes, copiar os ficheiros de dados é muito mais rápido do que gerar e reproduzir SQL. Ferramentas como <b>Percona XtraBackup</b> ou <b>MySQL Enterprise Backup</b> fazem cópias físicas consistentes sem parar o servidor.</p>`),
@@ -683,6 +964,24 @@ SOURCE /caminho/escola.sql;</code></pre><p>Ficheiros comprimidos restauram-se co
     quiz('Que mecanismo permite recuperar até um instante exato?', ['Replicação', 'Binary log (PITR)', 'TRUNCATE', 'GRANT'], 1, 'Reaplica as alterações registadas.'),
     quiz('Porque é que a replicação não substitui o backup?', ['Porque é lenta', 'Porque os erros também são replicados', 'Porque não copia índices', 'Porque só funciona em Windows'], 1, 'Um DROP acidental chega à réplica.'),
     quiz('O "1" da regra 3-2-1 refere-se a…', ['1 backup por dia', '1 cópia fora do local', '1 administrador', '1 disco'], 1, 'Protege contra desastres no local.'),
+    quiz('Qual o comando que exporta só a tabela alunos da BD escola?', ['mysqldump -u root -p alunos > a.sql', 'mysqldump -u root -p escola alunos > a.sql', 'mysqldump --table alunos', 'SELECT * INTO BACKUP alunos'], 1, 'Indica-se a BD e depois a(s) tabela(s).'),
+    quiz('Para que serve a opção --databases do mysqldump?', ['Comprime o ficheiro', 'Permite várias BD e inclui o CREATE DATABASE no ficheiro', 'Exporta só a estrutura', 'Apaga as BD'], 1, 'Assim o restauro cria a BD.'),
+    quiz('Um backup lógico de uma BD com 500 GB…', ['é muito rápido a restaurar', 'pode demorar muitas horas a gerar e a restaurar', 'não é possível', 'ocupa sempre menos de 1 GB'], 1, 'Para BD grandes, preferem-se backups físicos.'),
+    quiz('Como se agenda um backup diário no Linux?', ['Com cron', 'Com GRANT', 'Com o binary log', 'Com SOURCE'], 0, 'O cron executa comandos a horas marcadas.'),
+    quiz('Que ferramenta faz backups físicos sem parar o servidor?', ['mysqldump', 'Percona XtraBackup', 'SOURCE', 'EXPLAIN'], 1, 'Ou o MySQL Enterprise Backup.'),
+    predict('Este comando faz o quê?', 'mysqldump -u root -p escola | gzip > escola.sql.gz', ['Restaura a BD escola', 'Gera o backup da BD escola já comprimido', 'Apaga a BD escola', 'Mostra o conteúdo do ficheiro'], 1, 'O | envia a saída do mysqldump para o gzip.'),
+    quiz('O que significa PITR?', ['Restaurar até um instante exato', 'Comprimir backups', 'Replicar servidores', 'Cifrar ficheiros'], 0, 'Point-In-Time Recovery, com o binary log.'),
+    quiz('Onde deve ficar pelo menos uma cópia do backup, segundo a regra 3-2-1?', ['No mesmo disco', 'Fora do local (ex.: outro edifício ou nuvem)', 'Na memória RAM', 'No servidor de produção'], 1, 'Protege contra incêndios, roubos e ransomware.'),
+  ],
+  real: [
+    'Fazer o backup da BD escola com <code>mysqldump</code> e abrir o ficheiro .sql num editor de texto.',
+    'Restaurar o ficheiro numa BD nova (<code>escola_teste</code>) e comparar <code>SELECT COUNT(*)</code> das tabelas.',
+    'Gerar um backup comprimido com <code>| gzip</code> e restaurá-lo com <code>gunzip &lt; … | mysql …</code>.',
+    'Escrever um pequeno script (.bat ou .sh) que faça o backup com a data no nome do ficheiro.',
+  ],
+  practice: [
+    code('Escreva o comando que exporta a base de dados escola para o ficheiro escola.sql (utilizador root, com palavra-passe).', ['^mysqldump -u ?root -p ?escola>escola\\.sql$', '^mysqldump -p -u ?root escola>escola\\.sql$'], 'mysqldump -u root -p escola > escola.sql', 'mysqldump -u … -p base > ficheiro'),
+    code('Escreva o comando que restaura o ficheiro escola.sql na base de dados escola (utilizador root, com palavra-passe).', ['^mysql -u ?root -p ?escola<escola\\.sql$', '^mysql -p -u ?root escola<escola\\.sql$'], 'mysql -u root -p escola < escola.sql', 'mysql -u … -p base < ficheiro'),
   ],
 },
 ];
@@ -690,17 +989,20 @@ SOURCE /caminho/escola.sql;</code></pre><p>Ficheiros comprimidos restauram-se co
 /* IDs estáveis e estrutura derivada: capítulo.lição.exercício */
 CHAPTERS.forEach((c, ci) => {
   c.idx = ci;
-  c.lessons.forEach((l, li) => {
-    l.id = `${c.id}.${li + 1}`;
+  let ln = 0;
+  c.lessons.forEach((l) => {
+    l.id = l.key ? `${c.id}.${l.key}` : `${c.id}.${++ln}`;
     l.chapter = c.id;
     let n = 0;
-    l.steps.forEach((s, si) => { s.idx = si; if (s.t !== 'learn') s.id = `${l.id}.${++n}`; });
+    l.steps.forEach((s, si) => { s.idx = si; if (s.t !== 'learn') s.id = s.key ? `${l.id}.${s.key}` : `${l.id}.${++n}`; });
     l.ex = l.steps.filter((s) => s.t !== 'learn');
   });
   c.test.forEach((q, qi) => (q.id = `${c.id}.t${qi + 1}`));
+  (c.practice || []).forEach((q, qi) => (q.id = `${c.id}.p${qi + 1}`));
 });
 
 const PASS_MARK = 70; // % mínima no miniteste para concluir o capítulo
+const TEST_DRAW = { quiz: 8, practice: 2 }; // perguntas sorteadas em cada tentativa do miniteste
 
 const BADGES = [
   { id: 'first', icon: 'check', name: 'Primeiros passos', desc: 'Resolveu o primeiro exercício', test: (s) => s.exDone >= 1 },
@@ -715,9 +1017,13 @@ const BADGES = [
   { id: 'sec', icon: 'shield', name: 'Guardião', desc: 'Concluiu o capítulo de segurança', test: (s) => s.chaptersDone.includes('sec') },
   { id: 'nexus1', icon: 'terminal', name: 'Primeiro acesso', desc: 'Abriu a primeira porta da estação Órion', test: (s) => s.gameDone >= 1 },
   { id: 'drone', icon: 'zap', name: 'Drone desligado', desc: 'Desativou um drone com SQL no Protocolo NEXUS', test: (s) => s.gameRooms.includes('g4') },
+  { id: 'review', icon: 'refresh', name: 'Memória de elefante', desc: '10 revisões certas na página Revisão', test: (s) => s.reviews >= 10 },
+  { id: 'clean', icon: 'eye', name: 'Sem espreitar', desc: 'Concluiu um capítulo sem ver nenhuma resposta', test: (s) => s.cleanChapters.length >= 1 },
+  { id: 'real', icon: 'cpu', name: 'Mãos no servidor', desc: 'Fez todas as tarefas de «Prática no MySQL real» de um capítulo', test: (s) => s.realDone.length >= 1 },
+  { id: 'project', icon: 'layers', name: 'Projeto entregue', desc: 'Entregou o projeto final ao professor', test: (s) => s.projectSent },
   { id: 'all', icon: 'award', name: 'Mestre MySQL', desc: 'Concluiu todos os capítulos', test: (s) => s.chaptersDone.length === CHAPTERS.length },
 ];
 
-const api = { CHAPTERS, BADGES, PASS_MARK };
+const api = { CHAPTERS, BADGES, PASS_MARK, TEST_DRAW };
 if (typeof module !== 'undefined') module.exports = api; else root.CONTENT = api;
 })(typeof window !== 'undefined' ? window : globalThis);

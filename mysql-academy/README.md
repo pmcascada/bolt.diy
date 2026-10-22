@@ -4,29 +4,37 @@ Aplicação de **autoaprendizagem de MySQL** para desktop e telemóvel (PWA inst
 
 ## Como se aprende
 
-1. **Passo a passo** — cada lição apresenta um conceito de cada vez (ex.: `SELECT`), seguido logo de um exercício sobre esse conceito. O passo seguinte (ex.: `WHERE`) só aparece depois de o aluno acertar. Se ficar bloqueado, pode ver a resposta certa a qualquer momento ("Ver resposta certa") e continuar a lição, perdendo o XP desse exercício.
-2. **Lições sequenciais** — dentro de cada capítulo, cada lição desbloqueia a seguinte. Os capítulos podem ser abordados por qualquer ordem.
-3. **Manual do capítulo** — toda a matéria do capítulo num documento de consulta, com resumo de sintaxe, sempre disponível (página própria, painel lateral durante as lições, imprimível/PDF).
-4. **Miniteste final** — escolha múltipla (8 perguntas, ordem aleatória), desbloqueado após as lições; aprovação com 70% conclui o capítulo. Correção detalhada no fim; conta o melhor resultado.
+1. **Passo a passo** — cada lição apresenta um conceito de cada vez, seguido logo de um exercício sobre esse conceito; o passo seguinte só aparece depois de o aluno acertar. Se ficar bloqueado, pode ver a resposta certa ("Ver resposta certa") e continuar, perdendo o XP desse exercício.
+2. **Correção que explica** — nas consultas, a app diz *porque* o resultado não está certo (falta o WHERE, linhas repetidas → DISTINCT, ordem errada → ORDER BY, colunas a mais ou por outra ordem, INNER vs LEFT JOIN…) e mostra o resultado esperado. INSERT/UPDATE/DELETE são verificados pelo **efeito nas tabelas** ("alterou 8 linhas, mas só devia ser 1 — falta o WHERE"), por isso qualquer forma correta é aceite.
+3. **Formatos variados** — escolha múltipla, "qual é o resultado?" (prever o resultado de uma instrução), "corrija o erro" (instrução com um erro já escrita), ordenar cláusulas ou passos, escrever comandos, consultas, alterações de dados e criação de tabelas, e uma **visualização passo a passo** da execução de um SELECT (FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY → LIMIT).
+4. **Revisão espaçada** — os exercícios em que o aluno precisou de várias tentativas, de dicas ou de ver a resposta voltam a aparecer na página **Revisão** ao fim de 1, 3, 7 e 14 dias; cada lição começa com um **aquecimento** opcional com um exercício de lições anteriores (prática intercalada).
+5. **Manual do capítulo** — toda a matéria do capítulo num documento de consulta, sempre disponível (página própria, painel lateral durante as lições, imprimível/PDF).
+6. **Miniteste final** — em cada tentativa são sorteadas 8 perguntas de um banco de 16 e 2 exercícios práticos (SQL escrito pelo aluno). Aprovação com 70% conclui o capítulo. As respostas certas só são mostradas depois de aprovar; antes disso, o aluno vê apenas quais as perguntas que errou.
+7. **Ponte para o MySQL real** — cada capítulo tem tarefas para fazer num servidor MySQL instalado (com os erros reais a observar), os scripts `escola.sql` e `loja.sql` para descarregar, e um **projeto final** que o aluno entrega ao professor (script + resultados), com verificação automática dos requisitos.
 
-## Conteúdo (7 capítulos · 27 lições · 188 passos · 104 exercícios · 58 perguntas de miniteste)
+## Conteúdo (7 capítulos · 33 lições · 241 passos · 143 exercícios · 112 perguntas e 21 exercícios práticos de miniteste)
 
 1. Introdução ao MySQL
-2. Criar bases de dados e tabelas (tipos e restrições, chaves estrangeiras e relações 1:N com ON DELETE, relações N:M com chave composta, ALTER TABLE e um desafio final: modelar uma loja online)
-3. Inserir, alterar e eliminar dados (INSERT, UPDATE, DELETE, TRUNCATE)
-4. Consultas com SELECT (SELECT, WHERE, ORDER BY/LIMIT/DISTINCT, agregações e GROUP BY/HAVING, JOIN, subconsultas) – consultas executadas numa BD de exemplo no browser (AlaSQL)
+2. Criar bases de dados e tabelas (tipos e restrições, chaves estrangeiras e relações 1:N com ON DELETE, relações N:M, ALTER TABLE, **normalização: do enunciado às tabelas (1FN, 2FN, 3FN)** e um desafio final: modelar uma loja online)
+3. Inserir, alterar e eliminar dados (INSERT, UPDATE, DELETE, TRUNCATE e manutenção de dados da BD loja)
+4. Consultas com SELECT (SELECT, WHERE, ORDER BY/LIMIT/DISTINCT, agregações e GROUP BY/HAVING, JOIN, subconsultas, **funções de texto, números e datas**, **CASE e IFNULL/COALESCE**, **JOIN de três tabelas e UNION** e **perguntas de negócio** com enunciados abertos)
 5. Restrições, índices e vistas (CHECK, CREATE INDEX, CREATE VIEW)
 6. Segurança: utilizadores, GRANT/REVOKE, roles
 7. Backup e restauro (mysqldump, restauro, binlog, regra 3-2-1)
 
-Exercícios: escolha múltipla, "escreva o comando", consultas SELECT validadas pelo resultado e criação/alteração de tabelas validadas pela estrutura obtida (colunas, tipos, chaves, restrições e ON DELETE), com mensagens sobre o que falta. Há ainda um **Laboratório SQL** livre.
+Duas bases de dados de exemplo correm no browser (AlaSQL): **escola** (pequena, para aprender) e **loja** (30 clientes, 18 produtos, 80 encomendas de 2024–2025, com datas e valores NULL), gerada sempre igual. O **Laboratório SQL** permite escolher a BD e executar várias instruções.
 
 ## Gamificação e registo de evolução
 
-- XP por exercício (10/15/20 conforme o tipo; menos com várias tentativas ou dicas; zero se a solução foi consultada), +20 por lição e +100 por capítulo (miniteste aprovado)
-- Níveis, dias seguidos (streak) e conquistas
-- Página **Progresso**: lições, exercícios e resultado do miniteste por capítulo, gráfico de 14 dias, histórico completo de tentativas e minitestes, exportação CSV/JSON
-- **Classificação** entre alunos (requer o servidor); o XP é recalculado no servidor a partir do progresso
+- XP por exercício (10–20 conforme o tipo; menos com várias tentativas ou dicas; zero se a solução foi consultada), +20 por lição **só se todos os exercícios forem resolvidos sem ver a resposta**, +100 por capítulo (miniteste aprovado) e +5 por cada revisão certa
+- Níveis, dias seguidos (streak) e conquistas, incluindo conquistas de domínio (capítulo sem ver respostas, 10 revisões, prática no MySQL real, projeto entregue)
+- Página **Progresso**: lições, exercícios e miniteste por capítulo, gráfico de 14 dias, histórico de tentativas, exportação CSV/JSON
+- **Classificação** geral ou **desta semana** (XP dos últimos 7 dias), com filtro por **turma**
+
+## Área do professor
+
+- Tabela de alunos com filtro por turma e exportação CSV; detalhe de cada aluno com o histórico (incluindo o texto das respostas erradas), revisões, prática no MySQL real e o **projeto final** entregue.
+- **Exercícios com mais dificuldade**: percentagem de alunos que acertaram à primeira, quantos viram a resposta e as **respostas erradas mais comuns** de cada exercício; perguntas dos minitestes mais erradas.
 
 ## Protocolo NEXUS (jogo 3D)
 
@@ -39,7 +47,7 @@ Jogo na primeira pessoa (só para computador), acessível no menu por baixo do L
 
 ## Publicar na Internet (gratuito)
 
-Siga o guia **[PUBLICAR.md](PUBLICAR.md)**: o site fica no Cloudflare Pages e as contas, o progresso e a classificação no Supabase (plano gratuito). Basta executar `supabase/schema.sql` no Supabase e preencher `public/config.js`.
+Siga o guia **[PUBLICAR.md](PUBLICAR.md)**: o site fica no Vercel ou no Cloudflare Pages e as contas, o progresso e a classificação no Supabase (plano gratuito). Basta executar `supabase/schema.sql` no Supabase e preencher `public/config.js`. Quem já tinha executado a versão anterior do `schema.sql` deve executá-lo de novo: acrescenta as turmas e o XP semanal sem perder dados.
 
 ## Executar localmente
 
@@ -47,7 +55,7 @@ Siga o guia **[PUBLICAR.md](PUBLICAR.md)**: o site fica no Cloudflare Pages e as
 cd mysql-academy
 npm start            # http://localhost:3000   (sem dependências, Node >= 18)
 # opcional: PORT=8080 TEACHER_KEY=segredo DATA_DIR=/dados npm start
-npm test             # valida todas as soluções dos exercícios
+npm test             # valida todas as soluções, o motor SQL, a pontuação e o jogo
 ```
 
 - Com `public/config.js` vazio, as contas e a classificação usam este servidor local (nome + PIN). Com o Supabase configurado, usam o Supabase (email + palavra-passe).
@@ -62,9 +70,11 @@ supabase/schema.sql  tabelas, regras de segurança (RLS) e funções para o Supa
 public/config.js   endereço e chave pública do Supabase
 public/backend.js  contas e sincronização (Supabase ou servidor local)
 public/            a aplicação (HTML/CSS/JS puro, sem build)
-  content.js       capítulos → lições → passos (learn/quiz/code/query), resumo de sintaxe e miniteste
-  score.js         regras de XP e níveis (partilhado cliente/servidor)
-  db.js            BD de exemplo "escola" + validação de respostas
+  content.js       capítulos → lições → passos (learn/quiz/order/code/query/dml/ddl), resumo de sintaxe,
+                   banco do miniteste, exercícios práticos e tarefas no MySQL real
+  score.js         regras de XP, níveis, revisão espaçada e XP semanal (partilhado cliente/servidor)
+  db.js            BD de exemplo "escola" e "loja", funções do MySQL em falta no motor, verificação
+                   de consultas (com explicações), de INSERT/UPDATE/DELETE (pelo efeito) e de comandos
   game/levels.js   história e salas do Protocolo NEXUS (bases de dados, objetivos, regras das portas)
   game/game.js     motor 3D do jogo (Three.js)
   ddl.js           verificador de CREATE/ALTER/DROP TABLE (compara a estrutura obtida com a esperada)
@@ -74,5 +84,7 @@ public/            a aplicação (HTML/CSS/JS puro, sem build)
 
 ## Notas
 
-- O simulador de SELECT usa AlaSQL: é uma aproximação do MySQL e não substitui um servidor real; as lições de DDL, segurança e backup são validadas por padrões de texto.
+- O simulador usa AlaSQL: é uma aproximação do MySQL e não substitui um servidor real (por isso existem as tarefas de "Prática no MySQL real" e o projeto final). As lições de segurança e backup são validadas por padrões de texto (com tolerância a aspas e a `utilizador@anfitrião` sem plicas).
+- Os IDs das lições e dos exercícios acrescentados nesta versão têm chaves próprias (ex.: `select.func.2`), por isso o progresso já guardado continua válido. As lições já começadas mantêm-se abertas mesmo quando surgem lições novas antes delas.
+- A versão anterior está guardada no ramo `versao-1-0` do repositório.
 - A pontuação é calculada no browser do aluno; as regras do Supabase impedem alterar o progresso de outros alunos e valores impossíveis, mas um aluno com conhecimentos técnicos poderia falsificar o seu próprio progresso.

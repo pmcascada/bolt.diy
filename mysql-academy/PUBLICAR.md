@@ -15,6 +15,7 @@ Os nomes dos menus podem variar ligeiramente, porque estes serviços atualizam a
 
 1. No menu lateral abra **SQL Editor** → **New query**.
 2. Copie todo o conteúdo do ficheiro [`supabase/schema.sql`](supabase/schema.sql), cole e clique em **Run**.
+   > **Atualização:** se já tinha executado uma versão anterior deste ficheiro, execute-o de novo. É seguro: acrescenta a coluna `turma` aos perfis, o XP da semana e o novo limite de XP, sem apagar dados.
 3. Deve aparecer *Success. No rows returned*. (Pode voltar a executar o script mais tarde sem perder dados.)
 
 ## 3. Configurar as contas de aluno
