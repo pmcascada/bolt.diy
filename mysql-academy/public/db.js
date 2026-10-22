@@ -21,21 +21,21 @@
     ],
   };
   const COLS = {
-    cursos: ['id', 'nome', 'horas'],
-    alunos: ['id', 'nome', 'idade', 'cidade', 'curso_id'],
-    notas: ['aluno_id', 'disciplina', 'nota'],
+    cursos: ['id_curso', 'nome', 'horas'],
+    alunos: ['id_aluno', 'nome', 'idade', 'cidade', 'id_curso'],
+    notas: ['id_aluno', 'disciplina', 'nota'],
     v_alunos_cursos: ['aluno', 'idade', 'cidade', 'curso'],
   };
   // Estrutura apresentada ao aluno (como no DESCRIBE do MySQL).
   const SCHEMA = {
     alunos: { desc: 'Alunos inscritos na escola', cols: [
-      ['id', 'INT', 'PK', 'Identificador do aluno'], ['nome', 'VARCHAR(80)', '', 'Nome completo'],
+      ['id_aluno', 'INT', 'PK', 'Identificador do aluno'], ['nome', 'VARCHAR(80)', '', 'Nome completo'],
       ['idade', 'INT', '', 'Idade em anos'], ['cidade', 'VARCHAR(50)', '', 'Cidade onde vive'],
-      ['curso_id', 'INT', 'FK → cursos.id', 'Curso em que está inscrito'] ] },
+      ['id_curso', 'INT', 'FK → cursos.id_curso', 'Curso em que está inscrito'] ] },
     cursos: { desc: 'Cursos disponíveis', cols: [
-      ['id', 'INT', 'PK', 'Identificador do curso'], ['nome', 'VARCHAR(50)', '', 'Nome do curso'], ['horas', 'INT', '', 'Duração em horas'] ] },
+      ['id_curso', 'INT', 'PK', 'Identificador do curso'], ['nome', 'VARCHAR(50)', '', 'Nome do curso'], ['horas', 'INT', '', 'Duração em horas'] ] },
     notas: { desc: 'Notas obtidas pelos alunos em cada disciplina', cols: [
-      ['aluno_id', 'INT', 'FK → alunos.id', 'Aluno a quem pertence a nota'], ['disciplina', 'VARCHAR(50)', '', 'Nome da disciplina'], ['nota', 'INT', '', 'Classificação de 0 a 20'] ] },
+      ['id_aluno', 'INT', 'FK → alunos.id_aluno', 'Aluno a quem pertence a nota'], ['disciplina', 'VARCHAR(50)', '', 'Nome da disciplina'], ['nota', 'INT', '', 'Classificação de 0 a 20'] ] },
     v_alunos_cursos: { view: true, desc: 'Vista (VIEW): cada aluno com o nome do seu curso', cols: [
       ['aluno', 'VARCHAR(80)', '', 'alunos.nome'], ['idade', 'INT', '', 'alunos.idade'], ['cidade', 'VARCHAR(50)', '', 'alunos.cidade'], ['curso', 'VARCHAR(50)', '', 'cursos.nome'] ] },
   };
@@ -44,13 +44,13 @@
 
   // Vistas existentes na base de dados de exemplo.
   const VIEWS = {
-    v_alunos_cursos: 'CREATE VIEW v_alunos_cursos AS SELECT a.nome AS aluno, a.idade, a.cidade, c.nome AS curso FROM alunos a JOIN cursos c ON a.curso_id = c.id',
+    v_alunos_cursos: 'CREATE VIEW v_alunos_cursos AS SELECT a.nome AS aluno, a.idade, a.cidade, c.nome AS curso FROM alunos a JOIN cursos c ON a.id_curso = c.id_curso',
   };
 
   const DDL = {
-    cursos: 'CREATE TABLE cursos (id INT, nome VARCHAR(50), horas INT)',
-    alunos: 'CREATE TABLE alunos (id INT, nome VARCHAR(80), idade INT, cidade VARCHAR(50), curso_id INT)',
-    notas: 'CREATE TABLE notas (aluno_id INT, disciplina VARCHAR(50), nota INT)',
+    cursos: 'CREATE TABLE cursos (id_curso INT, nome VARCHAR(50), horas INT)',
+    alunos: 'CREATE TABLE alunos (id_aluno INT, nome VARCHAR(80), idade INT, cidade VARCHAR(50), id_curso INT)',
+    notas: 'CREATE TABLE notas (id_aluno INT, disciplina VARCHAR(50), nota INT)',
   };
 
   function create() {
