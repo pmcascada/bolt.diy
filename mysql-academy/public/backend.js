@@ -74,7 +74,7 @@
       B.user.turma = t;
     };
     B.leaderboard = async () => {
-      const { data, error } = await sb.rpc('leaderboard', { lim: 300 });
+      const { data, error } = await sb.rpc('leaderboard2', { lim: 300 });
       if (error) throw error;
       return data.map((r) => ({ name: r.name, xp: r.xp, weekXp: r.week_xp || 0, turma: r.turma || '', level: r.level, pct: r.pct, streak: r.streak }));
     };

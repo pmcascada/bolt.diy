@@ -59,8 +59,8 @@ $$;
 
 -- Classificação pública: só nome, turma e resumo, nunca o progresso detalhado.
 -- O XP da semana só conta se o aluno teve atividade nos últimos 7 dias.
-drop function if exists public.leaderboard(int);
-create function public.leaderboard(lim int default 100)
+-- (leaderboard2 substitui a função leaderboard da versão 1, que pode ficar na base de dados sem uso.)
+create or replace function public.leaderboard2(lim int default 100)
 returns table (name text, turma text, xp int, week_xp int, level int, pct int, ex_done int, chapters_done int, streak int, badges int, updated_at timestamptz)
 language sql stable security definer set search_path = public as $$
   select p.name, p.turma, g.xp, case when g.updated_at > now() - interval '7 days' then g.week_xp else 0 end,
@@ -115,7 +115,7 @@ grant select, insert, update on public.progress to authenticated;
 
 revoke execute on function public.handle_new_user() from public, anon, authenticated;
 revoke execute on function public.touch_progress() from public, anon, authenticated;
-grant execute on function public.leaderboard(int) to anon, authenticated;
+grant execute on function public.leaderboard2(int) to anon, authenticated;
 grant execute on function public.name_available(text) to anon, authenticated;
 grant execute on function public.is_teacher() to authenticated;
 
