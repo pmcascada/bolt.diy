@@ -4,7 +4,7 @@ Aplicação de **autoaprendizagem de MySQL** para desktop e telemóvel (PWA inst
 
 ## Como se aprende
 
-1. **Passo a passo** — cada lição apresenta um conceito de cada vez (ex.: `SELECT`), seguido logo de um exercício sobre esse conceito. O passo seguinte (ex.: `WHERE`) só aparece depois de o aluno acertar. Após 2 tentativas falhadas pode consultar a solução para avançar, sem pontuação.
+1. **Passo a passo** — cada lição apresenta um conceito de cada vez (ex.: `SELECT`), seguido logo de um exercício sobre esse conceito. O passo seguinte (ex.: `WHERE`) só aparece depois de o aluno acertar. Se ficar bloqueado, pode ver a resposta certa a qualquer momento ("Ver resposta certa") e continuar a lição, perdendo o XP desse exercício.
 2. **Lições sequenciais** — dentro de cada capítulo, cada lição desbloqueia a seguinte. Os capítulos podem ser abordados por qualquer ordem.
 3. **Manual do capítulo** — toda a matéria do capítulo num documento de consulta, com resumo de sintaxe, sempre disponível (página própria, painel lateral durante as lições, imprimível/PDF).
 4. **Miniteste final** — escolha múltipla (8 perguntas, ordem aleatória), desbloqueado após as lições; aprovação com 70% conclui o capítulo. Correção detalhada no fim; conta o melhor resultado.

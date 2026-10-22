@@ -172,7 +172,7 @@ function record(ex, ok) {
   st.log = st.log.slice(-500);
   touchDay();
   if (!ok || st.done[ex.id]) { persist(); return; }
-  if (st.rev[ex.id]) { persist(); toast('Correto · sem pontuação (solução consultada)', 'info'); return; }
+  if (st.rev[ex.id]) { persist(); toast('Correto · sem pontuação (resposta consultada)', 'info'); return; }
   const before = sum();
   st.done[ex.id] = { tries: a.tries, hints: a.hints, at: Date.now() };
   toast(`Resposta correta · +${S.exXp(ex.t, a.tries, a.hints)} XP`);
@@ -400,17 +400,30 @@ function taskEl(ex, i, onPass) {
   function paint(fbHtml) {
     const done = st.done[ex.id], rev = st.rev[ex.id], a = st.att[ex.id] || { tries: 0, hints: 0 };
     el.className = 'task' + (done || rev ? ' done' : '');
-    const chip = done ? `<span class="chip ok">${ic('check')}+${S.exXp(ex.t, done.tries, done.hints)} XP</span>` : rev ? '<span class="chip">Solução consultada</span>' : `<span class="chip">${S.BASE[ex.t]} XP</span>`;
+    const chip = done ? `<span class="chip ok">${ic('check')}+${S.exXp(ex.t, done.tries, done.hints)} XP</span>` : rev ? '<span class="chip">Resposta consultada · 0 XP</span>' : `<span class="chip">${S.BASE[ex.t]} XP</span>`;
     el.innerHTML = `<div class="task-h"><span>${ic('edit')}Exercício ${i + 1} · ${tag}</span>${chip}</div>
       <div class="task-b"><div class="q">${esc(ex.q)}</div><div class="body"></div><div class="fb" aria-live="polite">${fbHtml || ''}</div></div>`;
     const body = el.querySelector('.body'), fb = el.querySelector('.fb');
+    // Mostrar a resposta certa: desbloqueia a lição, mas o exercício deixa de dar XP.
+    const answerHtml = () => ex.t === 'quiz'
+      ? `<b>Resposta certa:</b> ${esc(ex.opts[ex.a])}. ${esc(ex.why)}<br><span class="small">Pode continuar a lição; este exercício já não conta XP.</span>`
+      : `<b>Resposta certa:</b> <code>${esc(ex.solution)}</code><br><span class="small">Estude-a com atenção. Pode continuar a lição; este exercício já não conta XP.</span>`;
+    const reveal = () => {
+      if (!confirm(`Ver a resposta certa?\n\nPerde os ${S.BASE[ex.t]} XP deste exercício, mas pode continuar a lição.`)) return;
+      st.rev[ex.id] = 1; st.log.push({ at: Date.now(), id: ex.id, ok: false }); touchDay(); persist();
+      if (ex.t !== 'quiz') { el._val = ex.solution; if (ex.t === 'query') { try { el._out = table(D.run(D.create(), ex.solution)); } catch { el._out = ''; } } }
+      paint(alertBox('info', 'eye', answerHtml()));
+      onPass(); renderChrome();
+    };
+    const revealBtn = () => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn link sm'; b.innerHTML = ic('eye') + `Ver resposta certa (−${S.BASE[ex.t]} XP)`; b.onclick = reveal; return b; };
+    if (rev && !done && !fbHtml) fb.innerHTML = alertBox('info', 'eye', answerHtml());
     if (ex.t === 'quiz') {
       body.className = 'body opts';
       const order = el._order || (el._order = ex.opts.map((o, k) => k).sort(() => Math.random() - 0.5));
       order.forEach((k, posi) => {
-        const b = document.createElement('button'); b.className = 'opt'; b.disabled = !!done;
+        const b = document.createElement('button'); b.className = 'opt'; b.disabled = !!(done || rev);
         b.innerHTML = `<span class="lt">${'ABCD'[posi]}</span><span>${esc(ex.opts[k])}</span>`;
-        if (done && k === ex.a) b.classList.add('good');
+        if ((done || rev) && k === ex.a) b.classList.add('good');
         b.onclick = () => {
           if (k === ex.a) { record(ex, true); paint(alertBox('ok', 'checkCircle', `<b>Correto.</b> ${esc(ex.why)}`)); onPass(); }
           else { b.classList.add('wrong'); b.disabled = true; record(ex, false); fb.innerHTML = alertBox('bad', 'x', 'Resposta incorreta. Releia a explicação e tente outra opção.'); }
@@ -418,6 +431,7 @@ function taskEl(ex, i, onPass) {
         body.append(b);
       });
       if (done && !fbHtml) fb.innerHTML = alertBox('ok', 'info', esc(ex.why));
+      if (!done && !rev) { const r = document.createElement('div'); r.className = 'reveal-row'; r.append(revealBtn()); body.append(r); }
       return;
     }
     const ta = document.createElement('textarea'); ta.className = 'sql'; ta.spellcheck = false; ta.autocapitalize = 'off'; ta.autocomplete = 'off';
@@ -438,19 +452,8 @@ function taskEl(ex, i, onPass) {
       else {
         record(ex, false);
         fb.innerHTML = alertBox('bad', 'x', ex.t === 'query' ? 'O resultado não coincide com o esperado. Verifique colunas, filtros e agrupamentos.' : 'Ainda não está correto. Confira a sintaxe e os nomes utilizados.');
-        aid();
       }
     };
-    function aid() {
-      if ((st.att[ex.id] || { tries: 0 }).tries >= 2 && !tools.querySelector('[data-sol]') && !st.done[ex.id] && !st.rev[ex.id]) {
-        mk('Ver solução (sem pontuação)', 'eye', 'link sm', () => {
-          st.rev[ex.id] = 1; st.log.push({ at: Date.now(), id: ex.id, ok: false }); persist();
-          el._val = ex.solution;
-          paint(alertBox('info', 'info', `Solução: <code>${esc(ex.solution)}</code><br>Estude-a com atenção — pode continuar a lição, mas este exercício não conta para a pontuação.`));
-          onPass(); renderChrome();
-        }).dataset.sol = 1;
-      }
-    }
     mk(ex.t === 'query' ? 'Executar e verificar' : 'Verificar', 'check', '', check);
     if (ex.t === 'query') mk('Executar', 'play', 'sec-b', () => { out.innerHTML = el._out = runSql(D.create(), ta.value); });
     let sp = null;
@@ -462,11 +465,11 @@ function taskEl(ex, i, onPass) {
     };
     const sb = ex.t === 'query' ? mk('Estrutura das tabelas', 'table', 'sec-b', toggleSchema) : null;
     if (!done && !rev) mk(`Dica (−${S.HINT_COST} XP)`, 'bulb', 'link sm', () => { a.hints = Math.min(a.hints + 1, 9); st.att[ex.id] = a; persist(); fb.innerHTML = alertBox('info', 'bulb', esc(ex.hint)); });
+    if (!done && !rev) tools.append(revealBtn());
     const k = document.createElement('span'); k.className = 'small muted kb'; k.innerHTML = '<span class="kbd">Ctrl</span> + <span class="kbd">Enter</span>'; tools.append(k);
     ta.onkeydown = (ev) => { if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter') { ev.preventDefault(); check(); } };
     body.append(ta, tools, out);
     if (sb && el._schema) { el._schema = false; toggleSchema(); }
-    if (a.tries >= 2 && !done) aid();
   }
   paint();
   return el;
