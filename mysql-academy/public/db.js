@@ -25,6 +25,20 @@
     alunos: ['id', 'nome', 'idade', 'cidade', 'curso_id'],
     notas: ['aluno_id', 'disciplina', 'nota'],
   };
+  // Estrutura apresentada ao aluno (como no DESCRIBE do MySQL).
+  const SCHEMA = {
+    alunos: { desc: 'Alunos inscritos na escola', cols: [
+      ['id', 'INT', 'PK', 'Identificador do aluno'], ['nome', 'VARCHAR(80)', '', 'Nome completo'],
+      ['idade', 'INT', '', 'Idade em anos'], ['cidade', 'VARCHAR(50)', '', 'Cidade onde vive'],
+      ['curso_id', 'INT', 'FK → cursos.id', 'Curso em que está inscrito'] ] },
+    cursos: { desc: 'Cursos disponíveis', cols: [
+      ['id', 'INT', 'PK', 'Identificador do curso'], ['nome', 'VARCHAR(50)', '', 'Nome do curso'], ['horas', 'INT', '', 'Duração em horas'] ] },
+    notas: { desc: 'Notas obtidas pelos alunos em cada disciplina', cols: [
+      ['aluno_id', 'INT', 'FK → alunos.id', 'Aluno a quem pertence a nota'], ['disciplina', 'VARCHAR(50)', '', 'Nome da disciplina'], ['nota', 'INT', '', 'Classificação de 0 a 20'] ] },
+  };
+  // Tabelas referidas numa instrução (FROM / JOIN), pela ordem em que aparecem.
+  const tablesIn = (sql) => [...new Set([...String(sql).matchAll(/\b(?:from|join)\s+`?(\w+)/gi)].map((m) => m[1].toLowerCase()).filter((t) => SCHEMA[t]))];
+
   const DDL = {
     cursos: 'CREATE TABLE cursos (id INT, nome VARCHAR(50), horas INT)',
     alunos: 'CREATE TABLE alunos (id INT, nome VARCHAR(80), idade INT, cidade VARCHAR(50), curso_id INT)',
@@ -87,6 +101,6 @@
     return ex.ok.some((r) => new RegExp(r).test(n));
   }
 
-  const api = { create, run, check, checkCode, norm, SEED, COLS };
+  const api = { create, run, check, checkCode, norm, SEED, COLS, SCHEMA, tablesIn };
   if (typeof module !== 'undefined') module.exports = api; else root.SQLDB = api;
 })(typeof window !== 'undefined' ? window : globalThis);
