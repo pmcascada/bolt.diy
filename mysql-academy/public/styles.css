@@ -536,3 +536,6 @@ details.pj pre{max-height:360px;overflow:auto}
 .ch-vis label .no{font-family:var(--mono);font-size:.8rem;color:var(--muted)}
 .ch-vis label b{display:block;font-size:.9rem}
 .ch-vis input{width:16px;height:16px;accent-color:var(--accent);flex:none}
+.reset-box{margin-top:16px;padding-top:14px;border-top:1px solid var(--border)}
+.reset-box h4{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:.95rem}
+.reset-box p{margin:0 0 10px}

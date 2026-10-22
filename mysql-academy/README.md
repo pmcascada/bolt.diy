@@ -35,6 +35,7 @@ Duas bases de dados de exemplo correm no browser (AlaSQL): **escola** (pequena, 
 
 - Tabela de alunos com filtro por turma e exportação CSV; detalhe de cada aluno com o histórico (incluindo o texto das respostas erradas), revisões, prática no MySQL real e o **projeto final** entregue.
 - **Acesso reservado**: o site só abre a quem introduzir a **palavra-passe de acesso**, definida pelo gestor na Área do professor. A verificação é feita no Vercel (`public/middleware.js`, que recusa os ficheiros a quem não tem o cookie de acesso) e no Supabase (a palavra-passe fica guardada só como resumo SHA-256; criar conta exige o token de acesso). Com o servidor local (`npm start`) não há palavra-passe.
+- **Reinício do progresso**: qualquer utilizador pode pedir, no Perfil, que o seu progresso seja reiniciado; o gestor aprova ou recusa na Área do professor (secção «Pedidos de reinício do progresso»). Ao aprovar, o progresso é apagado na conta e, na sincronização seguinte, em todos os dispositivos do utilizador.
 - **Gestor do site**: atribui ou retira o perfil de professor (secção «Gestão de professores») e escolhe que **capítulos ficam visíveis para os alunos** (secção «Capítulos visíveis para os alunos»), para controlar o ritmo da turma.
 - **Exercícios com mais dificuldade**: percentagem de alunos que acertaram à primeira, quantos viram a resposta e as **respostas erradas mais comuns** de cada exercício; perguntas dos minitestes mais erradas.
 

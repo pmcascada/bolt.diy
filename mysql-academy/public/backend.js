@@ -105,6 +105,23 @@
       if (error) throw error;
       if (!data) throw new Error('Só o gestor do site pode alterar os capítulos visíveis.');
     };
+    // Pedidos de reinício do progresso: o utilizador pede, o gestor aprova ou recusa.
+    B.myResetRequest = async () => {
+      const { data, error } = await sb.from('reset_requests').select('id, status, reason, created_at, decided_at').order('created_at', { ascending: false }).limit(1).maybeSingle();
+      if (error) throw error;
+      return data;
+    };
+    B.requestReset = async (reason) => {
+      const { error } = await sb.from('reset_requests').insert({ reason: reason ? String(reason).slice(0, 300) : null });
+      if (error) throw /duplicate|unique/i.test(error.message) ? new Error('Já tem um pedido pendente.') : error;
+    };
+    B.cancelReset = async (id) => { const { error } = await sb.from('reset_requests').delete().eq('id', id); if (error) throw error; };
+    B.adminResets = async () => { const { data, error } = await sb.rpc('admin_reset_requests'); if (error) throw error; return data || []; };
+    B.decideReset = async (id, approve) => {
+      const { data, error } = await sb.rpc('decide_reset', { req: id, approve });
+      if (error) throw error;
+      if (!data) throw new Error('Este pedido já foi tratado ou não tem permissão para o decidir.');
+    };
     // Gestor do site: lista de contas e atribuição do perfil de professor.
     B.adminUsers = async () => {
       const { data, error } = await sb.rpc('admin_users');

@@ -264,6 +264,66 @@ language plpgsql security definer set search_path = public as
   return new;
 end';
 
+-- ------------------------------------------------------------
+-- Versão 6: pedidos de reinício do progresso. O utilizador pede; o gestor aprova ou recusa.
+-- Ao aprovar, o progresso fica vazio com a marca resetAt: os dispositivos do aluno, ao sincronizar,
+-- apagam também o progresso local (senão voltaria a ser enviado para a conta).
+-- ------------------------------------------------------------
+create table if not exists public.reset_requests (
+  id          bigint generated always as identity primary key,
+  user_id     uuid not null default auth.uid() references public.profiles (id) on delete cascade,
+  reason      text check (reason is null or char_length(reason) <= 300),
+  status      text not null default 'pendente' check (status in ('pendente', 'aprovado', 'recusado')),
+  created_at  timestamptz not null default now(),
+  decided_at  timestamptz
+);
+create unique index if not exists reset_requests_one_pending on public.reset_requests (user_id) where status = 'pendente';
+alter table public.reset_requests enable row level security;
+revoke all on public.reset_requests from anon, authenticated;
+grant select, delete on public.reset_requests to authenticated;
+grant insert (reason) on public.reset_requests to authenticated;
+drop policy if exists "reset: ver os próprios" on public.reset_requests;
+create policy "reset: ver os próprios" on public.reset_requests for select to authenticated using (user_id = auth.uid());
+drop policy if exists "reset: pedir para si" on public.reset_requests;
+create policy "reset: pedir para si" on public.reset_requests for insert to authenticated with check (user_id = auth.uid() and status = 'pendente');
+drop policy if exists "reset: cancelar pendente" on public.reset_requests;
+create policy "reset: cancelar pendente" on public.reset_requests for delete to authenticated using (user_id = auth.uid() and status = 'pendente');
+
+-- Pedidos para o gestor (pendentes primeiro, depois os 30 mais recentes já decididos).
+create or replace function public.admin_reset_requests()
+returns table (id bigint, user_id uuid, name text, email text, turma text, reason text, status text, created_at timestamptz, decided_at timestamptz)
+language sql stable security definer set search_path = public as
+'(select r.id, r.user_id, p.name, u.email::text, p.turma, r.reason, r.status, r.created_at, r.decided_at
+    from public.reset_requests r join public.profiles p on p.id = r.user_id join auth.users u on u.id = r.user_id
+   where public.is_admin() and r.status = ''pendente'' order by r.created_at)
+ union all
+ (select r.id, r.user_id, p.name, u.email::text, p.turma, r.reason, r.status, r.created_at, r.decided_at
+    from public.reset_requests r join public.profiles p on p.id = r.user_id join auth.users u on u.id = r.user_id
+   where public.is_admin() and r.status <> ''pendente'' order by r.decided_at desc limit 30)';
+
+-- Aprova (apaga o progresso) ou recusa um pedido pendente. Só o gestor.
+create or replace function public.decide_reset(req bigint, approve boolean) returns boolean
+language plpgsql volatile security definer set search_path = public as
+'declare uid uuid;
+begin
+  if not public.is_admin() then return false; end if;
+  update public.reset_requests set status = case when approve then ''aprovado'' else ''recusado'' end, decided_at = now()
+   where id = req and status = ''pendente'' returning user_id into uid;
+  if uid is null then return false; end if;
+  if approve then
+    update public.progress
+       set state = jsonb_build_object(''resetAt'', floor(extract(epoch from now()) * 1000)::bigint),
+           xp = 0, week_xp = 0, level = 1, pct = 0, ex_done = 0, chapters_done = 0, streak = 0, badges = 0
+     where user_id = uid;
+  end if;
+  return true;
+end';
+
+revoke execute on function public.admin_reset_requests() from public, anon;
+revoke execute on function public.decide_reset(bigint, boolean) from public, anon;
+grant execute on function public.admin_reset_requests() to authenticated;
+grant execute on function public.decide_reset(bigint, boolean) to authenticated;
+
 -- ============================================================
 -- Gestor do site: executar uma única vez, com o email da conta do gestor. A partir daí,
 -- o gestor atribui o perfil de professor a outras contas na Área do professor.
