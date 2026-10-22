@@ -375,7 +375,7 @@
       const pk = s.cols.filter((c) => /^PK/.test(c[2])).map((c) => c[0]);
       const lines = s.cols.map(([c, ty]) => `  ${c} ${ty}${pk.includes(c) ? ' NOT NULL' : ''}${c === d.auto[t] ? ' AUTO_INCREMENT' : ''}`);
       if (pk.length) lines.push(`  PRIMARY KEY (${pk.join(', ')})`);
-      for (const [c] of s.cols) { const f = fk(t, c); if (f && d.schema[f[0]]) lines.push(`  FOREIGN KEY (${c}) REFERENCES ${f[0]}(${f[1] === c || !f[1] ? c : f[1]})`); }
+      for (const [c] of s.cols) { const f = fk(t, c); if (f && d.schema[f[0]]) lines.push(`  FOREIGN KEY (${c}) REFERENCES ${f[0]}(${f[1] === c || !f[1] ? c : f[1]}) ON UPDATE CASCADE ON DELETE RESTRICT`); }
       out += `CREATE TABLE ${t} (\n${lines.join(',\n')}\n);\n\n`;
     }
     const order = Object.keys(d.seed);

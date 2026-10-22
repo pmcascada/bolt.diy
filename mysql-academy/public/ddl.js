@@ -176,7 +176,7 @@
     const isKey = (target.pk && sameSet(target.pk, fk.refCols)) || target.uniques.some((u) => sameSet(u, fk.refCols));
     if (!isKey) fail(`A chave estrangeira tem de referenciar a chave primária (ou uma coluna UNIQUE) de ${fk.ref}.`);
     if (fk.onDelete === 'SET NULL' || fk.onUpdate === 'SET NULL') fk.cols.forEach((c) => { if (tbl.cols[c].notnull) fail(`ON DELETE SET NULL não é possível porque ${tbl.name}.${c} é NOT NULL: a coluna tem de aceitar NULL.`); });
-    tbl.fks.push({ cols: fk.cols, ref: fk.ref, refCols: fk.refCols, onDelete: fk.onDelete || 'RESTRICT', onUpdate: fk.onUpdate || 'RESTRICT', explicitDelete: !!fk.onDelete, name: cname || `${tbl.name}_ibfk_${tbl.fks.length + 1}` });
+    tbl.fks.push({ cols: fk.cols, ref: fk.ref, refCols: fk.refCols, onDelete: fk.onDelete || 'RESTRICT', onUpdate: fk.onUpdate || 'RESTRICT', explicitDelete: !!fk.onDelete, explicitUpdate: !!fk.onUpdate, name: cname || `${tbl.name}_ibfk_${tbl.fks.length + 1}` });
   }
   const sameSet = (a, b) => a.length === b.length && a.every((x) => b.includes(x));
   const sameFamily = (a, b) => a.base === b.base || (INT_FAMILY.includes(a.base) && INT_FAMILY.includes(b.base));
@@ -341,6 +341,7 @@
         if (!g) { say(`Tabela ${tn}: falta a chave estrangeira <b>${cols(f.cols)} → ${f.ref}${cols(f.refCols)}</b>.`); continue; }
         if (g.ref !== f.ref || !sameSet(g.refCols, f.refCols)) say(`Tabela ${tn}: a chave estrangeira ${cols(f.cols)} devia referenciar ${f.ref}${cols(f.refCols)}.`);
         else if (f.explicitDelete && g.onDelete !== f.onDelete) say(`Tabela ${tn}: a chave estrangeira ${cols(f.cols)} devia usar <b>ON DELETE ${f.onDelete}</b>${g.onDelete !== 'RESTRICT' ? `, e não ${g.onDelete}` : ''}.`);
+        if (g.ref === f.ref && f.explicitUpdate && g.onUpdate !== f.onUpdate) say(`Tabela ${tn}: a chave estrangeira ${cols(f.cols)} devia usar <b>ON UPDATE ${f.onUpdate}</b>${g.onUpdate !== 'RESTRICT' ? `, e não ${g.onUpdate}` : ''}.`);
       }
       if (!loose) for (const g of a.fks) if (!e.fks.some((x) => sameSet(x.cols, g.cols))) say(`Tabela ${tn}: a chave estrangeira ${cols(g.cols)} não foi pedida.`);
       for (const k of e.checks) {
