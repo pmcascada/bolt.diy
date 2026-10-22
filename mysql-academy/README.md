@@ -34,6 +34,7 @@ Duas bases de dados de exemplo correm no browser (AlaSQL): **escola** (pequena, 
 ## Área do professor
 
 - Tabela de alunos com filtro por turma e exportação CSV; detalhe de cada aluno com o histórico (incluindo o texto das respostas erradas), revisões, prática no MySQL real e o **projeto final** entregue.
+- **Gestor do site**: atribui ou retira o perfil de professor (secção «Gestão de professores») e escolhe que **capítulos ficam visíveis para os alunos** (secção «Capítulos visíveis para os alunos»), para controlar o ritmo da turma.
 - **Exercícios com mais dificuldade**: percentagem de alunos que acertaram à primeira, quantos viram a resposta e as **respostas erradas mais comuns** de cada exercício; perguntas dos minitestes mais erradas.
 
 ## Protocolo NEXUS (jogo 3D)

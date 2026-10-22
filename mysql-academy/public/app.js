@@ -161,10 +161,31 @@ const lessonDone = (l) => l.ex.every(passed);
 const lessonStarted = (l) => (st.pos[l.id] || 0) > 0 || l.ex.some(passed);
 const lessonOpen = (c, i) => i === 0 || lessonDone(c.lessons[i - 1]) || lessonStarted(c.lessons[i]);
 function findLesson(id) { for (const c of CHAPTERS) for (const l of c.lessons) if (l.id === id) return { c, l, i: c.lessons.indexOf(l) }; return null; }
+// Capítulos ocultos aos alunos pelo gestor do site (os professores veem todos, assinalados).
+const HIDDEN_KEY = 'mysql-academy.hidden';
+let hiddenCh = new Set();
+try { hiddenCh = new Set(JSON.parse(localStorage.getItem(HIDDEN_KEY) || '[]')); } catch { /* sem storage */ }
+const staff = () => !!(BK.user && BK.user.teacher);
+const chHidden = (c) => hiddenCh.has(c.id) && !staff();
+const visibleCh = () => CHAPTERS.filter((c) => !chHidden(c));
+function setHidden(ids) {
+  const before = [...hiddenCh].sort().join();
+  hiddenCh = new Set(ids);
+  try { localStorage.setItem(HIDDEN_KEY, JSON.stringify([...hiddenCh])); } catch { /* ignorar */ }
+  return before !== [...hiddenCh].sort().join();
+}
+async function loadSettings() { try { return setHidden((await BK.settings()).hidden); } catch { return false; } }
+// Página de um capítulo oculto (aberta por um link antigo ou escrita à mão).
+function hiddenPage(c) {
+  if (!chHidden(c)) return false;
+  crumbs = [['Conteúdos', '#/learn']];
+  view.innerHTML = `<div class="card locked-card"><span class="side-i">${ic('lock')}</span><div><h2>Capítulo ainda não disponível</h2><p class="muted">O professor vai abrir este capítulo quando a turma estiver pronta. Entretanto, pode continuar os capítulos disponíveis ou rever a matéria na página Revisão.</p><div class="row"><a class="btn" href="#/learn">Ver capítulos disponíveis</a><a class="btn sec-b" href="#/rev">${ic('repeat')}Revisão</a></div></div></div>`;
+  return true;
+}
 // O próximo passo do percurso: a primeira lição por concluir ou o miniteste por aprovar.
 function nextAction() {
   const s = sum();
-  for (const c of CHAPTERS) {
+  for (const c of visibleCh()) {
     const i = c.lessons.findIndex((l) => !lessonDone(l));
     if (i >= 0) return { kind: 'lesson', c, l: c.lessons[i], i };
     if (!s.perChapter[c.id].test.passed) return { kind: 'test', c };
@@ -285,18 +306,18 @@ function vHome() {
   <section class="sec"><h2>Conteúdos do curso</h2>${moduleList(s)}</section>`;
 }
 function moduleList(s) {
-  return `<div class="list">${CHAPTERS.map((c) => {
+  return `<div class="list">${visibleCh().map((c) => {
     const p = s.perChapter[c.id];
     const status = p.complete ? `<span class="chip ok">Concluído · ${p.test.best}%</span>` : p.unlocked ? '<span class="chip acc">Miniteste disponível</span>' : `<span>${p.lessonsOk}/${p.lessons} lições</span>`;
     return `<a class="item" href="#/c/${c.id}"><span class="no">${pad2(c.idx + 1)}</span><span class="ico ${p.complete ? 'done' : ''}">${ic(p.complete ? 'check' : c.icon)}</span>
-    <span><b>${esc(c.title)}</b><span class="d">${esc(c.desc)}</span></span>
+    <span><b>${esc(c.title)}</b>${hiddenCh.has(c.id) ? ` <span class="chip" title="Os alunos não veem este capítulo">${ic('eye')}Oculto aos alunos</span>` : ''}<span class="d">${esc(c.desc)}</span></span>
     <span class="p"><span class="row" style="justify-content:space-between">${status}<span class="num-t">${p.pct}%</span></span>${bar(p.pct, p.complete ? 'ok' : '')}</span>
     <span class="chev">${ic('chevR')}</span></a>`;
   }).join('')}</div>`;
 }
 function vLearn() {
   crumbs = [['Conteúdos', '#/learn']];
-  view.innerHTML = `<div class="page-h"><div><div class="eyebrow">Programa</div><h1>Conteúdos do curso</h1><p>${CHAPTERS.length} capítulos · ${CHAPTERS.reduce((n, c) => n + c.lessons.length, 0)} lições · ${S.TOTAL_EX} exercícios · ${CHAPTERS.length} minitestes</p></div></div>
+  view.innerHTML = `<div class="page-h"><div><div class="eyebrow">Programa</div><h1>Conteúdos do curso</h1><p>${visibleCh().length} capítulos · ${visibleCh().reduce((n, c) => n + c.lessons.length, 0)} lições · ${visibleCh().reduce((n, c) => n + c.lessons.reduce((k, l) => k + l.ex.length, 0), 0)} exercícios · ${visibleCh().length} minitestes${visibleCh().length < CHAPTERS.length ? ` <span class="chip">${CHAPTERS.length - visibleCh().length} ${CHAPTERS.length - visibleCh().length === 1 ? 'capítulo será aberto' : 'capítulos serão abertos'} pelo professor</span>` : ''}</p></div></div>
   <div class="card" style="margin-bottom:16px"><div class="how">${[['book', 'Aprender', 'Cada lição apresenta um conceito de cada vez.'], ['edit', 'Praticar', 'Logo a seguir, resolve um exercício sobre esse conceito para avançar.'], ['layers', 'Consultar', 'O manual de cada capítulo está sempre disponível.'], ['repeat', 'Rever', 'O que custou mais volta na página Revisão, em 1, 3, 7 e 14 dias.'], ['clipboard', 'Validar', `No fim, um miniteste (mín. ${PASS_MARK}%) conclui o capítulo.`]].map(([i, t, d], k) => `<div><span class="how-i">${ic(i)}</span><b>${k + 1}. ${t}</b><span>${d}</span></div>`).join('')}</div></div>
   ${moduleList(sum())}`;
 }
@@ -304,6 +325,7 @@ function vLearn() {
 /* ---------- capítulo ---------- */
 function vChapter(id) {
   const c = CHAPTERS.find((x) => x.id === id); if (!c) return vHome();
+  if (hiddenPage(c)) return;
   crumbs = [['Conteúdos', '#/learn'], [`Capítulo ${c.idx + 1}`, '#/c/' + c.id]];
   const p = sum().perChapter[c.id];
   view.innerHTML = `<div class="page-h"><div><div class="eyebrow">Capítulo ${pad2(c.idx + 1)}</div><h1>${esc(c.title)}</h1><p>${esc(c.desc)}</p></div>
@@ -339,6 +361,7 @@ function vChapter(id) {
 function vLesson(id) {
   const f = findLesson(id); if (!f) return vHome();
   const { c: C, l: L, i: idx } = f;
+  if (hiddenPage(C)) return;
   crumbs = [['Conteúdos', '#/learn'], [`Capítulo ${C.idx + 1}`, '#/c/' + C.id], [`Lição ${idx + 1}`, '#/l/' + L.id]];
   if (!lessonOpen(C, idx)) {
     view.innerHTML = `<div class="card locked-card"><span class="side-i">${ic('lock')}</span><div><h2>Lição bloqueada</h2><p class="muted">A matéria é apresentada de forma gradual. Conclua primeiro a lição <b>${esc(C.lessons[idx - 1].title)}</b>.</p><div class="row"><a class="btn" href="#/l/${C.lessons[idx - 1].id}">Ir para a lição anterior</a><a class="btn sec-b" href="#/m/${C.id}">${ic('book')}Consultar o manual</a></div></div></div>`;
@@ -700,6 +723,7 @@ function manualHtml(c) {
 const C2 = (c, i) => `${c.idx + 1}.${i + 1}`;
 function vManual(id) {
   const c = CHAPTERS.find((x) => x.id === id); if (!c) return vHome();
+  if (hiddenPage(c)) return;
   crumbs = [['Conteúdos', '#/learn'], [`Capítulo ${c.idx + 1}`, '#/c/' + c.id], ['Manual', '#/m/' + c.id]];
   view.innerHTML = `<div class="page-h"><div><div class="eyebrow">Manual · Capítulo ${pad2(c.idx + 1)}</div><h1>${esc(c.title)}</h1><p>Documento de consulta com toda a matéria do capítulo.</p></div>
     <div class="row noprint"><button class="btn sec-b sm" id="print">${ic('printer')}Imprimir / PDF</button><a class="btn sm" href="#/c/${c.id}">Voltar ao capítulo</a></div></div>
@@ -735,6 +759,7 @@ function gradeItem(x, ans) {
 }
 function vTest(id) {
   const c = CHAPTERS.find((x) => x.id === id); if (!c) return vHome();
+  if (hiddenPage(c)) return;
   crumbs = [['Conteúdos', '#/learn'], [`Capítulo ${c.idx + 1}`, '#/c/' + c.id], ['Miniteste', '#/t/' + c.id]];
   const p = sum().perChapter[c.id];
   const nQuiz = Math.min(TEST_DRAW.quiz, c.test.length), nPrac = Math.min(TEST_DRAW.practice, (c.practice || []).length);
@@ -785,7 +810,7 @@ function vTest(id) {
   const right = (x) => (x.practice ? `<pre class="sol"><code class="hl">${hl(x.q.solution)}</code></pre>` : `<span class="chip ok">${esc(x.q.opts[x.q.a])}</span>`);
   view.innerHTML = head + `<div class="card result ${pass ? 'pass' : 'fail'}"><div class="score"><b>${score}%</b><span>${ok} de ${r.qs.length} certas</span></div>
     <div><h2>${pass ? 'Aprovado' : 'Ainda não foi desta'}</h2><p class="muted">${pass ? (r.firstPass ? `O capítulo <b>${esc(c.title)}</b> está concluído. Recebeu +${S.CHAPTER_BONUS} XP.` : 'Miniteste aprovado.') : `Precisa de pelo menos ${PASS_MARK}% para concluir o capítulo. Veja abaixo as perguntas que errou, reveja essa matéria no manual e tente de novo — as perguntas serão outras.`}</p>
-    <div class="row">${pass ? (CHAPTERS[c.idx + 1] ? `<a class="btn" href="#/c/${CHAPTERS[c.idx + 1].id}">Capítulo seguinte ${ic('chevR')}</a>` : '<a class="btn" href="#/progress">Ver progresso</a>') : `<button class="btn" id="again">${ic('reset')}Repetir miniteste</button>`}<a class="btn sec-b" href="#/m/${c.id}">${ic('book')}Rever manual</a></div></div></div>
+    <div class="row">${pass ? (visibleCh().find((x) => x.idx > c.idx) ? `<a class="btn" href="#/c/${visibleCh().find((x) => x.idx > c.idx).id}">Capítulo seguinte ${ic('chevR')}</a>` : '<a class="btn" href="#/progress">Ver progresso</a>') : `<button class="btn" id="again">${ic('reset')}Repetir miniteste</button>`}<a class="btn sec-b" href="#/m/${c.id}">${ic('book')}Rever manual</a></div></div></div>
     <div class="sec"><h2>${pass ? 'Correção' : 'Resultado por pergunta'}</h2>${pass ? '' : `<p class="small muted">As respostas certas só são mostradas depois de ser aprovado, para que o miniteste continue a medir o que sabe.</p>`}
     ${r.qs.map((x, k) => `<div class="review ${res[k] ? 'ok' : 'bad'}"><div class="rv-h">${ic(res[k] ? 'checkCircle' : 'x')}<b>${k + 1}. ${esc(x.q.q)}</b></div>
       ${x.q.sql ? `<pre class="sol"><code class="hl">${hl(x.q.sql)}</code></pre>` : ''}
@@ -962,7 +987,7 @@ function vProgress() {
     <div class="kpi"><div class="l">${ic('target')}À 1.ª tentativa</div><div class="v">${s.firstTry}</div><div class="s">de ${s.exDone} exercícios resolvidos</div></div>
     <div class="kpi"><div class="l">${ic('flame')}Sequência</div><div class="v">${s.streak}</div><div class="s">dias consecutivos</div></div>
   </div>
-  <div class="card" style="margin-top:16px"><div class="card-h"><h3>Progresso por capítulo</h3></div><div class="scroll"><table class="tbl"><thead><tr><th>Capítulo</th><th style="width:28%">Progresso</th><th>Lições</th><th>Exercícios</th><th>Miniteste</th></tr></thead><tbody>${CHAPTERS.map((c) => { const p = s.perChapter[c.id]; return `<tr><td><a href="#/c/${c.id}" style="color:inherit">${c.idx + 1}. ${esc(c.title)}</a></td><td>${bar(p.pct, p.complete ? 'ok' : '')}</td><td class="small">${p.lessonsOk}/${p.lessons}</td><td class="small">${p.ok}/${p.tot}</td><td>${p.test.attempts ? `<span class="chip ${p.test.passed ? 'ok' : 'bad'}">${p.test.best}% · ${p.test.passed ? 'Aprovado' : 'Não aprovado'}</span>` : p.unlocked ? '<span class="chip acc">Disponível</span>' : '<span class="chip">Bloqueado</span>'}</td></tr>`; }).join('')}</tbody></table></div></div>
+  <div class="card" style="margin-top:16px"><div class="card-h"><h3>Progresso por capítulo</h3></div><div class="scroll"><table class="tbl"><thead><tr><th>Capítulo</th><th style="width:28%">Progresso</th><th>Lições</th><th>Exercícios</th><th>Miniteste</th></tr></thead><tbody>${visibleCh().map((c) => { const p = s.perChapter[c.id]; return `<tr><td><a href="#/c/${c.id}" style="color:inherit">${c.idx + 1}. ${esc(c.title)}</a></td><td>${bar(p.pct, p.complete ? 'ok' : '')}</td><td class="small">${p.lessonsOk}/${p.lessons}</td><td class="small">${p.ok}/${p.tot}</td><td>${p.test.attempts ? `<span class="chip ${p.test.passed ? 'ok' : 'bad'}">${p.test.best}% · ${p.test.passed ? 'Aprovado' : 'Não aprovado'}</span>` : p.unlocked ? '<span class="chip acc">Disponível</span>' : '<span class="chip">Bloqueado</span>'}</td></tr>`; }).join('')}</tbody></table></div></div>
   <div class="two" style="margin-top:16px">
     <div class="card"><div class="card-h"><h3>Atividade (14 dias)</h3><span class="small muted">${total14} exercícios</span></div>
       <div class="chart">${days.map(([k]) => `<div style="height:${Math.round((100 * (byDay[k] || 0)) / mx)}%" title="${k}: ${byDay[k] || 0} exercícios"></div>`).join('')}</div>
@@ -1159,10 +1184,10 @@ async function vProf() {
     ${rows.map((r, i) => `<tr class="pr" data-i="${i}"><td><span class="who"><span class="avatar">${esc(initials(r.name))}</span><b>${esc(r.name)}</b>${r.s.projectSent ? ` <span class="chip ok" title="Projeto final entregue">${ic('folder')}</span>` : ''}</span></td>${turmas.length ? `<td class="small muted">${esc(r.turma || '—')}</td>` : ''}<td>${r.s.level}</td><td class="r"><b>${r.s.xp}</b></td><td><div class="row" style="flex-wrap:nowrap">${bar(r.s.pct)}<span class="small muted num-t" style="min-width:36px">${r.s.pct}%</span></div></td>
       ${CHAPTERS.map((c) => { const p = r.s.perChapter[c.id]; return `<td class="c">${p.test.passed ? `<span class="chip ok" title="Miniteste aprovado">${p.test.best}%</span>` : p.test.attempts ? `<span class="chip bad" title="Melhor resultado no miniteste">${p.test.best}%</span>` : `<span class="small muted" title="Lições concluídas">${p.lessonsOk}/${p.lessons}</span>`}</td>`; }).join('')}
       <td class="small muted" style="white-space:nowrap">${r.updated ? new Date(r.updated).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' }) : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Ainda não há alunos inscritos.</div>'}</div>
-  ${BK.user && BK.user.admin ? '<div id="adminBox"></div>' : ''}
+  ${BK.user && BK.user.admin ? '<div id="chVis"></div><div id="adminBox"></div>' : ''}
   <p class="small muted" style="margin-top:10px">Colunas C1–C${CHAPTERS.length}: resultado do miniteste de cada capítulo (verde = aprovado) ou lições concluídas. Clique num aluno para ver o detalhe.</p><div id="profDetail"></div>
   ${difficultyHtml(rows)}`;
-  if (BK.user && BK.user.admin) renderAdmin();
+  if (BK.user && BK.user.admin) { renderChapterVis(); renderAdmin(); }
   view.querySelectorAll('tr.dr').forEach((tr) => (tr.onclick = () => { const d = view.querySelector(`tr.dx[data-for="${tr.dataset.id}"]`); d.hidden = !d.hidden; tr.classList.toggle('me', !d.hidden); }));
   if ($('#diffAll')) $('#diffAll').onclick = () => { profAll = !profAll; vProf(); };
   $('#profTools').innerHTML = `${turmas.length ? `<select class="txt sel" id="pturma" aria-label="Turma"><option value="">Todas as turmas</option>${turmas.map((t) => `<option ${t === profTurma ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>` : ''}<select class="txt sel" id="psort" aria-label="Ordenar"><option value="xp">Ordenar por XP</option><option value="name">Ordenar por nome</option><option value="recent">Mais recentes</option></select><button class="btn sec-b sm" id="prefresh">${ic('refresh')}Atualizar</button><button class="btn sec-b sm" id="pcsv">${ic('download')}Exportar CSV</button>`;
@@ -1189,6 +1214,28 @@ async function vProf() {
     $('#profDetail').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }));
 }
+/* ---------- gestor do site: capítulos visíveis para os alunos ---------- */
+function renderChapterVis() {
+  const box = $('#chVis'); if (!box) return;
+  const draft = new Set(hiddenCh);
+  const paint = () => {
+    const changed = [...draft].sort().join() !== [...hiddenCh].sort().join();
+    box.innerHTML = `<div class="card" style="margin-top:16px"><div class="card-h"><h3>${ic('eye')}Capítulos visíveis para os alunos</h3><span class="small muted">${CHAPTERS.length - draft.size} de ${CHAPTERS.length} visíveis</span></div>
+      <p class="small muted" style="margin-top:0">Oculte os capítulos que a turma ainda não deve abordar, para controlar o ritmo. Os alunos deixam de ver os capítulos ocultos (no painel, nos conteúdos, nos manuais e nos minitestes); o progresso que já tenham feito mantém-se. Os professores continuam a ver todos os capítulos.</p>
+      <div class="ch-vis">${CHAPTERS.map((c) => `<label class="${draft.has(c.id) ? 'off' : ''}"><input type="checkbox" data-ch="${c.id}" ${draft.has(c.id) ? '' : 'checked'}><span class="no">${pad2(c.idx + 1)}</span><span><b>${esc(c.title)}</b><span class="small muted">${draft.has(c.id) ? 'Oculto aos alunos' : 'Visível'}</span></span></label>`).join('')}</div>
+      <div class="row" style="margin-top:12px"><button class="btn" id="chSave" ${changed ? '' : 'disabled'}>${ic('check')}Guardar</button><button class="btn sec-b sm" id="chAll">Mostrar todos</button>
+      ${changed ? '<span class="small muted">Alterações por guardar.</span>' : ''}</div></div>`;
+    box.querySelectorAll('[data-ch]').forEach((b) => (b.onchange = () => { if (b.checked) draft.delete(b.dataset.ch); else draft.add(b.dataset.ch); paint(); }));
+    $('#chAll').onclick = () => { draft.clear(); paint(); };
+    $('#chSave').onclick = async () => {
+      $('#chSave').disabled = true;
+      try { await BK.setHiddenChapters([...draft]); setHidden([...draft]); toast(draft.size ? `${draft.size} ${draft.size === 1 ? 'capítulo oculto' : 'capítulos ocultos'} aos alunos` : 'Todos os capítulos estão visíveis'); paint(); }
+      catch (e) { toast(BK.errorText(e), 'alert'); paint(); }
+    };
+  };
+  paint();
+}
+
 /* ---------- gestor do site: atribuir o perfil de professor ---------- */
 let adminUsers = null, adminQ = '';
 async function renderAdmin() {
@@ -1316,13 +1363,15 @@ applyTheme();
 route();
 // Restaura a sessão (se existir) e sincroniza; só redesenha páginas sem trabalho em curso.
 BK.onRecovery = askNewPassword;
+const settingsReady = loadSettings();
 BK.init().then(async (u) => {
   if (BK.recovery) askNewPassword();
-  if (!u) { renderChrome(); return; }
+  const changed = await settingsReady;
+  if (!u) { if (changed) route(); else renderChrome(); return; }
   st.name = u.name;
   await push();
   const a = (location.hash.split('/')[1] || '');
-  if (['', 'learn', 'c', 'progress', 'rank', 'me', 'prof', 'projeto'].includes(a)) route(); else renderChrome();
+  if (changed || ['', 'learn', 'c', 'progress', 'rank', 'me', 'prof', 'projeto'].includes(a)) route(); else renderChrome();
 }).catch(() => renderChrome());
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();

@@ -530,3 +530,9 @@ details.pj pre{max-height:360px;overflow:auto}
 .lesson-intro p{margin:2px 0 0}
 .m-intro{color:var(--muted);font-style:italic;margin:-4px 0 12px}
 .prose td:first-child code{white-space:nowrap}
+.ch-vis{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}
+.ch-vis label{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--r-sm);cursor:pointer;background:var(--surface)}
+.ch-vis label.off{background:var(--surface-2);opacity:.75}
+.ch-vis label .no{font-family:var(--mono);font-size:.8rem;color:var(--muted)}
+.ch-vis label b{display:block;font-size:.9rem}
+.ch-vis input{width:16px;height:16px;accent-color:var(--accent);flex:none}
