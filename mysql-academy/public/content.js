@@ -44,7 +44,7 @@ const CHAPTERS = [
       <ul><li><b>Colunas</b> (ou campos) — as características guardadas, por exemplo <code>nome</code> ou <code>idade</code>;</li>
       <li><b>Linhas</b> (ou registos) — cada elemento concreto, por exemplo um aluno;</li>
       <li><b>Chave primária</b> — a coluna que identifica cada linha de forma única, por exemplo <code>id_aluno</code>.</li></ul>
-      <p>Execute o exemplo para ver a tabela <code>alunos</code> da base de dados de exemplo <b>escola</b>:</p>`,
+      <p>Execute o exemplo para ver a tabela <code>alunos</code> da base de dados de exemplo <b>escola</b>. A instrução <code>SELECT * FROM alunos;</code> significa simplesmente «mostra todas as colunas (<code>*</code>) da tabela alunos» — o comando <code>SELECT</code> será estudado em pormenor no capítulo 4; por agora basta observar o resultado.</p>`,
       [ex('SELECT * FROM alunos;', 'Cada linha é um aluno; cada coluna, uma característica.', true)]),
     quiz('Na tabela alunos, o que representa uma linha?', ['Uma característica comum a todos os alunos', 'Um aluno concreto', 'O nome da base de dados', 'O tipo de dados de uma coluna'], 1, 'Cada linha (registo) corresponde a um elemento — neste caso, um aluno.'),
     quiz('Para que serve a chave primária?', ['Encriptar a tabela', 'Identificar cada linha de forma única', 'Ordenar os resultados', 'Guardar a palavra-passe'], 1, 'Não podem existir duas linhas com o mesmo valor de chave primária.'),
@@ -62,7 +62,7 @@ const CHAPTERS = [
       <p>Dois comandos úteis para explorar o servidor:</p>`,
       [ex('SHOW DATABASES;', 'Lista as bases de dados existentes no servidor.'), ex('SELECT VERSION();', 'Mostra a versão do MySQL.')]),
     code('Escreva o comando que lista as bases de dados do servidor.', ['^show (databases|schemas)$'], 'SHOW DATABASES;', 'Começa por SHOW…'),
-    learn('Famílias de comandos SQL', `<p>Os comandos SQL agrupam-se em famílias, de acordo com a sua função:</p>
+    learn('Famílias de comandos SQL', `<p>Os comandos SQL agrupam-se em famílias, de acordo com a sua função. Não precisa de os saber já escrever: cada família é estudada num capítulo próprio. Por exemplo, <code>CREATE TABLE</code> cria uma tabela nova (capítulo 2), <code>INSERT</code> acrescenta dados a uma tabela (capítulo 3), <code>SELECT</code> consulta dados (capítulo 4) e <code>GRANT</code> dá permissões a um utilizador (capítulo 6).</p>
       <table><tr><th>Família</th><th>Função</th><th>Comandos</th></tr>
       <tr><td>DDL</td><td>Definir estruturas</td><td><code>CREATE</code>, <code>ALTER</code>, <code>DROP</code></td></tr>
       <tr><td>DML</td><td>Manipular dados</td><td><code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code></td></tr>
@@ -71,10 +71,25 @@ const CHAPTERS = [
       </table>`),
     quiz('A que família pertence o comando CREATE TABLE?', ['DDL', 'DML', 'DCL', 'DQL'], 0, 'CREATE define estruturas: é DDL (Data Definition Language).'),
     quiz('E o comando GRANT?', ['DDL', 'DML', 'DCL', 'DQL'], 2, 'GRANT e REVOKE controlam permissões: DCL (Data Control Language).'),
+    learn('Navegar no servidor: USE, SHOW TABLES e DESCRIBE', `<p>Um servidor MySQL guarda várias bases de dados, e cada base de dados tem várias tabelas. Para "navegar" usam-se três comandos simples:</p>
+      <table><tr><th>Comando</th><th>O que faz</th></tr>
+      <tr><td><code>USE escola;</code></td><td>escolhe a base de dados com que se vai trabalhar (a base de dados <b>ativa</b>). Os comandos seguintes referem-se às tabelas dessa base de dados.</td></tr>
+      <tr><td><code>SHOW TABLES;</code></td><td>lista as tabelas da base de dados ativa — por isso só funciona depois do <code>USE</code>.</td></tr>
+      <tr><td><code>DESCRIBE alunos;</code></td><td>mostra a estrutura de uma tabela: as colunas e o tipo de cada uma.</td></tr></table>
+      <p>Uma sessão típica no cliente <code>mysql</code>: entrar (<code>mysql -u root -p</code>), ver as bases de dados (<code>SHOW DATABASES;</code>), escolher uma (<code>USE</code>), ver as tabelas (<code>SHOW TABLES;</code>) e, no fim, sair (<code>EXIT;</code>).</p>`,
+      [ex('USE escola;\nSHOW TABLES;', 'Primeiro escolhe-se a base de dados; depois listam-se as suas tabelas.')]),
     key('o1', order('Ordene os passos de uma primeira sessão no cliente mysql: entrar no servidor, ver as bases de dados, escolher a escola, listar as suas tabelas e sair.',
       ['mysql -u root -p', 'SHOW DATABASES;', 'USE escola;', 'SHOW TABLES;', 'EXIT;'], 'Primeiro liga-se ao servidor; só depois de escolher a base de dados com USE é que SHOW TABLES lista as tabelas dela.')),
   ] },
   { title: 'Tipos de dados', steps: [
+    learn('Para que servem os tipos de dados', `<p>Quando se cria uma tabela, é preciso dizer ao MySQL que colunas vai ter e <b>que tipo de valor</b> cada coluna guarda: números, texto, datas… Isso faz-se com o comando <code>CREATE TABLE</code>, que vai aprender a escrever no capítulo 2. Fica aqui um primeiro exemplo, só para ver onde os tipos são usados:</p>
+      <pre><code>CREATE TABLE produtos (
+  id_produto INT,          -- número inteiro
+  nome       VARCHAR(60),  -- texto até 60 caracteres
+  preco      DECIMAL(8,2), -- valor com 2 casas decimais
+  validade   DATE          -- data
+);</code></pre>
+      <p>O tipo certo garante que os dados são válidos (não se guarda texto numa coluna de preços), ocupam o espaço adequado e podem ser comparados e ordenados corretamente. Nesta lição vai conhecer os tipos mais usados.</p>`),
     learn('Tipos numéricos', `<p>Cada coluna tem um <b>tipo de dados</b> que define o que pode guardar.</p>
       <ul><li><b>Inteiros</b>: <code>TINYINT</code>, <code>INT</code>, <code>BIGINT</code> — idades, quantidades, identificadores.</li>
       <li><b>Decimais exatos</b>: <code>DECIMAL(p,d)</code> — por exemplo <code>DECIMAL(8,2)</code> guarda até 999999,99. Ideal para dinheiro.</li>
@@ -165,7 +180,7 @@ const CHAPTERS = [
   id_fornecedor INT AUTO_INCREMENT PRIMARY KEY,
   nome VARCHAR(80)
 );`, 'id_fornecedor INT AUTO_INCREMENT PRIMARY KEY, nome …'),
-    learn('Restrições: NOT NULL, UNIQUE e DEFAULT', `<ul><li><code>NOT NULL</code> — o valor é obrigatório;</li><li><code>UNIQUE</code> — não podem existir valores repetidos;</li><li><code>DEFAULT valor</code> — valor usado quando não é indicado nenhum.</li></ul>
+    learn('Restrições: NOT NULL, UNIQUE, DEFAULT e CHECK', `<p>As <b>restrições</b> são regras que o MySQL verifica sempre que se guardam dados numa coluna:</p><ul><li><code>NOT NULL</code> — o valor é obrigatório;</li><li><code>UNIQUE</code> — não podem existir valores repetidos;</li><li><code>DEFAULT valor</code> — valor usado quando não é indicado nenhum;</li><li><code>CHECK (condição)</code> — o valor tem de cumprir uma condição, por exemplo <code>preco DECIMAL(8,2) CHECK (preco &gt; 0)</code>. As condições usam os operadores de comparação <code>&gt;</code>, <code>&lt;</code>, <code>&gt;=</code>, <code>&lt;=</code>, <code>=</code> e <code>&lt;&gt;</code> (diferente). O CHECK é aprofundado no capítulo 5.</li></ul>
       <p>Escolha também o tipo certo: <code>CHAR(n)</code> para códigos de tamanho fixo (NIF, ISBN, código postal), <code>VARCHAR(n)</code> para texto variável e <code>DECIMAL(p,d)</code> para valores com casas decimais.</p>`,
       [ex("CREATE TABLE alunos (\n  id_aluno INT AUTO_INCREMENT PRIMARY KEY,\n  nome VARCHAR(80) NOT NULL,\n  email VARCHAR(100) UNIQUE,\n  idade INT DEFAULT 18\n);", 'Nome obrigatório, email sem repetidos, idade 18 por omissão.')]),
     quiz('Que restrição impede que uma coluna fique vazia?', ['UNIQUE', 'DEFAULT', 'NOT NULL', 'AUTO_INCREMENT'], 2, 'NOT NULL torna o valor obrigatório.'),
@@ -460,6 +475,15 @@ CREATE TABLE linhas_encomenda (
     learn('Expressões e várias colunas', `<p>O novo valor pode ser calculado a partir do atual, e podem alterar-se várias colunas separadas por vírgulas:</p>`,
       [ex("UPDATE notas SET nota = nota + 1\nWHERE disciplina = 'Programação';", 'Soma 1 valor a todas as notas de Programação.'), ex("UPDATE alunos SET idade = 21, cidade = 'Faro' WHERE id_aluno = 1;", 'Duas colunas de uma vez.')]),
     dml('Aumente em 100 as horas de todos os cursos.', 'UPDATE cursos SET horas = horas + 100;', 'SET horas = horas + 100'),
+    learn('Condições no WHERE: comparar e combinar', `<p>O <code>WHERE</code> aceita qualquer condição que seja verdadeira ou falsa para cada linha. As mais usadas:</p>
+      <table><tr><th>Operador</th><th>Significado</th><th>Exemplo</th></tr>
+      <tr><td><code>=</code> / <code>&lt;&gt;</code></td><td>igual / diferente</td><td><code>cidade = 'Porto'</code></td></tr>
+      <tr><td><code>&gt;</code> / <code>&lt;</code></td><td>maior / menor</td><td><code>idade &gt; 22</code></td></tr>
+      <tr><td><code>&gt;=</code> / <code>&lt;=</code></td><td>maior ou igual / menor ou igual</td><td><code>nota &lt;= 9</code></td></tr>
+      <tr><td><code>AND</code></td><td>as duas condições têm de ser verdadeiras</td><td><code>cidade = 'Porto' AND idade &gt; 20</code></td></tr>
+      <tr><td><code>OR</code></td><td>basta uma ser verdadeira</td><td><code>cidade = 'Porto' OR cidade = 'Braga'</code></td></tr></table>
+      <p>As datas comparam-se como o texto, entre plicas: <code>data &lt; '2025-07-01'</code> significa "antes de 1 de julho de 2025". No capítulo 4 (SELECT) verá ainda <code>IN</code>, <code>BETWEEN</code> e <code>LIKE</code>.</p>`,
+      [ex("UPDATE alunos SET cidade = 'Faro'\nWHERE idade > 22 AND cidade = 'Braga';", 'Só os alunos de Braga com mais de 22 anos.')]),
     key('p1', predict('Quantas linhas altera esta instrução na BD escola?', "UPDATE alunos SET cidade = 'Faro'\nWHERE idade > 22;", ['Nenhuma', '3', '5', 'Todas (10)'], 1, 'Só os alunos com mais de 22 anos: Diogo (24), Filipe (23) e Hugo (25).')),
     key('f1', dml('Um colega queria mudar para 1000 as horas do curso de Gestão, mas a instrução abaixo alteraria todos os cursos. Corrija-a antes de a executar.', 'UPDATE cursos SET horas = 1000 WHERE id_curso = 2;', "Falta o WHERE: só o curso de Gestão (id_curso 2 ou nome = 'Gestão').", { start: 'UPDATE cursos SET horas = 1000;' })),
   ] },
@@ -480,7 +504,9 @@ CREATE TABLE linhas_encomenda (
     dml('A editora aumentou 5% o preço de todos os livros (categoria Livros). Atualize a tabela produtos.', "UPDATE produtos SET preco = preco * 1.05 WHERE categoria = 'Livros';", "SET preco = preco * 1.05 WHERE categoria = 'Livros'", { db: 'loja' }),
     dml("A loja passou a vender o produto 'Mochila', da categoria Desporto, a 35 €, com 20 unidades em stock. Registe-o (o id_produto é automático).", "INSERT INTO produtos (nome, categoria, preco, stock) VALUES ('Mochila', 'Desporto', 35, 20);", 'INSERT INTO produtos (nome, categoria, preco, stock) VALUES (…);', { db: 'loja' }),
     learn('Apagar dados relacionados', `<p>Numa BD real, as linhas de uma encomenda referenciam a encomenda (chave estrangeira). Para apagar encomendas é preciso apagar <b>primeiro</b> as suas linhas — ou ter definido <code>ON DELETE CASCADE</code>.</p>
-      <p>Uma subconsulta escolhe as linhas a apagar a partir de outra tabela:</p>`,
+      <p>Mas a tabela <code>linhas_encomenda</code> não tem a coluna <code>estado</code>: o estado está na tabela <code>encomendas</code>. Para escolher as linhas a apagar usa-se uma <b>subconsulta</b> — uma consulta entre parênteses que devolve uma lista de valores:</p>
+      <ol><li><code>SELECT id_encomenda FROM encomendas WHERE estado = 'cancelada'</code> devolve a lista dos números das encomendas canceladas (o <code>SELECT</code> lê dados de uma tabela; é estudado no capítulo 4);</li>
+      <li><code>WHERE id_encomenda IN (…)</code> escolhe as linhas cujo <code>id_encomenda</code> está nessa lista.</li></ol>`,
       [ex("DELETE FROM linhas_encomenda\nWHERE id_encomenda IN (SELECT id_encomenda FROM encomendas WHERE estado = 'cancelada');", 'Apaga as linhas das encomendas canceladas (na BD loja).', 'loja')]),
     dml('Elimine da BD as encomendas canceladas, incluindo as suas linhas. Escreva as duas instruções pela ordem certa, separadas por ponto e vírgula.', "DELETE FROM linhas_encomenda WHERE id_encomenda IN (SELECT id_encomenda FROM encomendas WHERE estado = 'cancelada');\nDELETE FROM encomendas WHERE estado = 'cancelada';", 'Primeiro as linhas (com uma subconsulta), depois as encomendas.', { db: 'loja', xp: 25 }),
     dml("As encomendas no estado 'enviada' feitas antes de 1 de julho de 2025 já chegaram ao destino. Atualize o seu estado para 'entregue'.", "UPDATE encomendas SET estado = 'entregue' WHERE estado = 'enviada' AND data < '2025-07-01';", "Duas condições: o estado e a data (as datas comparam-se entre plicas: '2025-07-01').", { db: 'loja' }),
@@ -613,7 +639,8 @@ CREATE TABLE linhas_encomenda (
       [ex('SELECT nome, idade FROM alunos\nWHERE idade > (SELECT AVG(idade) FROM alunos);', 'Alunos com idade acima da média (21,5).', true)]),
     query('Mostre o nome dos cursos com mais horas do que a média de horas dos cursos.', 'SELECT nome FROM cursos WHERE horas > (SELECT AVG(horas) FROM cursos)', '(SELECT AVG(horas) FROM cursos)'),
     learn('Subconsulta com IN', `<p>Quando a subconsulta devolve uma lista de valores, usa-se com <code>IN</code>:</p>`,
-      [ex("SELECT nome FROM alunos\nWHERE id_aluno IN (SELECT id_aluno FROM notas WHERE disciplina = 'Programação');", 'Alunos com nota a Programação.', true)]),
+      [ex("SELECT nome FROM alunos\nWHERE id_aluno IN (SELECT id_aluno FROM notas WHERE disciplina = 'Programação');", 'Alunos com nota a Programação.', true),
+       ex('SELECT nome FROM alunos\nWHERE id_aluno NOT IN (SELECT id_aluno FROM notas);', 'NOT IN faz o contrário: alunos que não aparecem na lista, ou seja, sem nenhuma nota.', true)]),
     query('Mostre o nome dos alunos que têm alguma nota igual ou superior a 17 (use IN com subconsulta).', 'SELECT nome FROM alunos WHERE id_aluno IN (SELECT id_aluno FROM notas WHERE nota >= 17)', 'WHERE id_aluno IN (SELECT id_aluno FROM notas …)'),
   ] },
   { key: 'func', title: 'Funções de texto, números e datas', steps: [
@@ -719,7 +746,7 @@ CREATE TABLE linhas_encomenda (
   desc: 'CHECK para validar dados, índices para acelerar consultas e vistas (VIEW).',
   lessons: [
   { title: 'Validar dados com CHECK', steps: [
-    learn('A restrição CHECK', `<p>Já conhece as restrições <code>NOT NULL</code>, <code>UNIQUE</code> e <code>DEFAULT</code>. A restrição <code>CHECK</code> vai mais longe: define uma <b>condição</b> que todos os valores têm de cumprir. Se um INSERT ou UPDATE a violar, o MySQL recusa a operação.</p>
+    learn('A restrição CHECK', `<p>Já conhece as restrições <code>NOT NULL</code>, <code>UNIQUE</code> e <code>DEFAULT</code>, e viu de passagem o <code>CHECK</code> no capítulo 2. Vamos agora aprofundá-lo. A restrição <code>CHECK</code> vai mais longe que as outras: define uma <b>condição</b> que todos os valores têm de cumprir. Se um INSERT ou UPDATE a violar, o MySQL recusa a operação.</p>
       <p>Pode escrever-se junto da coluna ou no fim da definição da tabela:</p>
       <pre><code>CREATE TABLE produtos (
   id_produto INT PRIMARY KEY,
@@ -927,7 +954,8 @@ mysqldump -u root -p escola | gzip > escola.sql.gz         # comprimido</code></
   { title: 'Restaurar uma base de dados', steps: [
     learn('Restaurar a partir do terminal', `<p>O restauro "reproduz" o ficheiro SQL no servidor, invertendo o redirecionamento (<code>&lt;</code>). Se o dump não foi feito com <code>--databases</code>, a base de dados tem de existir antes:</p>
       <pre><code>mysql -u root -p -e "CREATE DATABASE escola"
-mysql -u root -p escola &lt; escola.sql</code></pre>`),
+mysql -u root -p escola &lt; escola.sql</code></pre>
+      <p>A opção <code>-e</code> ("execute") executa a instrução SQL indicada entre aspas e termina, sem abrir a linha de comandos <code>mysql&gt;</code>. Depois de restaurar, é boa prática confirmar os dados, por exemplo com <code>mysql -u root -p escola -e "SELECT COUNT(*) FROM alunos"</code>.</p>`),
     code('Escreva o comando que restaura o ficheiro loja.sql na base de dados loja (utilizador root, com palavra-passe).', ['^mysql -u ?root -p ?loja<loja\\.sql$', '^mysql -p -u ?root loja<loja\\.sql$'], 'mysql -u root -p loja < loja.sql', 'mysql -u … -p base < ficheiro'),
     learn('Restaurar dentro do cliente mysql', `<p>Se já estiver ligado ao <code>mysql&gt;</code>, pode executar um ficheiro de comandos com <code>SOURCE</code>:</p>
       <pre><code>USE escola;
@@ -986,6 +1014,45 @@ SOURCE /caminho/escola.sql;</code></pre><p>Ficheiros comprimidos restauram-se co
 },
 ];
 
+
+/* Enquadramento de cada lição: o que se vai aprender, porque é importante e como se liga ao resto do curso.
+   Aparece no topo da lição e no manual do capítulo. */
+const INTROS = {
+  'intro.1': 'Antes de escrever comandos, é preciso perceber o que é uma base de dados, como a informação se organiza em tabelas e qual o papel do MySQL e da linguagem SQL. Estes conceitos são a base de todo o curso.',
+  'intro.2': 'Nesta lição aprende a ligar-se a um servidor MySQL e a dar os primeiros comandos: ver as bases de dados, escolher uma, listar as suas tabelas e sair. Fica também a conhecer as famílias de comandos SQL, que correspondem aos capítulos seguintes.',
+  'intro.3': 'Cada coluna de uma tabela guarda um tipo de valor: números, texto ou datas. Nesta lição conhece os tipos mais usados e aprende a escolher o adequado — uma decisão que vai tomar sempre que criar tabelas com CREATE TABLE, no capítulo 2.',
+  'ddl.1': 'Uma base de dados é o "contentor" onde ficam as tabelas de um projeto. Antes de criar tabelas, aprende a criar, escolher e eliminar bases de dados.',
+  'ddl.2': 'É aqui que os tipos de dados do capítulo 1 são usados: aprende a criar tabelas com CREATE TABLE, a definir a chave primária e a acrescentar regras (restrições) que impedem dados inválidos.',
+  'ddl.3': 'As tabelas não vivem isoladas: um aluno pertence a um curso, uma encomenda pertence a um cliente. Nesta lição aprende a ligar tabelas com chaves estrangeiras (relações 1:N) e a decidir o que acontece quando se apaga um registo relacionado.',
+  'ddl.4': 'Algumas relações são "muitos para muitos": um aluno tem várias disciplinas e cada disciplina tem vários alunos. Aprende a representá-las com uma tabela de ligação — um padrão que vai encontrar em quase todas as bases de dados reais.',
+  'ddl.5': 'As necessidades mudam e as tabelas também: é preciso acrescentar colunas, corrigir tipos ou ligar tabelas já existentes. Aprende a alterar a estrutura com ALTER TABLE sem perder os dados, e a eliminar tabelas pela ordem certa.',
+  'ddl.norm': 'Até aqui as tabelas eram indicadas no enunciado. Num projeto real é o aluno que as tem de decidir a partir de um texto. Nesta lição aprende a encontrar entidades e relações e a aplicar as formas normais para evitar dados repetidos.',
+  'ddl.6': 'Desafio final do capítulo: a partir dos requisitos de uma loja online, cria sozinho as quatro tabelas, com chaves, relações e restrições. É a aplicação de tudo o que aprendeu no capítulo.',
+  'dml.1': 'Com as tabelas criadas, é preciso colocar-lhes dados. Nesta lição aprende o comando INSERT, para acrescentar uma ou várias linhas a uma tabela.',
+  'dml.2': 'Os dados mudam: um aluno muda de cidade, um preço aumenta. Aprende o comando UPDATE e, sobretudo, a escolher com WHERE exatamente as linhas a alterar — um UPDATE sem WHERE altera a tabela inteira.',
+  'dml.3': 'Por fim, aprende a eliminar dados: linhas escolhidas com DELETE ou a tabela inteira com TRUNCATE. Tal como no UPDATE, o WHERE é o que separa uma operação segura de um desastre.',
+  'dml.loja': 'Para praticar num cenário realista, passa a usar a base de dados loja, com clientes, produtos e encomendas. Aplica INSERT, UPDATE e DELETE a situações do dia a dia de uma loja, incluindo dados relacionados entre tabelas.',
+  'select.1': 'Consultar dados é a tarefa mais frequente em SQL. Esta lição apresenta o comando SELECT: como ler uma tabela, escolher colunas e fazer cálculos no resultado.',
+  'select.2': 'Raramente se quer ver uma tabela inteira. Aprende a filtrar as linhas com WHERE e com os operadores de comparação, AND/OR, IN, BETWEEN e LIKE.',
+  'select.3': 'Um resultado útil está organizado. Aprende a ordenar (ORDER BY), a limitar o número de linhas (LIMIT) e a eliminar repetidos (DISTINCT) — por exemplo, para obter "os 3 melhores".',
+  'select.4': 'Muitas perguntas pedem resumos: quantos alunos há por cidade, qual a média de cada disciplina. Aprende as funções de agregação e a agrupar linhas com GROUP BY e HAVING, e vê passo a passo como o MySQL executa uma consulta.',
+  'select.5': 'A informação está repartida por várias tabelas relacionadas (capítulo 2). Com JOIN volta a juntá-la numa só consulta — por exemplo, cada aluno com o nome do seu curso.',
+  'select.6': 'Às vezes a resposta depende de outra pergunta: "alunos com idade acima da média". Aprende a usar uma consulta dentro de outra (subconsulta).',
+  'select.func': 'Os dados nem sempre estão no formato que se quer mostrar. Aprende funções para transformar texto, arredondar números e trabalhar com datas, usando também a BD loja.',
+  'select.case': 'Aprende a criar categorias dentro de uma consulta com CASE (ex.: "caro", "barato") e a lidar com valores desconhecidos (NULL), que mudam o resultado das contas.',
+  'select.join3': 'Nas bases de dados reais é comum atravessar três ou mais tabelas para obter uma resposta. Aprende também a juntar resultados de consultas diferentes com UNION.',
+  'select.neg': 'Lição de aplicação: em vez de instruções passo a passo, recebe perguntas da direção da loja e tem de decidir que tabelas, filtros e agrupamentos usar. É assim que o SQL é usado no trabalho real.',
+  'adv.1': 'Uma base de dados só é útil se os dados forem válidos. Aprofunda a restrição CHECK, que impede, por exemplo, preços negativos ou notas acima de 20.',
+  'adv.2': 'Com milhões de linhas, uma consulta pode demorar muito. Os índices tornam as pesquisas rápidas. Aprende a criá-los e, sobretudo, quando vale a pena fazê-lo.',
+  'adv.3': 'Aprende a guardar consultas com um nome (vistas), para simplificar consultas complexas e mostrar a cada utilizador apenas os dados de que precisa — o que prepara o capítulo de segurança.',
+  'sec.1': 'Uma base de dados real é usada por várias pessoas e aplicações, e nem todas devem poder fazer tudo. Começa por aprender a criar e gerir contas de utilizador.',
+  'sec.2': 'Depois de criar um utilizador, é preciso dizer o que ele pode fazer. Aprende a dar e retirar permissões com GRANT e REVOKE, ao nível do servidor, da base de dados ou de uma tabela.',
+  'sec.3': 'Dar permissões a cada utilizador, um a um, torna-se difícil de gerir. Os roles agrupam permissões e atribuem-se de uma vez. A lição termina com as boas práticas de segurança.',
+  'backup.1': 'Avarias, erros humanos e ataques acontecem. Esta lição explica porque se fazem cópias de segurança e como se fazem com o mysqldump.',
+  'backup.2': 'Uma cópia de segurança só vale se for possível recuperá-la. Aprende a restaurar uma base de dados a partir de um ficheiro e a testar os backups.',
+  'backup.3': 'Para terminar, uma visão de conjunto: backups físicos, recuperação até um instante exato e a regra 3-2-1, para planear uma estratégia de backup completa.',
+};
+
 /* IDs estáveis e estrutura derivada: capítulo.lição.exercício */
 CHAPTERS.forEach((c, ci) => {
   c.idx = ci;
@@ -993,6 +1060,7 @@ CHAPTERS.forEach((c, ci) => {
   c.lessons.forEach((l) => {
     l.id = l.key ? `${c.id}.${l.key}` : `${c.id}.${++ln}`;
     l.chapter = c.id;
+    l.intro = INTROS[l.id] || '';
     let n = 0;
     l.steps.forEach((s, si) => { s.idx = si; if (s.t !== 'learn') s.id = s.key ? `${l.id}.${s.key}` : `${l.id}.${++n}`; });
     l.ex = l.steps.filter((s) => s.t !== 'learn');
