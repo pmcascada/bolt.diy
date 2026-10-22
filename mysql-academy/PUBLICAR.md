@@ -82,7 +82,8 @@ Em **Authentication** → **URL Configuration**, defina o **Site URL** com o end
    ```
 3. Volte a abrir o site: aparece no menu a **Área do professor**, com a evolução de todos os alunos (exportável em CSV). As contas de professor não entram na classificação.
 4. **Outros professores:** cada colega cria a sua conta no site; depois, o gestor abre a **Área do professor** → **Gestão de professores**, procura a conta e clica em **Tornar professor**. Os professores veem os alunos, mas só o gestor pode dar ou retirar o perfil de professor.
-5. **Ritmo da turma:** na Área do professor → **Capítulos visíveis para os alunos**, o gestor oculta os capítulos que a turma ainda não deve abordar e volta a mostrá-los quando for altura.
+5. **Palavra-passe de acesso ao site:** o site pede uma palavra-passe antes de abrir (a página `acesso.html`). Defina a palavra-passe inicial com o comando indicado no fim de `supabase/schema.sql`; depois, o gestor muda-a na Área do professor → **Palavra-passe de acesso ao site**. Se usar outro projeto Supabase, atualize também o endereço e a chave em `public/middleware.js` (os mesmos de `config.js`).
+6. **Ritmo da turma:** na Área do professor → **Capítulos visíveis para os alunos**, o gestor oculta os capítulos que a turma ainda não deve abordar e volta a mostrá-los quando for altura.
 
 ## Manutenção
 

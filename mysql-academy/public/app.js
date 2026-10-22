@@ -81,8 +81,16 @@ const sum = () => S.summarize(st);
 
 /* ---------- sincronização com a conta do aluno (Supabase ou servidor local) ---------- */
 const BK = window.BACKEND;
-const payload = () => ({ done: st.done, rev: st.rev, pos: st.pos, tests: st.tests, game: { done: st.game.done }, days: st.days, log: st.log, review: st.review, real: st.real, project: st.project });
+const payload = () => ({ ...(st.resetAt ? { resetAt: st.resetAt } : {}), done: st.done, rev: st.rev, pos: st.pos, tests: st.tests, game: { done: st.game.done }, days: st.days, log: st.log, review: st.review, real: st.real, project: st.project });
+let resetNotice = false;
 function merge(remote) {
+  // O gestor aprovou um pedido de reinício: apaga também o progresso guardado neste dispositivo.
+  if (remote.resetAt && remote.resetAt > (st.resetAt || 0)) {
+    const keep = { name: st.name, token: st.token, theme: st.theme, settings: st.game && st.game.settings };
+    Object.assign(st, EMPTY(), { name: keep.name, token: keep.token, theme: keep.theme, resetAt: remote.resetAt });
+    if (keep.settings) st.game.settings = keep.settings;
+    resetNotice = true;
+  }
   for (const [id, d] of Object.entries(remote.done || {})) if (!st.done[id] || st.done[id].at > d.at) st.done[id] = d;
   Object.assign(st.rev, remote.rev || {});
   for (const [id, t] of Object.entries(remote.tests || {})) {
@@ -108,6 +116,7 @@ async function push() {
       const remote = await BK.load();
       if (remote) merge(remote);
       await BK.save(payload(), sum());
+      if (resetNotice) { resetNotice = false; setTimeout(() => { modal('reset', 'Progresso reiniciado', 'O gestor do site aprovou o seu pedido: o seu progresso no curso foi reiniciado. Pode começar de novo a partir do primeiro capítulo.'); route(); }, 300); }
       online = true;
       try { localStorage.setItem(KEY, JSON.stringify(st)); } catch { /* ignorar */ }
     } catch { online = false; } finally { pushing = null; }
@@ -258,7 +267,7 @@ function isOn(h) {
 function renderChrome() {
   const nav = BK.user && BK.user.teacher ? [...NAV.slice(0, 2), ['Conta', [['#/me', 'user', 'Perfil'], ['#/prof', 'users', 'Área do professor']]]] : NAV;
   const nDue = dueReviews().length;
-  $('#nav').innerHTML = nav.map(([g, items]) => `<div class="grp">${g}</div>` + items.map(([h, i, t]) => `<a href="${h}" class="${isOn(h) ? 'on' : ''}">${ic(i)}<span>${t}</span>${h === '#/rev' && nDue ? `<span class="nav-n" title="Exercícios para rever hoje">${nDue}</span>` : ''}</a>`).join('')).join('');
+  $('#nav').innerHTML = nav.map(([g, items]) => `<div class="grp">${g}</div>` + items.map(([h, i, t]) => `<a href="${h}" class="${isOn(h) ? 'on' : ''}">${ic(i)}<span>${t}</span>${h === '#/rev' && nDue ? `<span class="nav-n" title="Exercícios para rever hoje">${nDue}</span>` : ''}${h === '#/prof' && adminPending ? `<span class="nav-n" title="Pedidos de reinício pendentes">${adminPending}</span>` : ''}</a>`).join('')).join('');
   $('#tabbar').innerHTML = TABS.map(([h, i, t]) => `<a href="${h}" class="${isOn(h) ? 'on' : ''}">${ic(i)}<span>${t}</span></a>`).join('');
   const s = sum();
   $('#mini').innerHTML = `<a class="who" href="#/me" style="color:inherit;text-decoration:none"><span class="avatar">${esc(initials((BK.user && BK.user.name) || 'A'))}</span><span><b>${esc((BK.user && BK.user.name) || 'Aluno convidado')}</b><span>Nível ${s.level} · ${s.title}</span></span></a>${bar(lvlPct(s))}<span class="small muted num-t">${s.xp} / ${s.next} XP</span>`;
@@ -1033,6 +1042,7 @@ function vMe() {
   if (u) {
     acct = `<div class="who" style="margin-bottom:14px"><span class="avatar" style="width:44px;height:44px">${esc(initials(u.name))}</span><span><b>${esc(u.name)}</b><span>${esc(u.email || 'Sessão iniciada')}${u.admin ? ' · Gestor do site' : u.teacher ? ' · Professor' : ''}</span></span></div>
     <p class="small muted">O progresso é guardado na sua conta e pode ser retomado em qualquer dispositivo.</p>${online === false ? alertBox('bad', 'alert', 'Sem ligação neste momento. A sincronização será feita mais tarde.') : ''}
+    <div id="resetBox"></div>
     ${u.teacher ? '' : `<form id="tf" class="row" style="align-items:flex-end;margin-top:10px"><label class="field" style="margin:0;flex:1">Turma (indicada pelo professor, ex.: 12.º B)<input class="txt" id="turma" maxlength="30" value="${esc(u.turma || '')}"></label><button class="btn sec-b" type="submit">Guardar turma</button></form>`}
     <div class="row" style="margin-top:14px"><button class="btn" id="sync">${ic('refresh')}Sincronizar</button><button class="btn sec-b" id="out">${ic('logout')}Terminar sessão</button>${u.teacher ? `<a class="btn sec-b" href="#/prof">${ic('users')}Área do professor</a>` : ''}</div>`;
   } else if (sbMode) {
@@ -1057,6 +1067,7 @@ function vMe() {
   const busyT = async (fn) => { try { await fn(); } catch (e) { toast(BK.errorText(e), 'alert'); } };
   const busy = async (fn) => { const b = view.querySelectorAll('#authf .btn'); b.forEach((x) => (x.disabled = true)); try { await fn(); } catch (e) { msg('bad', 'alert', esc(BK.errorText(e))); } finally { b.forEach((x) => (x.disabled = false)); } };
   if (u) {
+    renderResetBox();
     if ($('#tf')) $('#tf').onsubmit = (e) => { e.preventDefault(); busyT(async () => { await BK.setTurma($('#turma').value); toast('Turma guardada'); vMe(); }); };
     $('#sync').onclick = async () => { await push(); toast(online ? 'Progresso sincronizado' : 'Sem ligação', online ? 'check' : 'alert'); vMe(); };
     $('#out').onclick = async () => {
@@ -1098,6 +1109,27 @@ function vMe() {
   if ($('#reset')) $('#reset').onclick = () => { if (confirm('Apagar todo o progresso guardado neste dispositivo?')) { Object.assign(st, EMPTY()); persist(); route(); } };
 }
 let meTab = 'in';
+
+/* ---------- pedido de reinício do progresso (perfil) ---------- */
+async function renderResetBox() {
+  const box = $('#resetBox'); if (!box || !BK.requestReset) return;
+  let req = null;
+  try { req = await BK.myResetRequest(); } catch { return; }
+  if (!$('#resetBox')) return;
+  const when = (d) => new Date(d).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' });
+  const pending = req && req.status === 'pendente';
+  box.innerHTML = `<div class="reset-box"><h4>${ic('reset')}Reiniciar o meu progresso</h4>
+    ${pending ? `<p class="small">Pedido enviado em ${when(req.created_at)}. Aguarda a aprovação do gestor do site.${req.reason ? ` Motivo: <i>${esc(req.reason)}</i>` : ''}</p><button class="btn sec-b sm" id="rsCancel">Cancelar pedido</button>`
+      : `<p class="small muted">Se quiser recomeçar o curso do início, pode pedir ao gestor do site que reinicie o seu progresso. Depois de aprovado, são apagados os exercícios, minitestes, revisões, XP e histórico — nesta conta e em todos os seus dispositivos. A conta, o nome e a turma mantêm-se.</p>
+      ${req ? `<p class="small">Último pedido: <span class="chip ${req.status === 'aprovado' ? 'ok' : 'bad'}">${req.status === 'aprovado' ? 'Aprovado' : 'Recusado'}</span> em ${when(req.decided_at || req.created_at)}.</p>` : ''}
+      <form id="rsForm" class="row" style="align-items:flex-end;gap:10px"><label class="field" style="margin:0;flex:1;min-width:200px">Motivo (opcional)<input class="txt" id="rsReason" maxlength="300" placeholder="Ex.: quero repetir o curso desde o início"></label><button class="btn sec-b" type="submit">${ic('reset')}Pedir reinício</button></form>`}</div>`;
+  if ($('#rsCancel')) $('#rsCancel').onclick = async () => { try { await BK.cancelReset(req.id); toast('Pedido cancelado'); renderResetBox(); } catch (e) { toast(BK.errorText(e), 'alert'); } };
+  if ($('#rsForm')) $('#rsForm').onsubmit = async (e) => {
+    e.preventDefault();
+    if (!confirm('Enviar ao gestor do site o pedido para reiniciar todo o seu progresso no curso?\n\nSe for aprovado, o progresso é apagado e não pode ser recuperado.')) return;
+    try { await BK.requestReset($('#rsReason').value.trim()); toast('Pedido enviado ao gestor do site'); renderResetBox(); } catch (err) { toast(BK.errorText(err), 'alert'); }
+  };
+}
 
 // Depois de abrir o link "recuperar palavra-passe" recebido por email.
 function askNewPassword() {
@@ -1184,10 +1216,10 @@ async function vProf() {
     ${rows.map((r, i) => `<tr class="pr" data-i="${i}"><td><span class="who"><span class="avatar">${esc(initials(r.name))}</span><b>${esc(r.name)}</b>${r.s.projectSent ? ` <span class="chip ok" title="Projeto final entregue">${ic('folder')}</span>` : ''}</span></td>${turmas.length ? `<td class="small muted">${esc(r.turma || '—')}</td>` : ''}<td>${r.s.level}</td><td class="r"><b>${r.s.xp}</b></td><td><div class="row" style="flex-wrap:nowrap">${bar(r.s.pct)}<span class="small muted num-t" style="min-width:36px">${r.s.pct}%</span></div></td>
       ${CHAPTERS.map((c) => { const p = r.s.perChapter[c.id]; return `<td class="c">${p.test.passed ? `<span class="chip ok" title="Miniteste aprovado">${p.test.best}%</span>` : p.test.attempts ? `<span class="chip bad" title="Melhor resultado no miniteste">${p.test.best}%</span>` : `<span class="small muted" title="Lições concluídas">${p.lessonsOk}/${p.lessons}</span>`}</td>`; }).join('')}
       <td class="small muted" style="white-space:nowrap">${r.updated ? new Date(r.updated).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' }) : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Ainda não há alunos inscritos.</div>'}</div>
-  ${BK.user && BK.user.admin ? '<div id="chVis"></div><div id="adminBox"></div>' : ''}
+  ${BK.user && BK.user.admin ? '<div id="resetReqs"></div><div id="chVis"></div><div id="sitePass"></div><div id="adminBox"></div>' : ''}
   <p class="small muted" style="margin-top:10px">Colunas C1–C${CHAPTERS.length}: resultado do miniteste de cada capítulo (verde = aprovado) ou lições concluídas. Clique num aluno para ver o detalhe.</p><div id="profDetail"></div>
   ${difficultyHtml(rows)}`;
-  if (BK.user && BK.user.admin) { renderChapterVis(); renderAdmin(); }
+  if (BK.user && BK.user.admin) { renderResetReqs(); renderChapterVis(); renderSitePass(); renderAdmin(); }
   view.querySelectorAll('tr.dr').forEach((tr) => (tr.onclick = () => { const d = view.querySelector(`tr.dx[data-for="${tr.dataset.id}"]`); d.hidden = !d.hidden; tr.classList.toggle('me', !d.hidden); }));
   if ($('#diffAll')) $('#diffAll').onclick = () => { profAll = !profAll; vProf(); };
   $('#profTools').innerHTML = `${turmas.length ? `<select class="txt sel" id="pturma" aria-label="Turma"><option value="">Todas as turmas</option>${turmas.map((t) => `<option ${t === profTurma ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>` : ''}<select class="txt sel" id="psort" aria-label="Ordenar"><option value="xp">Ordenar por XP</option><option value="name">Ordenar por nome</option><option value="recent">Mais recentes</option></select><button class="btn sec-b sm" id="prefresh">${ic('refresh')}Atualizar</button><button class="btn sec-b sm" id="pcsv">${ic('download')}Exportar CSV</button>`;
@@ -1214,6 +1246,35 @@ async function vProf() {
     $('#profDetail').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }));
 }
+/* ---------- gestor do site: pedidos de reinício do progresso ---------- */
+let adminPending = 0;
+async function loadAdminPending() {
+  if (!(BK.user && BK.user.admin && BK.adminResets)) return;
+  try { adminPending = (await BK.adminResets()).filter((r) => r.status === 'pendente').length; renderChrome(); } catch { /* ignorar */ }
+}
+async function renderResetReqs() {
+  const box = $('#resetReqs'); if (!box || !BK.adminResets) return;
+  let rows = [];
+  try { rows = await BK.adminResets(); } catch (e) { box.innerHTML = alertBox('bad', 'alert', esc(BK.errorText(e))); return; }
+  if (!$('#resetReqs')) return;
+  const pend = rows.filter((r) => r.status === 'pendente'), done = rows.filter((r) => r.status !== 'pendente');
+  adminPending = pend.length; renderChrome();
+  const when = (d) => (d ? new Date(d).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' }) : '—');
+  box.innerHTML = `<div class="card" style="margin-top:16px"><div class="card-h"><h3>${ic('reset')}Pedidos de reinício do progresso</h3><span class="small muted">${pend.length ? `${pend.length} ${pend.length === 1 ? 'pendente' : 'pendentes'}` : 'Nenhum pendente'}</span></div>
+    ${pend.length ? `<div class="scroll"><table class="tbl"><thead><tr><th>Utilizador</th><th>Turma</th><th>Motivo</th><th>Pedido em</th><th></th></tr></thead><tbody>
+      ${pend.map((r) => `<tr><td><b>${esc(r.name)}</b><div class="small muted">${esc(r.email || '')}</div></td><td class="small muted">${esc(r.turma || '—')}</td><td class="small">${r.reason ? esc(r.reason) : '<span class="muted">—</span>'}</td><td class="small muted" style="white-space:nowrap">${when(r.created_at)}</td>
+        <td class="r" style="white-space:nowrap"><button class="btn sm danger" data-rs="${r.id}" data-ok="1">Aprovar e reiniciar</button> <button class="btn sec-b sm" data-rs="${r.id}" data-ok="0">Recusar</button></td></tr>`).join('')}</tbody></table></div>`
+      : '<p class="small muted" style="margin:0">Quando um utilizador pedir para reiniciar o progresso (na página Perfil), o pedido aparece aqui.</p>'}
+    ${done.length ? `<details class="pj" style="margin-top:12px"><summary>Pedidos já tratados (${done.length})</summary><table class="tbl"><tbody>${done.map((r) => `<tr><td>${esc(r.name)}</td><td><span class="chip ${r.status === 'aprovado' ? 'ok' : 'bad'}">${r.status === 'aprovado' ? 'Aprovado' : 'Recusado'}</span></td><td class="small muted">${when(r.decided_at)}</td></tr>`).join('')}</tbody></table></details>` : ''}</div>`;
+  box.querySelectorAll('[data-rs]').forEach((b) => (b.onclick = async () => {
+    const r = pend.find((x) => String(x.id) === b.dataset.rs), approve = b.dataset.ok === '1';
+    if (!confirm(approve ? `Reiniciar todo o progresso de ${r.name}?\n\nSão apagados os exercícios, minitestes, XP e histórico. Não pode ser desfeito.` : `Recusar o pedido de ${r.name}?`)) return;
+    b.disabled = true;
+    try { await BK.decideReset(r.id, approve); toast(approve ? `Progresso de ${r.name} reiniciado` : 'Pedido recusado'); profRows = null; vProf(); }
+    catch (e) { b.disabled = false; toast(BK.errorText(e), 'alert'); }
+  }));
+}
+
 /* ---------- gestor do site: capítulos visíveis para os alunos ---------- */
 function renderChapterVis() {
   const box = $('#chVis'); if (!box) return;
@@ -1234,6 +1295,26 @@ function renderChapterVis() {
     };
   };
   paint();
+}
+
+/* ---------- gestor do site: palavra-passe de acesso ao site ---------- */
+function renderSitePass() {
+  const box = $('#sitePass'); if (!box || !BK.setSitePassword) return;
+  box.innerHTML = `<div class="card" style="margin-top:16px"><div class="card-h"><h3>${ic('lock')}Palavra-passe de acesso ao site</h3></div>
+    <p class="small muted" style="margin-top:0">O site só abre a quem introduzir esta palavra-passe; só depois os alunos podem criar conta ou iniciar sessão. Ao mudá-la, todas as pessoas (incluindo quem já tinha entrado) terão de introduzir a nova palavra-passe — comunique-a aos alunos antes de a mudar. As maiúsculas contam.</p>
+    <form id="spf" class="row" style="align-items:flex-end;gap:10px">
+      <label class="field" style="margin:0;flex:1;min-width:180px">Nova palavra-passe<input class="txt" id="sp1" type="password" autocomplete="new-password" minlength="4" required></label>
+      <label class="field" style="margin:0;flex:1;min-width:180px">Repetir<input class="txt" id="sp2" type="password" autocomplete="new-password" minlength="4" required></label>
+      <button class="btn" type="submit">${ic('check')}Mudar palavra-passe</button></form></div>`;
+  $('#spf').onsubmit = async (e) => {
+    e.preventDefault();
+    const a = $('#sp1').value, b = $('#sp2').value;
+    if (a.trim().length < 4) return toast('A palavra-passe deve ter pelo menos 4 caracteres.', 'alert');
+    if (a !== b) return toast('As duas palavras-passe não coincidem.', 'alert');
+    if (!confirm('Mudar a palavra-passe de acesso ao site?\n\nTodos os alunos terão de introduzir a nova palavra-passe.')) return;
+    try { await BK.setSitePassword(a); $('#spf').reset(); toast('Palavra-passe de acesso alterada'); }
+    catch (err) { toast(BK.errorText(err), 'alert'); }
+  };
 }
 
 /* ---------- gestor do site: atribuir o perfil de professor ---------- */
@@ -1363,6 +1444,11 @@ applyTheme();
 route();
 // Restaura a sessão (se existir) e sincroniza; só redesenha páginas sem trabalho em curso.
 BK.onRecovery = askNewPassword;
+// Palavra-passe de acesso ao site (só com o Supabase): sem token válido, vai para a página de acesso.
+if (BK.checkAccess) {
+  if (!BK.accessToken()) location.replace('acesso.html');
+  else BK.checkAccess().then((ok) => { if (!ok) { BK.clearAccess(); location.replace('acesso.html'); } });
+}
 const settingsReady = loadSettings();
 BK.init().then(async (u) => {
   if (BK.recovery) askNewPassword();
@@ -1370,6 +1456,7 @@ BK.init().then(async (u) => {
   if (!u) { if (changed) route(); else renderChrome(); return; }
   st.name = u.name;
   await push();
+  loadAdminPending();
   const a = (location.hash.split('/')[1] || '');
   if (changed || ['', 'learn', 'c', 'progress', 'rank', 'me', 'prof', 'projeto'].includes(a)) route(); else renderChrome();
 }).catch(() => renderChrome());

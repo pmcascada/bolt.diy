@@ -16,7 +16,8 @@
     [/password should|weak password|at least 6/i, 'A palavra-passe deve ter pelo menos 6 caracteres.'],
     [/rate limit|too many|security purposes/i, 'Demasiados pedidos seguidos. Aguarde alguns minutos e tente novamente.'],
     [/unable to validate email|invalid.*email|email.*invalid/i, 'Endereço de email inválido.'],
-    [/database error saving new user|duplicate key/i, 'Esse nome já está a ser usado. Escolha outro.'],
+    [/database error saving new user/i, 'Não foi possível criar a conta: o nome já está a ser usado ou o acesso ao site expirou (recarregue a página e introduza de novo a palavra-passe de acesso).'],
+    [/duplicate key/i, 'Esse nome já está a ser usado. Escolha outro.'],
     [/failed to fetch|networkerror|load failed/i, 'Sem ligação à Internet ou ao Supabase. Tente mais tarde.'],
   ];
   function supabaseBackend() {
@@ -42,7 +43,7 @@
       const { data: free, error: e1 } = await sb.rpc('name_available', { n: name });
       if (e1) throw e1;
       if (!free) throw new Error('Esse nome já está a ser usado. Escolha outro.');
-      const { data, error } = await sb.auth.signUp({ email, password, options: { data: { name, turma: cleanTurma(turma) }, emailRedirectTo: here() } });
+      const { data, error } = await sb.auth.signUp({ email, password, options: { data: { name, turma: cleanTurma(turma), access: B.accessToken() }, emailRedirectTo: here() } });
       if (error) throw error;
       if (!data.session) return { needsConfirm: true };
       return { user: await loadUser(data.session) };
@@ -73,6 +74,26 @@
       if (error) throw error;
       B.user.turma = t;
     };
+    // Palavra-passe de acesso ao site: o token de acesso fica num cookie (lido pelo Vercel) e no browser.
+    const ACCESS = 'mysql-academy.acesso';
+    B.accessToken = () => { try { return localStorage.getItem(ACCESS) || (document.cookie.match(/(?:^|;\s*)mya_acesso=([0-9a-f]{64})/) || [])[1] || ''; } catch { return ''; } };
+    B.saveAccess = (tok) => {
+      document.cookie = `mya_acesso=${tok}; Max-Age=${60 * 86400}; Path=/; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`;
+      try { localStorage.setItem(ACCESS, tok); } catch { /* sem storage */ }
+    };
+    B.clearAccess = () => { document.cookie = 'mya_acesso=; Max-Age=0; Path=/'; try { localStorage.removeItem(ACCESS); } catch { /* ignorar */ } };
+    B.checkAccess = async () => {
+      const t = B.accessToken(); if (!t) return false;
+      const { data, error } = await sb.rpc('site_token_ok', { t });
+      if (error) return true; // sem ligação: não se bloqueia quem já tinha entrado
+      return data === true;
+    };
+    B.setSitePassword = async (p) => {
+      const { data, error } = await sb.rpc('set_site_password', { p });
+      if (error) throw error;
+      if (!data) throw new Error('Não foi possível mudar a palavra-passe (mínimo 4 caracteres; só o gestor do site a pode mudar).');
+      B.saveAccess(data);
+    };
     // Definições do site (capítulos ocultos aos alunos): todos leem, só o gestor altera.
     B.settings = async () => {
       const { data, error } = await sb.from('settings').select('hidden_chapters').eq('id', 1).maybeSingle();
@@ -83,6 +104,23 @@
       const { data, error } = await sb.rpc('set_hidden_chapters', { ids });
       if (error) throw error;
       if (!data) throw new Error('Só o gestor do site pode alterar os capítulos visíveis.');
+    };
+    // Pedidos de reinício do progresso: o utilizador pede, o gestor aprova ou recusa.
+    B.myResetRequest = async () => {
+      const { data, error } = await sb.from('reset_requests').select('id, status, reason, created_at, decided_at').order('created_at', { ascending: false }).limit(1).maybeSingle();
+      if (error) throw error;
+      return data;
+    };
+    B.requestReset = async (reason) => {
+      const { error } = await sb.from('reset_requests').insert({ reason: reason ? String(reason).slice(0, 300) : null });
+      if (error) throw /duplicate|unique/i.test(error.message) ? new Error('Já tem um pedido pendente.') : error;
+    };
+    B.cancelReset = async (id) => { const { error } = await sb.from('reset_requests').delete().eq('id', id); if (error) throw error; };
+    B.adminResets = async () => { const { data, error } = await sb.rpc('admin_reset_requests'); if (error) throw error; return data || []; };
+    B.decideReset = async (id, approve) => {
+      const { data, error } = await sb.rpc('decide_reset', { req: id, approve });
+      if (error) throw error;
+      if (!data) throw new Error('Este pedido já foi tratado ou não tem permissão para o decidir.');
     };
     // Gestor do site: lista de contas e atribuição do perfil de professor.
     B.adminUsers = async () => {
