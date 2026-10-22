@@ -26,7 +26,7 @@ const CHAPTERS = [
     learn('Tabelas, linhas e colunas', `<p>Uma tabela é formada por:</p>
       <ul><li><b>Colunas</b> (ou campos) — as características guardadas, por exemplo <code>nome</code> ou <code>idade</code>;</li>
       <li><b>Linhas</b> (ou registos) — cada elemento concreto, por exemplo um aluno;</li>
-      <li><b>Chave primária</b> — a coluna que identifica cada linha de forma única, por exemplo <code>id</code>.</li></ul>
+      <li><b>Chave primária</b> — a coluna que identifica cada linha de forma única, por exemplo <code>id_aluno</code>.</li></ul>
       <p>Execute o exemplo para ver a tabela <code>alunos</code> da base de dados de exemplo <b>escola</b>:</p>`,
       [ex('SELECT * FROM alunos;', 'Cada linha é um aluno; cada coluna, uma característica.', true)]),
     quiz('Na tabela alunos, o que representa uma linha?', ['Uma característica comum a todos os alunos', 'Um aluno concreto', 'O nome da base de dados', 'O tipo de dados de uma coluna'], 1, 'Cada linha (registo) corresponde a um elemento — neste caso, um aluno.'),
@@ -108,17 +108,18 @@ const CHAPTERS = [
   { title: 'Criar tabelas', steps: [
     learn('CREATE TABLE', `<p>Uma tabela define-se com o seu nome e a lista de colunas, cada uma com o respetivo tipo:</p>
       <pre><code>CREATE TABLE cursos (
-  id INT,
+  id_curso INT,
   nome VARCHAR(50),
   horas INT
 );</code></pre><p>As colunas são separadas por vírgulas e a lista fica entre parênteses.</p>`),
-    code('Crie a tabela clientes com as colunas id (INT) e nome (VARCHAR(50)). Escreva numa só linha.', ['^create table clientes\\(id int(\\(\\d+\\))?,nome varchar\\(50\\)\\)$'], 'CREATE TABLE clientes (id INT, nome VARCHAR(50));', 'CREATE TABLE clientes (id INT, nome …);'),
+    code('Crie a tabela clientes com as colunas id_cliente (INT) e nome (VARCHAR(50)). Escreva numa só linha.', ['^create table clientes\\(id_cliente int(\\(\\d+\\))?,nome varchar\\(50\\)\\)$'], 'CREATE TABLE clientes (id_cliente INT, nome VARCHAR(50));', 'CREATE TABLE clientes (id_cliente INT, nome …);'),
     learn('Chave primária e AUTO_INCREMENT', `<p>A <b>chave primária</b> (<code>PRIMARY KEY</code>) identifica cada linha de forma única e não aceita valores repetidos nem vazios.</p>
-      <p>Com <code>AUTO_INCREMENT</code>, o MySQL atribui automaticamente o número seguinte a cada nova linha:</p>`,
-      [ex('CREATE TABLE produtos (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  nome VARCHAR(60)\n);', 'O id é gerado automaticamente: 1, 2, 3…')]),
-    code('Crie a tabela fornecedores com id INT AUTO_INCREMENT como chave primária e nome VARCHAR(80).', ['^create table fornecedores\\(id int(\\(\\d+\\))? (not null )?auto_increment primary key,nome varchar\\(80\\)\\)$', '^create table fornecedores\\(id int(\\(\\d+\\))? (not null )?primary key auto_increment,nome varchar\\(80\\)\\)$', '^create table fornecedores\\(id int(\\(\\d+\\))? (not null )?auto_increment,nome varchar\\(80\\),primary key\\(id\\)\\)$'], 'CREATE TABLE fornecedores (id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(80));', 'id INT AUTO_INCREMENT PRIMARY KEY, nome …'),
+      <p>Com <code>AUTO_INCREMENT</code>, o MySQL atribui automaticamente o número seguinte a cada nova linha.</p>
+      <p><b>Convenção usada neste curso:</b> a chave primária chama-se <code>id_</code> seguido do nome da tabela no singular — <code>id_aluno</code>, <code>id_curso</code>, <code>id_produto</code>. As chaves estrangeiras usam o mesmo nome da chave que referenciam (ex.: <code>alunos.id_curso</code> → <code>cursos.id_curso</code>), o que torna as ligações entre tabelas fáceis de ler.</p>`,
+      [ex('CREATE TABLE produtos (\n  id_produto INT AUTO_INCREMENT PRIMARY KEY,\n  nome VARCHAR(60)\n);', 'O id_produto é gerado automaticamente: 1, 2, 3…')]),
+    code('Crie a tabela fornecedores com id_fornecedor INT AUTO_INCREMENT como chave primária e nome VARCHAR(80).', ['^create table fornecedores\\(id_fornecedor int(\\(\\d+\\))? (not null )?auto_increment primary key,nome varchar\\(80\\)\\)$', '^create table fornecedores\\(id_fornecedor int(\\(\\d+\\))? (not null )?primary key auto_increment,nome varchar\\(80\\)\\)$', '^create table fornecedores\\(id_fornecedor int(\\(\\d+\\))? (not null )?auto_increment,nome varchar\\(80\\),primary key\\(id_fornecedor\\)\\)$'], 'CREATE TABLE fornecedores (id_fornecedor INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(80));', 'id_fornecedor INT AUTO_INCREMENT PRIMARY KEY, nome …'),
     learn('Restrições: NOT NULL, UNIQUE e DEFAULT', `<ul><li><code>NOT NULL</code> — o valor é obrigatório;</li><li><code>UNIQUE</code> — não podem existir valores repetidos;</li><li><code>DEFAULT valor</code> — valor usado quando não é indicado nenhum.</li></ul>`,
-      [ex("CREATE TABLE alunos (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  nome VARCHAR(80) NOT NULL,\n  email VARCHAR(100) UNIQUE,\n  idade INT DEFAULT 18\n);", 'Nome obrigatório, email sem repetidos, idade 18 por omissão.')]),
+      [ex("CREATE TABLE alunos (\n  id_aluno INT AUTO_INCREMENT PRIMARY KEY,\n  nome VARCHAR(80) NOT NULL,\n  email VARCHAR(100) UNIQUE,\n  idade INT DEFAULT 18\n);", 'Nome obrigatório, email sem repetidos, idade 18 por omissão.')]),
     quiz('Que restrição impede que uma coluna fique vazia?', ['UNIQUE', 'DEFAULT', 'NOT NULL', 'AUTO_INCREMENT'], 2, 'NOT NULL torna o valor obrigatório.'),
     quiz('Que restrição impede emails repetidos?', ['UNIQUE', 'DEFAULT', 'NOT NULL', 'CHECK NULL'], 0, 'UNIQUE garante que não há dois valores iguais.'),
     learn('Ver a estrutura de uma tabela', `<p>Depois de criar uma tabela, pode consultar a sua estrutura (colunas, tipos, chaves):</p>`, [ex('DESCRIBE alunos;', 'Também pode escrever DESC alunos;'), ex('SHOW TABLES;', 'Lista as tabelas da base de dados ativa.')]),
@@ -126,7 +127,7 @@ const CHAPTERS = [
   ] },
   { title: 'Chaves estrangeiras e alteração de tabelas', steps: [
     learn('Chave estrangeira', `<p>Uma <b>chave estrangeira</b> (<code>FOREIGN KEY</code>) é uma coluna que referencia a chave primária de outra tabela. Garante a <b>integridade referencial</b>: não é possível inscrever um aluno num curso que não existe.</p>`,
-      [ex('CREATE TABLE alunos (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  nome VARCHAR(80) NOT NULL,\n  curso_id INT,\n  FOREIGN KEY (curso_id) REFERENCES cursos(id)\n);', 'curso_id tem de existir em cursos.id.')]),
+      [ex('CREATE TABLE alunos (\n  id_aluno INT AUTO_INCREMENT PRIMARY KEY,\n  nome VARCHAR(80) NOT NULL,\n  id_curso INT,\n  FOREIGN KEY (id_curso) REFERENCES cursos(id_curso)\n);', 'id_curso tem de existir em cursos.id_curso.')]),
     quiz('Para que serve uma FOREIGN KEY?', ['Tornar a tabela mais rápida', 'Ligar duas tabelas e garantir a integridade referencial', 'Encriptar a coluna', 'Impedir valores NULL'], 1, 'Garante que o valor referenciado existe na outra tabela.'),
     learn('ALTER TABLE — acrescentar colunas', `<p>Uma tabela já existente pode ser alterada sem perder os dados. Para acrescentar uma coluna:</p>`, [ex('ALTER TABLE alunos ADD COLUMN telefone VARCHAR(20);', 'Acrescenta a coluna telefone.')]),
     code('Acrescente à tabela alunos a coluna email do tipo VARCHAR(100).', ['^alter table alunos add( column)? email varchar\\(100\\)$'], 'ALTER TABLE alunos ADD COLUMN email VARCHAR(100);', 'ALTER TABLE … ADD COLUMN …'),
@@ -139,8 +140,8 @@ RENAME TABLE alunos TO estudantes;              -- muda o nome</code></pre>`),
   ] }],
   cheat: [
     ['CREATE DATABASE [IF NOT EXISTS] bd;', 'Criar base de dados'], ['USE bd;', 'Selecionar a base de dados ativa'], ['DROP DATABASE bd;', 'Eliminar base de dados'],
-    ['CREATE TABLE t (col TIPO [restrições], …);', 'Criar tabela'], ['id INT AUTO_INCREMENT PRIMARY KEY', 'Chave primária automática'],
-    ['NOT NULL · UNIQUE · DEFAULT v', 'Restrições de coluna'], ['FOREIGN KEY (c) REFERENCES t2(id)', 'Chave estrangeira'],
+    ['CREATE TABLE t (col TIPO [restrições], …);', 'Criar tabela'], ['id_tabela INT AUTO_INCREMENT PRIMARY KEY', 'Chave primária automática (id_ + nome da tabela)'],
+    ['NOT NULL · UNIQUE · DEFAULT v', 'Restrições de coluna'], ['FOREIGN KEY (id_t2) REFERENCES t2(id_t2)', 'Chave estrangeira'],
     ['DESCRIBE t; · SHOW TABLES;', 'Ver estrutura / listar tabelas'], ['ALTER TABLE t ADD COLUMN c TIPO;', 'Acrescentar coluna'],
     ['ALTER TABLE t MODIFY c TIPO;', 'Alterar tipo'], ['ALTER TABLE t DROP COLUMN c;', 'Remover coluna'], ['DROP TABLE t;', 'Eliminar tabela'],
   ],
@@ -162,7 +163,7 @@ RENAME TABLE alunos TO estudantes;              -- muda o nome</code></pre>`),
   lessons: [
   { title: 'INSERT — inserir dados', steps: [
     learn('Inserir uma linha', `<p>Adicionam-se linhas a uma tabela com <code>INSERT INTO</code>, indicando as colunas e os respetivos valores, pela mesma ordem:</p>`,
-      [ex("INSERT INTO cursos (nome, horas)\nVALUES ('Marketing', 700);", 'O id é gerado pelo AUTO_INCREMENT.')]),
+      [ex("INSERT INTO cursos (nome, horas)\nVALUES ('Marketing', 700);", 'O id_curso é gerado pelo AUTO_INCREMENT.')]),
     code("Insira na tabela cursos (colunas nome e horas) o curso 'Direito' com 1000 horas.", ["^insert into cursos\\(nome,horas\\) ?values\\('direito',1000\\)$"], "INSERT INTO cursos (nome, horas) VALUES ('Direito', 1000);", "INSERT INTO cursos (nome, horas) VALUES ('…', …);"),
     learn('Texto, números e datas', `<p>Texto e datas escrevem-se entre <b>plicas</b> (<code>'Ana'</code>, <code>'2025-09-15'</code>); números escrevem-se sem plicas. Uma coluna sem valor indica-se com <code>NULL</code>.</p>
       <p>Indicar a lista de colunas é uma boa prática: o código fica claro e continua a funcionar se a estrutura da tabela mudar.</p>`),
@@ -173,18 +174,18 @@ RENAME TABLE alunos TO estudantes;              -- muda o nome</code></pre>`),
   ] },
   { title: 'UPDATE — alterar dados', steps: [
     learn('UPDATE com WHERE', `<p><code>UPDATE</code> modifica linhas existentes. <code>SET</code> indica as novas colunas/valores e <code>WHERE</code> escolhe <b>quais</b> linhas alterar:</p>`,
-      [ex("UPDATE alunos\nSET cidade = 'Évora'\nWHERE id = 3;", 'Só altera a linha com id 3.')]),
-    code('Altere a idade do aluno com id 5 para 22.', ['^update alunos set idade=22 where id=5$'], 'UPDATE alunos SET idade = 22 WHERE id = 5;', 'UPDATE alunos SET … WHERE …'),
+      [ex("UPDATE alunos\nSET cidade = 'Évora'\nWHERE id_aluno = 3;", 'Só altera a linha com id_aluno 3.')]),
+    code('Altere a idade do aluno com id_aluno 5 para 22.', ['^update alunos set idade=22 where id_aluno=5$'], 'UPDATE alunos SET idade = 22 WHERE id_aluno = 5;', 'UPDATE alunos SET … WHERE …'),
     learn('Cuidado com o WHERE', `<p class="warn"><b>Sem WHERE, todas as linhas da tabela são alteradas.</b></p>
       <p>Boa prática: antes de um UPDATE importante, execute um <code>SELECT</code> com o mesmo WHERE para confirmar quais as linhas afetadas. O MySQL Workbench tem o modo <i>safe updates</i>, que recusa UPDATE/DELETE sem WHERE sobre uma chave.</p>`),
     quiz('O que acontece num UPDATE sem WHERE?', ['Dá sempre erro', 'Nada é alterado', 'Todas as linhas da tabela são alteradas', 'Só a primeira linha é alterada'], 2, 'Sem WHERE o UPDATE atinge a tabela inteira.'),
     learn('Expressões e várias colunas', `<p>O novo valor pode ser calculado a partir do atual, e podem alterar-se várias colunas separadas por vírgulas:</p>`,
-      [ex("UPDATE notas SET nota = nota + 1\nWHERE disciplina = 'Programação';", 'Soma 1 valor a todas as notas de Programação.'), ex("UPDATE alunos SET idade = 21, cidade = 'Faro' WHERE id = 1;", 'Duas colunas de uma vez.')]),
+      [ex("UPDATE notas SET nota = nota + 1\nWHERE disciplina = 'Programação';", 'Soma 1 valor a todas as notas de Programação.'), ex("UPDATE alunos SET idade = 21, cidade = 'Faro' WHERE id_aluno = 1;", 'Duas colunas de uma vez.')]),
     code('Aumente em 100 as horas de todos os cursos.', ['^update cursos set horas=horas\\+100$'], 'UPDATE cursos SET horas = horas + 100;', 'SET horas = horas + 100'),
   ] },
   { title: 'DELETE e TRUNCATE', steps: [
-    learn('DELETE', `<p><code>DELETE</code> remove linhas. Tal como no UPDATE, o <code>WHERE</code> indica quais — sem ele, a tabela fica vazia!</p>`, [ex('DELETE FROM alunos WHERE id = 10;', 'Remove apenas o aluno com id 10.')]),
-    code('Elimine da tabela alunos o aluno com id 7.', ['^delete from alunos where id=7$'], 'DELETE FROM alunos WHERE id = 7;', 'DELETE FROM … WHERE …'),
+    learn('DELETE', `<p><code>DELETE</code> remove linhas. Tal como no UPDATE, o <code>WHERE</code> indica quais — sem ele, a tabela fica vazia!</p>`, [ex('DELETE FROM alunos WHERE id_aluno = 10;', 'Remove apenas o aluno com id_aluno 10.')]),
+    code('Elimine da tabela alunos o aluno com id_aluno 7.', ['^delete from alunos where id_aluno=7$'], 'DELETE FROM alunos WHERE id_aluno = 7;', 'DELETE FROM … WHERE …'),
     learn('TRUNCATE', `<p><code>TRUNCATE TABLE t;</code> esvazia a tabela inteira de forma muito rápida e reinicia o contador <code>AUTO_INCREMENT</code>. Não aceita WHERE e mantém a estrutura da tabela.</p>`),
     quiz('Qual a diferença principal entre DELETE e TRUNCATE?', ['Não há diferença', 'TRUNCATE esvazia a tabela inteira rapidamente; DELETE aceita WHERE', 'TRUNCATE elimina também a estrutura', 'DELETE é mais rápido em tabelas grandes'], 1, 'TRUNCATE não aceita WHERE.'),
     code('Esvazie completamente a tabela registos, da forma mais rápida.', ['^truncate( table)? registos$'], 'TRUNCATE TABLE registos;', 'TRUNCATE TABLE …'),
@@ -201,7 +202,7 @@ RENAME TABLE alunos TO estudantes;              -- muda o nome</code></pre>`),
     quiz('Como se aumenta em 10% o preço de todos os produtos?', ['UPDATE produtos SET preco = 10%', 'UPDATE produtos SET preco = preco * 1.1', 'ALTER produtos preco + 10%', 'SET preco += 10'], 1, 'O novo valor pode ser calculado.'),
     quiz('O que faz DELETE FROM alunos; (sem WHERE)?', ['Elimina a tabela', 'Elimina todas as linhas, mantendo a tabela', 'Dá erro', 'Elimina a primeira linha'], 1, 'A estrutura mantém-se.'),
     quiz('Qual destes comandos aceita WHERE?', ['TRUNCATE', 'DELETE', 'DROP TABLE', 'CREATE TABLE'], 1, 'Só o DELETE filtra linhas.'),
-    quiz('Que comando esvazia toda a tabela de forma rápida e reinicia o AUTO_INCREMENT?', ['DELETE FROM t WHERE 1', 'DROP TABLE t', 'TRUNCATE TABLE t', 'UPDATE t SET id = 0'], 2, 'TRUNCATE mantém a estrutura mas apaga todas as linhas.'),
+    quiz('Que comando esvazia toda a tabela de forma rápida e reinicia o AUTO_INCREMENT?', ['DELETE FROM t WHERE 1', 'DROP TABLE t', 'TRUNCATE TABLE t', 'UPDATE t SET coluna = 0'], 2, 'TRUNCATE mantém a estrutura mas apaga todas as linhas.'),
     quiz('Antes de executar um UPDATE ou DELETE importante, qual é a boa prática?', ['Desligar o servidor', 'Testar primeiro o WHERE com um SELECT', 'Apagar os índices', 'Usar sempre TRUNCATE'], 1, 'O SELECT mostra exatamente que linhas vão ser afetadas.'),
   ],
 },
@@ -212,7 +213,7 @@ RENAME TABLE alunos TO estudantes;              -- muda o nome</code></pre>`),
   lessons: [
   { title: 'O comando SELECT', steps: [
     learn('A base de dados escola', `<p>Neste capítulo vai praticar consultas reais sobre a base de dados <b>escola</b>, que tem três tabelas:</p>
-      <ul><li><code>alunos(id, nome, idade, cidade, curso_id)</code></li><li><code>cursos(id, nome, horas)</code></li><li><code>notas(aluno_id, disciplina, nota)</code></li></ul>
+      <ul><li><code>alunos(id_aluno, nome, idade, cidade, id_curso)</code></li><li><code>cursos(id_curso, nome, horas)</code></li><li><code>notas(id_aluno, disciplina, nota)</code></li></ul>
       <p>As suas respostas são <b>executadas</b> e o resultado é comparado com o esperado. Pode experimentar à vontade.</p>`),
     learn('SELECT * — todas as colunas', `<p>O comando <code>SELECT</code> lê dados de uma tabela. A forma mais simples é:</p>
       <pre><code>SELECT * FROM tabela;</code></pre>
@@ -272,25 +273,25 @@ RENAME TABLE alunos TO estudantes;              -- muda o nome</code></pre>`),
   { title: 'Juntar tabelas com JOIN', steps: [
     learn('INNER JOIN', `<p>Os dados estão repartidos por várias tabelas. O <code>JOIN</code> volta a juntá-los através das colunas relacionadas. O <code>INNER JOIN</code> devolve apenas as combinações que têm correspondência nas duas tabelas:</p>
       <p>Os <b>aliases</b> de tabela (<code>a</code>, <code>c</code>) encurtam a escrita e evitam ambiguidades (as duas tabelas têm uma coluna <code>nome</code>).</p>`,
-      [ex('SELECT a.nome, c.nome AS curso\nFROM alunos a\nINNER JOIN cursos c ON a.curso_id = c.id;', 'Cada aluno com o nome do seu curso.', true)]),
-    query('Mostre o nome de cada aluno com a disciplina e a nota (tabelas alunos e notas).', 'SELECT a.nome, n.disciplina, n.nota FROM alunos a INNER JOIN notas n ON n.aluno_id = a.id', 'JOIN notas n ON n.aluno_id = a.id'),
+      [ex('SELECT a.nome, c.nome AS curso\nFROM alunos a\nINNER JOIN cursos c ON a.id_curso = c.id_curso;', 'Cada aluno com o nome do seu curso.', true)]),
+    query('Mostre o nome de cada aluno com a disciplina e a nota (tabelas alunos e notas).', 'SELECT a.nome, n.disciplina, n.nota FROM alunos a INNER JOIN notas n ON n.id_aluno = a.id_aluno', 'JOIN notas n ON n.id_aluno = a.id_aluno'),
     learn('JOIN com WHERE', `<p>Depois de juntar as tabelas, pode filtrar por colunas de qualquer uma delas:</p>`,
-      [ex("SELECT a.nome FROM alunos a\nJOIN cursos c ON a.curso_id = c.id\nWHERE c.nome = 'Design';", 'Alunos do curso de Design.', true)]),
-    query("Mostre o nome dos alunos do curso de Informática.", "SELECT a.nome FROM alunos a INNER JOIN cursos c ON a.curso_id = c.id WHERE c.nome = 'Informática'", "WHERE c.nome = 'Informática'"),
+      [ex("SELECT a.nome FROM alunos a\nJOIN cursos c ON a.id_curso = c.id_curso\nWHERE c.nome = 'Design';", 'Alunos do curso de Design.', true)]),
+    query("Mostre o nome dos alunos do curso de Informática.", "SELECT a.nome FROM alunos a INNER JOIN cursos c ON a.id_curso = c.id_curso WHERE c.nome = 'Informática'", "WHERE c.nome = 'Informática'"),
     learn('LEFT JOIN', `<p>O <code>LEFT JOIN</code> devolve <b>todas</b> as linhas da tabela da esquerda, mesmo as que não têm correspondência; nesse caso as colunas da direita ficam a <code>NULL</code>. Para testar valores nulos usa-se <code>IS NULL</code> (nunca <code>= NULL</code>).</p>`,
-      [ex('SELECT a.nome, n.nota\nFROM alunos a LEFT JOIN notas n ON n.aluno_id = a.id;', 'O João aparece com nota NULL.', true)]),
-    query('Usando LEFT JOIN, mostre o nome dos alunos que não têm nenhuma nota.', 'SELECT a.nome FROM alunos a LEFT JOIN notas n ON n.aluno_id = a.id WHERE n.aluno_id IS NULL', 'LEFT JOIN … WHERE n.aluno_id IS NULL'),
+      [ex('SELECT a.nome, n.nota\nFROM alunos a LEFT JOIN notas n ON n.id_aluno = a.id_aluno;', 'O João aparece com nota NULL.', true)]),
+    query('Usando LEFT JOIN, mostre o nome dos alunos que não têm nenhuma nota.', 'SELECT a.nome FROM alunos a LEFT JOIN notas n ON n.id_aluno = a.id_aluno WHERE n.id_aluno IS NULL', 'LEFT JOIN … WHERE n.id_aluno IS NULL'),
     learn('JOIN com GROUP BY', `<p>JOIN e agregações combinam-se naturalmente — por exemplo, a média de cada aluno:</p>`,
-      [ex('SELECT a.nome, AVG(n.nota) AS media\nFROM alunos a JOIN notas n ON n.aluno_id = a.id\nGROUP BY a.nome;', 'Média de notas por aluno.', true)]),
-    query('Mostre o nome de cada curso e o número de alunos inscritos.', 'SELECT c.nome, COUNT(*) FROM cursos c INNER JOIN alunos a ON a.curso_id = c.id GROUP BY c.nome', 'JOIN + GROUP BY c.nome'),
+      [ex('SELECT a.nome, AVG(n.nota) AS media\nFROM alunos a JOIN notas n ON n.id_aluno = a.id_aluno\nGROUP BY a.nome;', 'Média de notas por aluno.', true)]),
+    query('Mostre o nome de cada curso e o número de alunos inscritos.', 'SELECT c.nome, COUNT(*) FROM cursos c INNER JOIN alunos a ON a.id_curso = c.id_curso GROUP BY c.nome', 'JOIN + GROUP BY c.nome'),
   ] },
   { title: 'Subconsultas', steps: [
     learn('Subconsulta escalar', `<p>Uma <b>subconsulta</b> é um SELECT dentro de outro. Quando devolve um único valor, pode ser usada numa comparação:</p>`,
       [ex('SELECT nome, idade FROM alunos\nWHERE idade > (SELECT AVG(idade) FROM alunos);', 'Alunos com idade acima da média (21,5).', true)]),
     query('Mostre o nome dos cursos com mais horas do que a média de horas dos cursos.', 'SELECT nome FROM cursos WHERE horas > (SELECT AVG(horas) FROM cursos)', '(SELECT AVG(horas) FROM cursos)'),
     learn('Subconsulta com IN', `<p>Quando a subconsulta devolve uma lista de valores, usa-se com <code>IN</code>:</p>`,
-      [ex("SELECT nome FROM alunos\nWHERE id IN (SELECT aluno_id FROM notas WHERE disciplina = 'Programação');", 'Alunos com nota a Programação.', true)]),
-    query('Mostre o nome dos alunos que têm alguma nota igual ou superior a 17 (use IN com subconsulta).', 'SELECT nome FROM alunos WHERE id IN (SELECT aluno_id FROM notas WHERE nota >= 17)', 'WHERE id IN (SELECT aluno_id FROM notas …)'),
+      [ex("SELECT nome FROM alunos\nWHERE id_aluno IN (SELECT id_aluno FROM notas WHERE disciplina = 'Programação');", 'Alunos com nota a Programação.', true)]),
+    query('Mostre o nome dos alunos que têm alguma nota igual ou superior a 17 (use IN com subconsulta).', 'SELECT nome FROM alunos WHERE id_aluno IN (SELECT id_aluno FROM notas WHERE nota >= 17)', 'WHERE id_aluno IN (SELECT id_aluno FROM notas …)'),
   ] }],
   cheat: [
     ['SELECT * FROM t;', 'Todas as colunas'], ['SELECT c1, c2 AS alias FROM t;', 'Colunas escolhidas e alias'],
@@ -320,19 +321,19 @@ RENAME TABLE alunos TO estudantes;              -- muda o nome</code></pre>`),
     learn('A restrição CHECK', `<p>Já conhece as restrições <code>NOT NULL</code>, <code>UNIQUE</code> e <code>DEFAULT</code>. A restrição <code>CHECK</code> vai mais longe: define uma <b>condição</b> que todos os valores têm de cumprir. Se um INSERT ou UPDATE a violar, o MySQL recusa a operação.</p>
       <p>Pode escrever-se junto da coluna ou no fim da definição da tabela:</p>
       <pre><code>CREATE TABLE produtos (
-  id INT PRIMARY KEY,
+  id_produto INT PRIMARY KEY,
   nome VARCHAR(60) NOT NULL,
   preco DECIMAL(8,2) CHECK (preco > 0),
   stock INT,
   CHECK (stock >= 0)
 );</code></pre>
       <p>O MySQL aplica as restrições CHECK a partir da versão 8.0.16.</p>`),
-    code('Crie a tabela artigos com id INT (chave primária), nome VARCHAR(60) e preco DECIMAL(8,2) com a restrição CHECK (preco > 0). Escreva numa só linha.', [
-      '^create table artigos\\(id int(\\(\\d+\\))? primary key,nome varchar\\(60\\)( ?not null)?,preco decimal\\(8,2\\)( ?not null)? ?check ?\\(preco>0\\)\\)$',
-      '^create table artigos\\(id int(\\(\\d+\\))? primary key,nome varchar\\(60\\)( ?not null)?,preco decimal\\(8,2\\)( ?not null)?,(constraint \\w+ )?check ?\\(preco>0\\)\\)$',
-    ], 'CREATE TABLE artigos (id INT PRIMARY KEY, nome VARCHAR(60), preco DECIMAL(8,2) CHECK (preco > 0));', 'preco DECIMAL(8,2) CHECK (preco > 0)'),
+    code('Crie a tabela artigos com id_artigo INT (chave primária), nome VARCHAR(60) e preco DECIMAL(8,2) com a restrição CHECK (preco > 0). Escreva numa só linha.', [
+      '^create table artigos\\(id_artigo int(\\(\\d+\\))? primary key,nome varchar\\(60\\)( ?not null)?,preco decimal\\(8,2\\)( ?not null)? ?check ?\\(preco>0\\)\\)$',
+      '^create table artigos\\(id_artigo int(\\(\\d+\\))? primary key,nome varchar\\(60\\)( ?not null)?,preco decimal\\(8,2\\)( ?not null)?,(constraint \\w+ )?check ?\\(preco>0\\)\\)$',
+    ], 'CREATE TABLE artigos (id_artigo INT PRIMARY KEY, nome VARCHAR(60), preco DECIMAL(8,2) CHECK (preco > 0));', 'preco DECIMAL(8,2) CHECK (preco > 0)'),
     learn('Quando a regra é violada', `<p>Experimente: a tabela é criada, mas a inserção de um preço negativo é recusada com um erro e a linha <b>não é guardada</b>.</p>`,
-      [ex("CREATE TABLE precos (id INT, valor DECIMAL(8,2) CHECK (valor > 0));", 'Cria uma tabela com uma regra de validação.'),
+      [ex("CREATE TABLE precos (id_preco INT, valor DECIMAL(8,2) CHECK (valor > 0));", 'Cria uma tabela com uma regra de validação.'),
        ex("INSERT INTO precos VALUES (1, -5);", 'No MySQL: ERROR 3819 — Check constraint is violated. Experimente no laboratório.')]),
     quiz('O que acontece a um INSERT que viola uma restrição CHECK?', ['A linha é guardada com o valor corrigido para 0', 'A operação é recusada com um erro e a linha não é guardada', 'A linha é guardada mas fica marcada', 'A restrição é desativada'], 1, 'O CHECK garante que só entram dados válidos.'),
     learn('Restrições com nome e ALTER TABLE', `<p>Dar um <b>nome</b> à restrição torna as mensagens de erro mais claras e permite removê-la mais tarde. Também é possível acrescentar uma restrição a uma tabela que já existe:</p>
@@ -349,7 +350,7 @@ ALTER TABLE alunos DROP CHECK chk_idade;</code></pre>
     quiz('Qual é a principal vantagem de criar um índice numa coluna?', ['Ocupa menos espaço em disco', 'Torna mais rápidas as pesquisas e junções por essa coluna', 'Impede valores repetidos em qualquer caso', 'Encripta os dados da coluna'], 1, 'O índice evita percorrer a tabela inteira.'),
     learn('CREATE INDEX', `<p>Cria-se um índice dando-lhe um nome e indicando a tabela e a(s) coluna(s). Por convenção os nomes começam por <code>idx_</code>:</p>`,
       [ex('CREATE INDEX idx_alunos_cidade ON alunos (cidade);', 'Acelera pesquisas como WHERE cidade = …'),
-       ex('CREATE INDEX idx_notas_aluno_disc ON notas (aluno_id, disciplina);', 'Índice composto, com duas colunas.'),
+       ex('CREATE INDEX idx_notas_aluno_disc ON notas (id_aluno, disciplina);', 'Índice composto, com duas colunas.'),
        ex('CREATE UNIQUE INDEX idx_cursos_nome ON cursos (nome);', 'Índice único: também impede nomes de curso repetidos.')]),
     code('Crie um índice chamado idx_notas_disciplina na coluna disciplina da tabela notas.', [
       '^create index idx_notas_disciplina on notas ?\\(disciplina\\)$',
@@ -371,7 +372,7 @@ EXPLAIN SELECT * FROM alunos WHERE cidade = 'Braga';   -- mostra se o índice é
       <p>Serve para:</p><ul><li><b>simplificar</b> consultas complexas (ex.: um JOIN usado muitas vezes);</li><li><b>segurança</b>: mostrar apenas algumas colunas ou linhas a certos utilizadores;</li><li><b>estabilidade</b>: as aplicações usam a vista mesmo que as tabelas mudem.</li></ul>`),
     quiz('Uma vista guarda uma cópia dos dados?', ['Sim, é uma cópia atualizada todas as noites', 'Não, guarda a consulta; os dados vêm das tabelas quando é consultada', 'Sim, mas só das colunas indicadas', 'Só se for criada com UNIQUE'], 1, 'É uma "tabela virtual".'),
     learn('CREATE VIEW', `<p>Cria-se com <code>CREATE VIEW nome AS SELECT …</code>. A base de dados escola já tem esta vista, que junta alunos e cursos:</p>`,
-      [ex('CREATE VIEW v_alunos_cursos AS\nSELECT a.nome AS aluno, a.idade, a.cidade, c.nome AS curso\nFROM alunos a JOIN cursos c ON a.curso_id = c.id;', 'Definição da vista v_alunos_cursos (já existe na BD escola).'),
+      [ex('CREATE VIEW v_alunos_cursos AS\nSELECT a.nome AS aluno, a.idade, a.cidade, c.nome AS curso\nFROM alunos a JOIN cursos c ON a.id_curso = c.id_curso;', 'Definição da vista v_alunos_cursos (já existe na BD escola).'),
        ex('SELECT * FROM v_alunos_cursos;', 'Usa-se como uma tabela normal.', true)]),
     query('Usando a vista v_alunos_cursos, mostre o nome (aluno) dos alunos do curso de Design.', "SELECT aluno FROM v_alunos_cursos WHERE curso = 'Design'", "SELECT aluno FROM v_alunos_cursos WHERE curso = …"),
     query('Usando a vista v_alunos_cursos, mostre cada curso e o número de alunos de Lisboa nesse curso.', "SELECT curso, COUNT(*) FROM v_alunos_cursos WHERE cidade = 'Lisboa' GROUP BY curso", "WHERE cidade = 'Lisboa' GROUP BY curso"),

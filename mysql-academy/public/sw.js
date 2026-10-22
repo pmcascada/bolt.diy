@@ -1,5 +1,5 @@
 /* Service worker: a app funciona offline depois da primeira visita. */
-const V = 'mya-v8';
+const V = 'mya-v9';
 const CORE = ['./', 'index.html', 'styles.css', 'config.js', 'app.js', 'content.js', 'score.js', 'db.js', 'backend.js', 'vendor/alasql.min.js', 'vendor/supabase.js', 'manifest.webmanifest', 'icon.svg', 'icon-mark.svg', 'icon-192.png'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(V).then((c) => c.addAll(CORE)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => {
