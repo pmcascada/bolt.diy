@@ -351,6 +351,36 @@ function runSql(db, sql) {
   try { return table(D.run(db, sql)); } catch (err) { return alertBox('bad', 'alert', `<b>Erro:</b> ${esc(err.message || err)}`); }
 }
 
+/* ---------- estrutura das tabelas (consulta durante os exercícios) ---------- */
+// Insere texto na posição do cursor de uma caixa de texto.
+function insertAt(ta, text) {
+  const a = ta.selectionStart ?? ta.value.length, b = ta.selectionEnd ?? a;
+  const before = ta.value.slice(0, a), sep = before && !/[\s(,.]$/.test(before) ? ' ' : '';
+  ta.value = before + sep + text + ta.value.slice(b);
+  const p = a + sep.length + text.length; ta.focus(); ta.setSelectionRange(p, p);
+  ta.dispatchEvent(new Event('input'));
+}
+// Painel com a estrutura (DESCRIBE) e os dados de cada tabela; as tabelas da pergunta aparecem primeiro.
+function schemaPanel(used, onPick) {
+  const names = [...used, ...Object.keys(D.SCHEMA).filter((t) => !used.includes(t))];
+  const el = document.createElement('div'); el.className = 'sp';
+  let cur = names[0], showData = false;
+  function paint() {
+    const t = D.SCHEMA[cur], rows = D.SEED[cur], cols = D.COLS[cur];
+    el.innerHTML = `<div class="sp-tabs" role="tablist">${names.map((n) => `<button type="button" role="tab" aria-selected="${n === cur}" class="${n === cur ? 'on' : ''}" data-t="${n}">${ic('table')}${n}${used.includes(n) ? '<span class="sp-dot" title="Usada nesta pergunta"></span>' : ''}</button>`).join('')}</div>
+      <div class="sp-b"><p class="small muted" style="margin:0 0 8px"><b>${cur}</b> — ${esc(t.desc)}${used.includes(cur) ? ' · <span class="chip acc">usada nesta pergunta</span>' : ''}</p>
+      <div class="scroll"><table class="tbl sp-t"><thead><tr><th>Campo</th><th>Tipo</th><th>Chave</th><th>Descrição</th></tr></thead><tbody>
+        ${t.cols.map(([c, ty, k, d]) => `<tr><td>${onPick ? `<button type="button" class="sp-col" data-c="${c}" title="Inserir na resposta">${c}</button>` : `<code>${c}</code>`}</td><td class="mono">${ty}</td><td>${k ? `<span class="chip ${k === 'PK' ? 'acc' : ''}">${esc(k)}</span>` : ''}</td><td class="small muted">${esc(d)}</td></tr>`).join('')}</tbody></table></div>
+      <div class="row" style="margin-top:10px;justify-content:space-between"><button type="button" class="btn link sm sp-data">${ic(showData ? 'chevL' : 'eye')}${showData ? 'Esconder dados' : `Ver dados (${rows.length} linhas)`}</button>${onPick ? '<span class="small muted">Clique num campo para o inserir na resposta.</span>' : ''}</div>
+      ${showData ? `<div class="res" style="max-height:240px"><table><thead><tr>${cols.map((c) => `<th>${c}</th>`).join('')}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((v) => `<td>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` : ''}</div>`;
+    el.querySelectorAll('[data-t]').forEach((b) => (b.onclick = () => { cur = b.dataset.t; paint(); }));
+    el.querySelector('.sp-data').onclick = () => { showData = !showData; paint(); };
+    if (onPick) el.querySelectorAll('.sp-col').forEach((b) => (b.onclick = () => onPick(b.dataset.c)));
+  }
+  paint();
+  return el;
+}
+
 function taskEl(ex, i, onPass) {
   const el = document.createElement('div');
   const tag = { quiz: 'Escolha múltipla', code: 'Escrever comando', query: 'Consulta SELECT' }[ex.t];
@@ -410,10 +440,19 @@ function taskEl(ex, i, onPass) {
     }
     mk(ex.t === 'query' ? 'Executar e verificar' : 'Verificar', 'check', '', check);
     if (ex.t === 'query') mk('Executar', 'play', 'sec-b', () => { out.innerHTML = el._out = runSql(D.create(), ta.value); });
+    let sp = null;
+    const toggleSchema = () => {
+      el._schema = !el._schema;
+      if (sp) { sp.remove(); sp = null; }
+      if (el._schema) { sp = schemaPanel(D.tablesIn(ex.solution), (c) => insertAt(ta, c)); body.insertBefore(sp, ta); }
+      sb.innerHTML = ic('table') + (el._schema ? 'Esconder estrutura' : 'Estrutura das tabelas');
+    };
+    const sb = ex.t === 'query' ? mk('Estrutura das tabelas', 'table', 'sec-b', toggleSchema) : null;
     if (!done && !rev) mk(`Dica (−${S.HINT_COST} XP)`, 'bulb', 'link sm', () => { a.hints = Math.min(a.hints + 1, 9); st.att[ex.id] = a; persist(); fb.innerHTML = alertBox('info', 'bulb', esc(ex.hint)); });
     const k = document.createElement('span'); k.className = 'small muted kb'; k.innerHTML = '<span class="kbd">Ctrl</span> + <span class="kbd">Enter</span>'; tools.append(k);
     ta.onkeydown = (ev) => { if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter') { ev.preventDefault(); check(); } };
     body.append(ta, tools, out);
+    if (sb && el._schema) { el._schema = false; toggleSchema(); }
     if (a.tries >= 2 && !done) aid();
   }
   paint();
@@ -511,13 +550,18 @@ function vLab() {
   crumbs = [['Laboratório SQL', '#/lab']];
   if (!labDb) labDb = D.create();
   view.innerHTML = `<div class="page-h"><div><div class="eyebrow">Prática livre</div><h1>Laboratório SQL</h1><p>Execute instruções sobre a base de dados <b>escola</b>. Os dados ficam apenas no seu dispositivo e podem ser repostos a qualquer momento.</p></div></div>
-  <div class="card"><div class="card-h"><h3>Esquema</h3><button class="btn sec-b sm" id="reset">${ic('reset')}Repor dados</button></div>
+  <div class="card"><div class="card-h"><h3>Esquema</h3><span class="row" style="gap:8px"><button class="btn sec-b sm" id="schemaBtn">${ic('table')}Estrutura das tabelas</button><button class="btn sec-b sm" id="reset">${ic('reset')}Repor dados</button></span></div><div id="labSchema"></div>
   <div class="schema">${Object.entries(D.COLS).map(([t, c]) => `<span><b>${t}</b> (${c.join(', ')})</span>`).join('')}</div>
   <textarea class="sql" id="labq" spellcheck="false" style="min-height:150px" aria-label="Instrução SQL"></textarea>
   <div class="tools"><button class="btn" id="go">${ic('play')}Executar</button><span class="small muted kb"><span class="kbd">Ctrl</span> + <span class="kbd">Enter</span></span></div>
   <div id="labout"></div></div>
   <p class="small muted" style="margin-top:12px">${ic('info')} O motor do laboratório simula o MySQL no browser e suporta SELECT, INSERT, UPDATE, DELETE e CREATE TABLE. Algumas funções específicas do MySQL podem não estar disponíveis.</p>`;
   const q = $('#labq'); q.value = labSql;
+  $('#schemaBtn').onclick = () => {
+    const box = $('#labSchema'), open = !box.firstChild;
+    box.innerHTML = ''; if (open) box.append(schemaPanel(D.tablesIn(q.value), (c) => insertAt(q, c)));
+    $('#schemaBtn').innerHTML = ic('table') + (open ? 'Esconder estrutura' : 'Estrutura das tabelas');
+  };
   const go = () => { labSql = q.value; $('#labout').innerHTML = runSql(labDb, q.value); touchDay(); persist(); };
   $('#go').onclick = go; q.onkeydown = (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); go(); } };
   $('#reset').onclick = () => { labDb = D.create(); $('#labout').innerHTML = alertBox('ok', 'check', 'Dados de exemplo repostos.'); };

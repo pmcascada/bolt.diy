@@ -341,3 +341,16 @@ select.txt.sel{height:30px;padding:0 8px;font-size:.82rem;margin:0;width:auto}
 .tbl.prof th.c,.tbl.prof td.c{text-align:center}
 .tbl tr.pr{cursor:pointer}.tbl tr.pr:hover td{background:var(--surface-2)}
 #modal form.box .txt{display:block}
+
+/* ---- estrutura das tabelas ---- */
+.sp{border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface-2);margin-bottom:12px;overflow:hidden}
+.sp-tabs{display:flex;gap:2px;padding:6px 6px 0;border-bottom:1px solid var(--border);overflow-x:auto}
+.sp-tabs button{display:inline-flex;align-items:center;gap:6px;border:1px solid transparent;border-bottom:0;background:none;font:500 .84rem var(--mono);color:var(--muted);padding:7px 12px;border-radius:7px 7px 0 0;cursor:pointer;white-space:nowrap}
+.sp-tabs button svg.i{width:15px;height:15px}
+.sp-tabs button.on{background:var(--surface);color:var(--text);border-color:var(--border);margin-bottom:-1px}
+.sp-dot{width:7px;height:7px;border-radius:50%;background:var(--accent)}
+.sp-b{background:var(--surface);padding:12px 14px}
+.sp-t td,.sp-t th{padding:7px 10px}
+.sp-t .mono{font-family:var(--mono);font-size:.8rem}
+.sp-col{font:500 .82rem var(--mono);color:var(--accent);background:var(--accent-weak);border:1px solid transparent;border-radius:5px;padding:2px 7px;cursor:pointer}
+.sp-col:hover{border-color:var(--accent)}
