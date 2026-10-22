@@ -354,3 +354,4 @@ select.txt.sel{height:30px;padding:0 8px;font-size:.82rem;margin:0;width:auto}
 .sp-t .mono{font-family:var(--mono);font-size:.8rem}
 .sp-col{font:500 .82rem var(--mono);color:var(--accent);background:var(--accent-weak);border:1px solid transparent;border-radius:5px;padding:2px 7px;cursor:pointer}
 .sp-col:hover{border-color:var(--accent)}
+.reveal-row{display:flex;justify-content:flex-end;margin-top:2px}
