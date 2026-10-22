@@ -1184,10 +1184,10 @@ async function vProf() {
     ${rows.map((r, i) => `<tr class="pr" data-i="${i}"><td><span class="who"><span class="avatar">${esc(initials(r.name))}</span><b>${esc(r.name)}</b>${r.s.projectSent ? ` <span class="chip ok" title="Projeto final entregue">${ic('folder')}</span>` : ''}</span></td>${turmas.length ? `<td class="small muted">${esc(r.turma || '—')}</td>` : ''}<td>${r.s.level}</td><td class="r"><b>${r.s.xp}</b></td><td><div class="row" style="flex-wrap:nowrap">${bar(r.s.pct)}<span class="small muted num-t" style="min-width:36px">${r.s.pct}%</span></div></td>
       ${CHAPTERS.map((c) => { const p = r.s.perChapter[c.id]; return `<td class="c">${p.test.passed ? `<span class="chip ok" title="Miniteste aprovado">${p.test.best}%</span>` : p.test.attempts ? `<span class="chip bad" title="Melhor resultado no miniteste">${p.test.best}%</span>` : `<span class="small muted" title="Lições concluídas">${p.lessonsOk}/${p.lessons}</span>`}</td>`; }).join('')}
       <td class="small muted" style="white-space:nowrap">${r.updated ? new Date(r.updated).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' }) : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Ainda não há alunos inscritos.</div>'}</div>
-  ${BK.user && BK.user.admin ? '<div id="chVis"></div><div id="adminBox"></div>' : ''}
+  ${BK.user && BK.user.admin ? '<div id="chVis"></div><div id="sitePass"></div><div id="adminBox"></div>' : ''}
   <p class="small muted" style="margin-top:10px">Colunas C1–C${CHAPTERS.length}: resultado do miniteste de cada capítulo (verde = aprovado) ou lições concluídas. Clique num aluno para ver o detalhe.</p><div id="profDetail"></div>
   ${difficultyHtml(rows)}`;
-  if (BK.user && BK.user.admin) { renderChapterVis(); renderAdmin(); }
+  if (BK.user && BK.user.admin) { renderChapterVis(); renderSitePass(); renderAdmin(); }
   view.querySelectorAll('tr.dr').forEach((tr) => (tr.onclick = () => { const d = view.querySelector(`tr.dx[data-for="${tr.dataset.id}"]`); d.hidden = !d.hidden; tr.classList.toggle('me', !d.hidden); }));
   if ($('#diffAll')) $('#diffAll').onclick = () => { profAll = !profAll; vProf(); };
   $('#profTools').innerHTML = `${turmas.length ? `<select class="txt sel" id="pturma" aria-label="Turma"><option value="">Todas as turmas</option>${turmas.map((t) => `<option ${t === profTurma ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>` : ''}<select class="txt sel" id="psort" aria-label="Ordenar"><option value="xp">Ordenar por XP</option><option value="name">Ordenar por nome</option><option value="recent">Mais recentes</option></select><button class="btn sec-b sm" id="prefresh">${ic('refresh')}Atualizar</button><button class="btn sec-b sm" id="pcsv">${ic('download')}Exportar CSV</button>`;
@@ -1234,6 +1234,26 @@ function renderChapterVis() {
     };
   };
   paint();
+}
+
+/* ---------- gestor do site: palavra-passe de acesso ao site ---------- */
+function renderSitePass() {
+  const box = $('#sitePass'); if (!box || !BK.setSitePassword) return;
+  box.innerHTML = `<div class="card" style="margin-top:16px"><div class="card-h"><h3>${ic('lock')}Palavra-passe de acesso ao site</h3></div>
+    <p class="small muted" style="margin-top:0">O site só abre a quem introduzir esta palavra-passe; só depois os alunos podem criar conta ou iniciar sessão. Ao mudá-la, todas as pessoas (incluindo quem já tinha entrado) terão de introduzir a nova palavra-passe — comunique-a aos alunos antes de a mudar. As maiúsculas contam.</p>
+    <form id="spf" class="row" style="align-items:flex-end;gap:10px">
+      <label class="field" style="margin:0;flex:1;min-width:180px">Nova palavra-passe<input class="txt" id="sp1" type="password" autocomplete="new-password" minlength="4" required></label>
+      <label class="field" style="margin:0;flex:1;min-width:180px">Repetir<input class="txt" id="sp2" type="password" autocomplete="new-password" minlength="4" required></label>
+      <button class="btn" type="submit">${ic('check')}Mudar palavra-passe</button></form></div>`;
+  $('#spf').onsubmit = async (e) => {
+    e.preventDefault();
+    const a = $('#sp1').value, b = $('#sp2').value;
+    if (a.trim().length < 4) return toast('A palavra-passe deve ter pelo menos 4 caracteres.', 'alert');
+    if (a !== b) return toast('As duas palavras-passe não coincidem.', 'alert');
+    if (!confirm('Mudar a palavra-passe de acesso ao site?\n\nTodos os alunos terão de introduzir a nova palavra-passe.')) return;
+    try { await BK.setSitePassword(a); $('#spf').reset(); toast('Palavra-passe de acesso alterada'); }
+    catch (err) { toast(BK.errorText(err), 'alert'); }
+  };
 }
 
 /* ---------- gestor do site: atribuir o perfil de professor ---------- */
@@ -1363,6 +1383,11 @@ applyTheme();
 route();
 // Restaura a sessão (se existir) e sincroniza; só redesenha páginas sem trabalho em curso.
 BK.onRecovery = askNewPassword;
+// Palavra-passe de acesso ao site (só com o Supabase): sem token válido, vai para a página de acesso.
+if (BK.checkAccess) {
+  if (!BK.accessToken()) location.replace('acesso.html');
+  else BK.checkAccess().then((ok) => { if (!ok) { BK.clearAccess(); location.replace('acesso.html'); } });
+}
 const settingsReady = loadSettings();
 BK.init().then(async (u) => {
   if (BK.recovery) askNewPassword();

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MySQL Academy · Acesso</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+  :root{--brand:#f7941d;--accent:#d06a00;--bg:#f6f7f9;--surface:#fff;--border:#e3e6eb;--text:#0f172a;--muted:#64748b;--bad:#b91c1c;--bad-weak:#fef2f2;color-scheme:light}
+  @media (prefers-color-scheme:dark){:root{--accent:#f7941d;--bg:#0b1120;--surface:#111827;--border:#1f2a3c;--text:#e5e9f0;--muted:#8b98ad;--bad:#f87171;--bad-weak:#3b0d0d;color-scheme:dark}}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:grid;place-items:center;padding:16px;background:var(--bg);color:var(--text);font:15px/1.6 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .box{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px}
+  .brand{display:flex;align-items:center;gap:10px;margin-bottom:22px}
+  .logo{width:36px;height:36px;border-radius:9px;background:var(--brand) url("icon-mark.svg") center/22px no-repeat;flex:none}
+  .brand b{display:block;font-size:1.05rem}.brand small{color:var(--muted);font-size:.8rem}
+  h1{font-size:1.15rem;margin:0 0 6px}p{margin:0 0 16px;color:var(--muted);font-size:.9rem}
+  label{display:block;font-size:.86rem;font-weight:500;margin-bottom:6px}
+  input{width:100%;height:42px;padding:0 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font:inherit}
+  input:focus{outline:2px solid var(--accent);outline-offset:1px}
+  button{width:100%;height:42px;margin-top:14px;border:0;border-radius:8px;background:var(--accent);color:#fff;font:inherit;font-weight:600;cursor:pointer}
+  button:disabled{opacity:.6;cursor:default}
+  .err{margin-top:12px;padding:8px 12px;border-radius:8px;background:var(--bad-weak);color:var(--bad);font-size:.86rem}
+  .err:empty{display:none}
+</style>
+</head>
+<body>
+<form class="box" id="f">
+  <div class="brand"><span class="logo"></span><span><b>MySQL Academy</b><small>Curso de autoaprendizagem</small></span></div>
+  <h1>Acesso reservado</h1>
+  <p>Este site é de uso exclusivo dos alunos e professores. Introduza a palavra-passe de acesso indicada pelo professor.</p>
+  <label for="pw">Palavra-passe de acesso</label>
+  <input id="pw" type="password" autocomplete="current-password" autofocus required>
+  <button type="submit" id="go">Entrar</button>
+  <div class="err" id="err" role="alert"></div>
+</form>
+<script src="config.js"></script>
+<script>
+/* Página de acesso: confirma a palavra-passe no Supabase e guarda o token de acesso
+   num cookie (lido pelo Vercel, middleware.js) e no browser (lido pela app). */
+(function () {
+  var cfg = window.APP_CONFIG || {};
+  if (!cfg.supabaseUrl) { location.replace('./'); return; } // sem Supabase (servidor local) não há palavra-passe
+  var f = document.getElementById('f'), pw = document.getElementById('pw'), go = document.getElementById('go'), err = document.getElementById('err');
+  f.onsubmit = function (e) {
+    e.preventDefault();
+    err.textContent = ''; go.disabled = true; go.textContent = 'A verificar…';
+    fetch(cfg.supabaseUrl + '/rest/v1/rpc/site_login', {
+      method: 'POST',
+      headers: { apikey: cfg.supabaseAnonKey, Authorization: 'Bearer ' + cfg.supabaseAnonKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p: pw.value }),
+    }).then(function (r) { if (!r.ok) throw new Error('rede'); return r.json(); }).then(function (tok) {
+      if (!tok) { err.textContent = 'Palavra-passe incorreta.'; pw.select(); return; }
+      document.cookie = 'mya_acesso=' + tok + '; Max-Age=' + 60 * 864e2 + '; Path=/; SameSite=Lax' + (location.protocol === 'https:' ? '; Secure' : '');
+      try { localStorage.setItem('mysql-academy.acesso', tok); } catch (e2) { /* sem storage */ }
+      location.replace('./' + location.hash); // mantém os links de confirmação de conta e de recuperação
+    }).catch(function () { err.textContent = 'Não foi possível verificar a palavra-passe. Confirme a ligação à Internet e tente novamente.'; })
+      .then(function () { go.disabled = false; go.textContent = 'Entrar'; });
+  };
+})();
+</script>
+</body>
+</html>
