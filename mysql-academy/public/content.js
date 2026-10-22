@@ -51,8 +51,8 @@ const CHAPTERS = [
       <tr><td>DML</td><td>Manipular dados</td><td><code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code></td></tr>
       <tr><td>DQL</td><td>Consultar dados</td><td><code>SELECT</code></td></tr>
       <tr><td>DCL</td><td>Controlar acessos</td><td><code>GRANT</code>, <code>REVOKE</code></td></tr>
-      <tr><td>TCL</td><td>Controlar transações</td><td><code>COMMIT</code>, <code>ROLLBACK</code></td></tr></table>`),
-    quiz('A que família pertence o comando CREATE TABLE?', ['DDL', 'DML', 'DCL', 'TCL'], 0, 'CREATE define estruturas: é DDL (Data Definition Language).'),
+      </table>`),
+    quiz('A que família pertence o comando CREATE TABLE?', ['DDL', 'DML', 'DCL', 'DQL'], 0, 'CREATE define estruturas: é DDL (Data Definition Language).'),
     quiz('E o comando GRANT?', ['DDL', 'DML', 'DCL', 'DQL'], 2, 'GRANT e REVOKE controlam permissões: DCL (Data Control Language).'),
   ] },
   { title: 'Tipos de dados', steps: [
@@ -81,7 +81,7 @@ const CHAPTERS = [
     quiz('Numa tabela, as colunas representam…', ['Os elementos concretos', 'As características guardadas de cada elemento', 'As bases de dados', 'Os utilizadores'], 1, 'Cada coluna é um campo/característica.'),
     quiz('Que opção do cliente mysql pede a palavra-passe?', ['-u', '-h', '-p', '-d'], 2, '-p (password).'),
     quiz('Como termina uma instrução SQL no cliente mysql?', ['Com ponto final', 'Com ponto e vírgula', 'Com dois pontos', 'Com Enter apenas'], 1, 'O ; indica o fim da instrução.'),
-    quiz('INSERT, UPDATE e DELETE pertencem a que família?', ['DDL', 'DML', 'DCL', 'TCL'], 1, 'São comandos de manipulação de dados.'),
+    quiz('INSERT, UPDATE e DELETE pertencem a que família?', ['DDL', 'DML', 'DCL', 'DQL'], 1, 'São comandos de manipulação de dados.'),
     quiz('Qual o tipo indicado para valores monetários?', ['FLOAT', 'DOUBLE', 'DECIMAL', 'TEXT'], 2, 'DECIMAL é exato.'),
     quiz('Qual a diferença entre CHAR e VARCHAR?', ['Nenhuma', 'CHAR tem tamanho fixo; VARCHAR é variável', 'VARCHAR só guarda números', 'CHAR só guarda uma letra'], 1, 'CHAR(n) ocupa sempre n caracteres.'),
     quiz('Qual destas datas está no formato correto do MySQL?', ["'14/03/2025'", "'2025-03-14'", "'03-14-2025'", "'14.03.25'"], 1, 'AAAA-MM-DD.'),
@@ -158,7 +158,7 @@ RENAME TABLE alunos TO estudantes;              -- muda o nome</code></pre>`),
 /* =============================== 3 =============================== */
 {
   id: 'dml', icon: 'edit', title: 'Inserir, alterar e eliminar dados',
-  desc: 'INSERT, UPDATE, DELETE e transações.',
+  desc: 'INSERT, UPDATE, DELETE e TRUNCATE.',
   lessons: [
   { title: 'INSERT — inserir dados', steps: [
     learn('Inserir uma linha', `<p>Adicionam-se linhas a uma tabela com <code>INSERT INTO</code>, indicando as colunas e os respetivos valores, pela mesma ordem:</p>`,
@@ -182,25 +182,17 @@ RENAME TABLE alunos TO estudantes;              -- muda o nome</code></pre>`),
       [ex("UPDATE notas SET nota = nota + 1\nWHERE disciplina = 'Programação';", 'Soma 1 valor a todas as notas de Programação.'), ex("UPDATE alunos SET idade = 21, cidade = 'Faro' WHERE id = 1;", 'Duas colunas de uma vez.')]),
     code('Aumente em 100 as horas de todos os cursos.', ['^update cursos set horas=horas\\+100$'], 'UPDATE cursos SET horas = horas + 100;', 'SET horas = horas + 100'),
   ] },
-  { title: 'DELETE e transações', steps: [
+  { title: 'DELETE e TRUNCATE', steps: [
     learn('DELETE', `<p><code>DELETE</code> remove linhas. Tal como no UPDATE, o <code>WHERE</code> indica quais — sem ele, a tabela fica vazia!</p>`, [ex('DELETE FROM alunos WHERE id = 10;', 'Remove apenas o aluno com id 10.')]),
     code('Elimine da tabela alunos o aluno com id 7.', ['^delete from alunos where id=7$'], 'DELETE FROM alunos WHERE id = 7;', 'DELETE FROM … WHERE …'),
     learn('TRUNCATE', `<p><code>TRUNCATE TABLE t;</code> esvazia a tabela inteira de forma muito rápida e reinicia o contador <code>AUTO_INCREMENT</code>. Não aceita WHERE e mantém a estrutura da tabela.</p>`),
     quiz('Qual a diferença principal entre DELETE e TRUNCATE?', ['Não há diferença', 'TRUNCATE esvazia a tabela inteira rapidamente; DELETE aceita WHERE', 'TRUNCATE elimina também a estrutura', 'DELETE é mais rápido em tabelas grandes'], 1, 'TRUNCATE não aceita WHERE.'),
-    learn('Transações', `<p>Uma <b>transação</b> agrupa várias instruções que devem ser executadas como um todo. Até ser confirmada, pode ser anulada:</p>
-      <pre><code>START TRANSACTION;
-DELETE FROM alunos WHERE cidade = 'Porto';
-SELECT COUNT(*) FROM alunos;   -- verificar
-ROLLBACK;   -- desfaz tudo   (COMMIT; confirmaria)</code></pre>
-      <p>As transações (tabelas InnoDB) garantem as propriedades <b>ACID</b>: Atomicidade, Consistência, Isolamento e Durabilidade.</p>`),
-    code('Escreva o comando que anula (desfaz) a transação em curso.', ['^rollback( work)?$'], 'ROLLBACK;', 'O contrário de COMMIT.'),
-    quiz('Que comando torna definitivas as alterações de uma transação?', ['SAVE', 'COMMIT', 'ROLLBACK', 'END'], 1, 'COMMIT confirma; ROLLBACK anula.'),
+    code('Esvazie completamente a tabela registos, da forma mais rápida.', ['^truncate( table)? registos$'], 'TRUNCATE TABLE registos;', 'TRUNCATE TABLE …'),
   ] }],
   cheat: [
     ["INSERT INTO t (c1, c2) VALUES (v1, v2);", 'Inserir uma linha'], ["INSERT INTO t (c1, c2) VALUES (…), (…);", 'Inserir várias linhas'],
     ['UPDATE t SET c = v WHERE condição;', 'Alterar linhas'], ['UPDATE t SET c = c + 1 WHERE …;', 'Alterar com expressão'],
     ['DELETE FROM t WHERE condição;', 'Eliminar linhas'], ['TRUNCATE TABLE t;', 'Esvaziar tabela'],
-    ['START TRANSACTION; … COMMIT; / ROLLBACK;', 'Transação: confirmar / anular'],
   ],
   test: [
     quiz('Qual a sintaxe correta para inserir um curso?', ["INSERT cursos VALUES nome='Arte'", "INSERT INTO cursos (nome) VALUES ('Arte');", "ADD INTO cursos ('Arte')", "UPDATE cursos ADD ('Arte')"], 1, 'INSERT INTO … (colunas) VALUES (…).'),
@@ -209,8 +201,8 @@ ROLLBACK;   -- desfaz tudo   (COMMIT; confirmaria)</code></pre>
     quiz('Como se aumenta em 10% o preço de todos os produtos?', ['UPDATE produtos SET preco = 10%', 'UPDATE produtos SET preco = preco * 1.1', 'ALTER produtos preco + 10%', 'SET preco += 10'], 1, 'O novo valor pode ser calculado.'),
     quiz('O que faz DELETE FROM alunos; (sem WHERE)?', ['Elimina a tabela', 'Elimina todas as linhas, mantendo a tabela', 'Dá erro', 'Elimina a primeira linha'], 1, 'A estrutura mantém-se.'),
     quiz('Qual destes comandos aceita WHERE?', ['TRUNCATE', 'DELETE', 'DROP TABLE', 'CREATE TABLE'], 1, 'Só o DELETE filtra linhas.'),
-    quiz('Numa transação, o que faz ROLLBACK?', ['Confirma as alterações', 'Anula as alterações não confirmadas', 'Reinicia o servidor', 'Faz backup'], 1, 'Desfaz desde o START TRANSACTION.'),
-    quiz('O "A" de ACID significa…', ['Acesso', 'Atomicidade', 'Autenticação', 'Agregação'], 1, 'Tudo ou nada.'),
+    quiz('Que comando esvazia toda a tabela de forma rápida e reinicia o AUTO_INCREMENT?', ['DELETE FROM t WHERE 1', 'DROP TABLE t', 'TRUNCATE TABLE t', 'UPDATE t SET id = 0'], 2, 'TRUNCATE mantém a estrutura mas apaga todas as linhas.'),
+    quiz('Antes de executar um UPDATE ou DELETE importante, qual é a boa prática?', ['Desligar o servidor', 'Testar primeiro o WHERE com um SELECT', 'Apagar os índices', 'Usar sempre TRUNCATE'], 1, 'O SELECT mostra exatamente que linhas vão ser afetadas.'),
   ],
 },
 /* =============================== 4 =============================== */
@@ -319,6 +311,95 @@ ROLLBACK;   -- desfaz tudo   (COMMIT; confirmaria)</code></pre>
     quiz('Como se testa se uma coluna não tem valor?', ['= NULL', 'IS NULL', "= ''", '== NULL'], 1, 'NULL compara-se com IS NULL.'),
   ],
 },
+/* ========================= restrições, índices e vistas ========================= */
+{
+  id: 'adv', icon: 'layers', title: 'Restrições, índices e vistas',
+  desc: 'CHECK para validar dados, índices para acelerar consultas e vistas (VIEW).',
+  lessons: [
+  { title: 'Validar dados com CHECK', steps: [
+    learn('A restrição CHECK', `<p>Já conhece as restrições <code>NOT NULL</code>, <code>UNIQUE</code> e <code>DEFAULT</code>. A restrição <code>CHECK</code> vai mais longe: define uma <b>condição</b> que todos os valores têm de cumprir. Se um INSERT ou UPDATE a violar, o MySQL recusa a operação.</p>
+      <p>Pode escrever-se junto da coluna ou no fim da definição da tabela:</p>
+      <pre><code>CREATE TABLE produtos (
+  id INT PRIMARY KEY,
+  nome VARCHAR(60) NOT NULL,
+  preco DECIMAL(8,2) CHECK (preco > 0),
+  stock INT,
+  CHECK (stock >= 0)
+);</code></pre>
+      <p>O MySQL aplica as restrições CHECK a partir da versão 8.0.16.</p>`),
+    code('Crie a tabela artigos com id INT (chave primária), nome VARCHAR(60) e preco DECIMAL(8,2) com a restrição CHECK (preco > 0). Escreva numa só linha.', [
+      '^create table artigos\\(id int(\\(\\d+\\))? primary key,nome varchar\\(60\\)( ?not null)?,preco decimal\\(8,2\\)( ?not null)? ?check ?\\(preco>0\\)\\)$',
+      '^create table artigos\\(id int(\\(\\d+\\))? primary key,nome varchar\\(60\\)( ?not null)?,preco decimal\\(8,2\\)( ?not null)?,(constraint \\w+ )?check ?\\(preco>0\\)\\)$',
+    ], 'CREATE TABLE artigos (id INT PRIMARY KEY, nome VARCHAR(60), preco DECIMAL(8,2) CHECK (preco > 0));', 'preco DECIMAL(8,2) CHECK (preco > 0)'),
+    learn('Quando a regra é violada', `<p>Experimente: a tabela é criada, mas a inserção de um preço negativo é recusada com um erro e a linha <b>não é guardada</b>.</p>`,
+      [ex("CREATE TABLE precos (id INT, valor DECIMAL(8,2) CHECK (valor > 0));", 'Cria uma tabela com uma regra de validação.'),
+       ex("INSERT INTO precos VALUES (1, -5);", 'No MySQL: ERROR 3819 — Check constraint is violated. Experimente no laboratório.')]),
+    quiz('O que acontece a um INSERT que viola uma restrição CHECK?', ['A linha é guardada com o valor corrigido para 0', 'A operação é recusada com um erro e a linha não é guardada', 'A linha é guardada mas fica marcada', 'A restrição é desativada'], 1, 'O CHECK garante que só entram dados válidos.'),
+    learn('Restrições com nome e ALTER TABLE', `<p>Dar um <b>nome</b> à restrição torna as mensagens de erro mais claras e permite removê-la mais tarde. Também é possível acrescentar uma restrição a uma tabela que já existe:</p>
+      <pre><code>ALTER TABLE alunos ADD CONSTRAINT chk_idade CHECK (idade >= 16);
+ALTER TABLE alunos DROP CHECK chk_idade;</code></pre>
+      <p>Ao acrescentar a restrição, as linhas que já existem também têm de a cumprir; caso contrário o ALTER TABLE falha.</p>`),
+    code('Acrescente à tabela notas uma restrição chamada chk_nota que garanta que a nota está entre 0 e 20 (use BETWEEN).', [
+      '^alter table notas add constraint chk_nota check ?\\(nota between 0 and 20\\)$',
+    ], 'ALTER TABLE notas ADD CONSTRAINT chk_nota CHECK (nota BETWEEN 0 AND 20);', 'ALTER TABLE notas ADD CONSTRAINT chk_nota CHECK (…)'),
+  ] },
+  { title: 'Índices', steps: [
+    learn('Para que serve um índice', `<p>Um <b>índice</b> funciona como o índice remissivo de um livro: em vez de ler todas as páginas, salta-se diretamente para o sítio certo. Sem índice, para encontrar os alunos de Braga o MySQL tem de percorrer <b>todas</b> as linhas da tabela.</p>
+      <p>Os índices aceleram as consultas que filtram (<code>WHERE</code>), juntam (<code>JOIN</code>) ou ordenam (<code>ORDER BY</code>) por essa coluna. A chave primária tem sempre um índice criado automaticamente.</p>`),
+    quiz('Qual é a principal vantagem de criar um índice numa coluna?', ['Ocupa menos espaço em disco', 'Torna mais rápidas as pesquisas e junções por essa coluna', 'Impede valores repetidos em qualquer caso', 'Encripta os dados da coluna'], 1, 'O índice evita percorrer a tabela inteira.'),
+    learn('CREATE INDEX', `<p>Cria-se um índice dando-lhe um nome e indicando a tabela e a(s) coluna(s). Por convenção os nomes começam por <code>idx_</code>:</p>`,
+      [ex('CREATE INDEX idx_alunos_cidade ON alunos (cidade);', 'Acelera pesquisas como WHERE cidade = …'),
+       ex('CREATE INDEX idx_notas_aluno_disc ON notas (aluno_id, disciplina);', 'Índice composto, com duas colunas.'),
+       ex('CREATE UNIQUE INDEX idx_cursos_nome ON cursos (nome);', 'Índice único: também impede nomes de curso repetidos.')]),
+    code('Crie um índice chamado idx_notas_disciplina na coluna disciplina da tabela notas.', [
+      '^create index idx_notas_disciplina on notas ?\\(disciplina\\)$',
+    ], 'CREATE INDEX idx_notas_disciplina ON notas (disciplina);', 'CREATE INDEX nome ON tabela (coluna);'),
+    learn('Consultar e remover índices', `<pre><code>SHOW INDEX FROM alunos;                    -- lista os índices da tabela
+DROP INDEX idx_alunos_cidade ON alunos;    -- remove um índice
+EXPLAIN SELECT * FROM alunos WHERE cidade = 'Braga';   -- mostra se o índice é usado</code></pre>
+      <p>O <code>EXPLAIN</code> mostra o plano de execução: na coluna <code>key</code> aparece o índice escolhido pelo MySQL.</p>`),
+    code('Remova o índice idx_alunos_cidade da tabela alunos.', [
+      '^drop index idx_alunos_cidade on alunos$', '^alter table alunos drop index idx_alunos_cidade$',
+    ], 'DROP INDEX idx_alunos_cidade ON alunos;', 'DROP INDEX nome ON tabela;'),
+    learn('Quando (não) criar índices', `<p>Os índices não são gratuitos: ocupam espaço e tornam os <code>INSERT</code>, <code>UPDATE</code> e <code>DELETE</code> mais lentos, porque o índice também tem de ser atualizado.</p>
+      <ul><li><b>Vale a pena:</b> colunas muito usadas em WHERE, JOIN ou ORDER BY, em tabelas grandes.</li>
+      <li><b>Não vale a pena:</b> tabelas pequenas, colunas raramente pesquisadas ou com muito poucos valores diferentes (ex.: sim/não).</li></ul>`),
+    quiz('Em qual destas situações um índice é MENOS útil?', ['Coluna email usada para procurar clientes numa tabela com milhões de linhas', 'Coluna usada em JOIN entre duas tabelas grandes', 'Coluna ativo (sim/não) numa tabela com 20 linhas', 'Coluna data usada em ORDER BY em relatórios frequentes'], 2, 'Tabela pequena e coluna com só dois valores: o índice não traz ganho.'),
+  ] },
+  { title: 'Vistas (VIEW)', steps: [
+    learn('O que é uma vista', `<p>Uma <b>vista</b> (<code>VIEW</code>) é uma consulta SELECT guardada com um nome, que se usa como se fosse uma tabela. A vista <b>não guarda dados</b>: sempre que é consultada, o MySQL executa a consulta e devolve os dados atuais.</p>
+      <p>Serve para:</p><ul><li><b>simplificar</b> consultas complexas (ex.: um JOIN usado muitas vezes);</li><li><b>segurança</b>: mostrar apenas algumas colunas ou linhas a certos utilizadores;</li><li><b>estabilidade</b>: as aplicações usam a vista mesmo que as tabelas mudem.</li></ul>`),
+    quiz('Uma vista guarda uma cópia dos dados?', ['Sim, é uma cópia atualizada todas as noites', 'Não, guarda a consulta; os dados vêm das tabelas quando é consultada', 'Sim, mas só das colunas indicadas', 'Só se for criada com UNIQUE'], 1, 'É uma "tabela virtual".'),
+    learn('CREATE VIEW', `<p>Cria-se com <code>CREATE VIEW nome AS SELECT …</code>. A base de dados escola já tem esta vista, que junta alunos e cursos:</p>`,
+      [ex('CREATE VIEW v_alunos_cursos AS\nSELECT a.nome AS aluno, a.idade, a.cidade, c.nome AS curso\nFROM alunos a JOIN cursos c ON a.curso_id = c.id;', 'Definição da vista v_alunos_cursos (já existe na BD escola).'),
+       ex('SELECT * FROM v_alunos_cursos;', 'Usa-se como uma tabela normal.', true)]),
+    query('Usando a vista v_alunos_cursos, mostre o nome (aluno) dos alunos do curso de Design.', "SELECT aluno FROM v_alunos_cursos WHERE curso = 'Design'", "SELECT aluno FROM v_alunos_cursos WHERE curso = …"),
+    query('Usando a vista v_alunos_cursos, mostre cada curso e o número de alunos de Lisboa nesse curso.', "SELECT curso, COUNT(*) FROM v_alunos_cursos WHERE cidade = 'Lisboa' GROUP BY curso", "WHERE cidade = 'Lisboa' GROUP BY curso"),
+    code("Crie a vista v_alunos_porto com o nome e a idade dos alunos da cidade do Porto.", [
+      "^create (or replace )?view v_alunos_porto as select nome,idade from alunos where cidade='porto'$",
+    ], "CREATE VIEW v_alunos_porto AS SELECT nome, idade FROM alunos WHERE cidade = 'Porto';", 'CREATE VIEW nome AS SELECT …'),
+    learn('Alterar, remover e proteger vistas', `<pre><code>CREATE OR REPLACE VIEW v_alunos_porto AS SELECT nome FROM alunos WHERE cidade = 'Porto';
+DROP VIEW v_alunos_porto;
+GRANT SELECT ON escola.v_alunos_cursos TO 'rececao'@'localhost';</code></pre>
+      <p>Com o <code>GRANT</code> sobre a vista, o utilizador vê apenas as colunas da vista, sem acesso às tabelas originais. Vistas simples (uma só tabela, sem agregações) também permitem UPDATE; as restantes são só de leitura.</p>`),
+    code('Elimine a vista v_alunos_porto.', ['^drop view (if exists )?v_alunos_porto$'], 'DROP VIEW v_alunos_porto;', 'DROP VIEW nome;'),
+  ] }],
+  cheat: [
+    ['col TIPO CHECK (condição)', 'Validar valores de uma coluna'], ['ALTER TABLE t ADD CONSTRAINT nome CHECK (…);', 'Acrescentar restrição com nome'], ['ALTER TABLE t DROP CHECK nome;', 'Remover restrição'],
+    ['CREATE INDEX idx_nome ON t (col);', 'Criar índice'], ['CREATE UNIQUE INDEX idx ON t (col);', 'Índice que impede repetidos'], ['SHOW INDEX FROM t; · DROP INDEX idx ON t;', 'Listar / remover índices'], ['EXPLAIN SELECT …', 'Ver se a consulta usa índices'],
+    ['CREATE VIEW v AS SELECT …;', 'Criar vista'], ['CREATE OR REPLACE VIEW v AS …;', 'Alterar vista'], ['DROP VIEW v;', 'Eliminar vista'],
+  ],
+  test: [
+    quiz('Para que serve a restrição CHECK?', ['Criar um índice', 'Garantir que os valores cumprem uma condição', 'Verificar a palavra-passe', 'Fazer uma cópia de segurança'], 1, 'Ex.: CHECK (preco > 0).'),
+    quiz('Qual destas definições impede notas acima de 20?', ['nota INT UNIQUE', 'nota INT DEFAULT 20', 'nota INT CHECK (nota <= 20)', 'nota INT INDEX 20'], 2, 'O CHECK valida o valor.'),
+    quiz('Porque se deve dar um nome a uma restrição (CONSTRAINT chk_…)?', ['É obrigatório', 'Para a identificar nos erros e poder removê-la', 'Para a tornar mais rápida', 'Para criar um índice'], 1, 'ALTER TABLE … DROP CHECK nome.'),
+    quiz('Que tipo de consultas um índice acelera?', ['Só INSERT', 'Pesquisas com WHERE, JOIN e ORDER BY pela coluna indexada', 'Só DELETE', 'Nenhuma; serve só para documentar'], 1, 'Evita percorrer a tabela inteira.'),
+    quiz('Qual é uma desvantagem dos índices?', ['Tornam os SELECT mais lentos', 'Ocupam espaço e tornam as escritas mais lentas', 'Apagam dados antigos', 'Impedem o uso de JOIN'], 1, 'Cada escrita também atualiza o índice.'),
+    quiz('Que comando mostra se o MySQL vai usar um índice numa consulta?', ['SHOW TABLES', 'DESCRIBE', 'EXPLAIN', 'ANALYZE INDEX'], 2, 'EXPLAIN mostra o plano de execução.'),
+    quiz('O que é uma vista (VIEW)?', ['Uma cópia de segurança', 'Uma consulta guardada que se usa como uma tabela', 'Um tipo de índice', 'Um utilizador só de leitura'], 1, 'É uma tabela virtual.'),
+    quiz('Como se dá acesso a apenas algumas colunas de uma tabela a um utilizador?', ['Com um índice nessas colunas', 'Criando uma vista com essas colunas e dando GRANT SELECT sobre a vista', 'Com CHECK nas colunas', 'Não é possível'], 1, 'As vistas são úteis para a segurança.'),
+  ],
+},
 /* =============================== 5 =============================== */
 {
   id: 'sec', icon: 'shield', title: 'Segurança: utilizadores e permissões',
@@ -398,7 +479,7 @@ mysqldump -u root -p --single-transaction --routines --events escola > escola.sq
 mysqldump -u root -p escola | gzip > escola.sql.gz         # comprimido</code></pre>
       <p><code>--single-transaction</code> obtém uma cópia consistente de tabelas InnoDB sem bloquear a base de dados.</p>`),
     code('Escreva o comando que exporta TODAS as bases de dados para o ficheiro tudo.sql (utilizador root, com palavra-passe).', ['^mysqldump -u ?root -p ?--all-databases>tudo\\.sql$', '^mysqldump --all-databases -u ?root -p ?>tudo\\.sql$', '^mysqldump -u ?root --all-databases -p ?>tudo\\.sql$', '^mysqldump -p -u ?root --all-databases>tudo\\.sql$'], 'mysqldump -u root -p --all-databases > tudo.sql', 'Use a opção --all-databases'),
-    quiz('Para que serve a opção --single-transaction?', ['Faz backup de uma só tabela', 'Obtém uma cópia consistente (InnoDB) sem bloquear as tabelas', 'Comprime o ficheiro', 'Apaga os dados antigos'], 1, 'Usa uma transação para obter uma imagem consistente.'),
+    quiz('Para que serve a opção --single-transaction?', ['Faz backup de uma só tabela', 'Obtém uma cópia consistente (InnoDB) sem bloquear as tabelas', 'Comprime o ficheiro', 'Apaga os dados antigos'], 1, 'Obtém uma imagem consistente dos dados sem bloquear a base de dados.'),
   ] },
   { title: 'Restaurar uma base de dados', steps: [
     learn('Restaurar a partir do terminal', `<p>O restauro "reproduz" o ficheiro SQL no servidor, invertendo o redirecionamento (<code>&lt;</code>). Se o dump não foi feito com <code>--databases</code>, a base de dados tem de existir antes:</p>
