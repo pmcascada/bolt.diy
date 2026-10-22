@@ -71,7 +71,7 @@ main{padding:28px clamp(16px,3vw,36px) 64px;width:100%;max-width:1120px;outline:
 .eyebrow{font-size:.74rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);margin-bottom:6px}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:20px;box-shadow:var(--shadow)}
 .card+.card,.card+.sec,.sec+.card{margin-top:16px}
-.card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.card-h{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
 .card-h h2,.card-h h3{margin:0}
 .sec{margin-top:28px}
 .sec>h2{font-size:1.02rem;margin-bottom:12px}
@@ -255,7 +255,7 @@ input.txt:focus{outline:2px solid var(--accent);outline-offset:1px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
 /* ---- aprendizagem gradual ---- */
-.how{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+.how{display:grid;grid-template-columns:repeat(5,1fr);gap:18px}
 .how>div{display:grid;gap:4px;font-size:.84rem;color:var(--muted)}
 .how b{color:var(--text);font-size:.9rem}
 .how-i{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;background:var(--accent-weak);color:var(--accent);margin-bottom:4px}
@@ -454,3 +454,70 @@ body.in-game{overflow:hidden}
 .gx-lock{position:absolute;left:50%;top:40%;transform:translateX(-50%);padding:8px 14px;border-radius:8px;background:rgba(3,8,20,.8);border:1px solid #22d3ee55;font-size:.88rem;color:#bae6fd}
 .gx-lock[hidden]{display:none}
 .gx-prompt[hidden]{display:none}
+
+/* ---- versão 2: novos formatos, revisão, prática no MySQL real, análise do professor ---- */
+#nav a .nav-n{margin-left:auto;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--accent);color:var(--on-accent);font-size:.72rem;font-weight:700;display:grid;place-items:center}
+.chip.db-chip{background:var(--warn-weak);color:var(--warn);border-color:transparent}
+.chip.db-chip svg.i{width:13px;height:13px}
+.q-code{margin:0 0 14px}
+.q-code pre{padding:12px 14px}
+pre.sol{margin:8px 0 0;border-radius:var(--r-sm);font-size:12.5px;white-space:pre-wrap;overflow-wrap:anywhere}
+.alert pre.sol{color:var(--code-text)}
+.task.review{border-style:dashed}
+.expected .res{max-height:240px}
+/* ordenar */
+.ord-l{margin:4px 0 6px}
+.ord-ans{list-style:decimal;margin:0 0 12px;padding:10px 10px 10px 34px;min-height:52px;border:1px dashed var(--border-strong);border-radius:var(--r-sm);background:var(--surface-2);display:grid;gap:6px}
+.ord-ans li::marker{color:var(--muted);font-size:.8rem}
+.ord-empty{list-style:none;margin-left:-24px}
+.ord-pool{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px}
+.ord-p{display:inline-flex;text-align:left;border:1px solid var(--border-strong);background:var(--surface);border-radius:var(--r-sm);padding:6px 10px;cursor:pointer;color:var(--text);font:inherit;max-width:100%}
+.ord-p:hover:not(:disabled){border-color:var(--accent);background:var(--accent-weak)}
+.ord-p code{background:none;border:0;padding:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.ord-p.in{width:100%}
+.ord-p:disabled{cursor:default}
+.ord-sol{margin:6px 0;padding-left:22px}
+/* visualização da execução */
+.viz{border:1px solid var(--border);border-radius:var(--r);padding:14px;margin:14px 0;background:var(--surface)}
+.viz-sql{background:var(--code-bg);color:var(--code-text);border-radius:var(--r-sm);padding:10px 14px;font:13px/1.7 var(--mono)}
+.viz-sql div{opacity:.45;padding:0 6px;border-radius:4px;transition:opacity .2s}
+.viz-sql div.on{opacity:1;background:#1e3a8a}
+.viz-steps{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 8px}
+.viz-steps button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--muted);border-radius:999px;padding:4px 10px 4px 4px;font:600 .74rem var(--font);cursor:pointer}
+.viz-steps button span{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:var(--surface);border:1px solid var(--border)}
+.viz-steps button.past{color:var(--text-2)}
+.viz-steps button.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.viz-steps button.on span{background:var(--on-accent);color:var(--accent);border-color:transparent}
+.viz-t{font-size:.9rem;color:var(--text-2)}
+.viz tr.g0 td{background:color-mix(in srgb,#3b82f6 14%,transparent)}
+.viz tr.g1 td{background:color-mix(in srgb,#22c55e 14%,transparent)}
+.viz tr.g2 td{background:color-mix(in srgb,#f59e0b 16%,transparent)}
+.viz tr.g3 td{background:color-mix(in srgb,#a855f7 14%,transparent)}
+.viz tr.g4 td{background:color-mix(in srgb,#ef4444 12%,transparent)}
+.viz tr.g5 td{background:color-mix(in srgb,#14b8a6 14%,transparent)}
+.viz tr.out td{opacity:.35;text-decoration:line-through}
+/* aquecimento e revisão */
+.warm{margin-bottom:18px;border-style:dashed}
+.warm #warmEx .task{margin:14px 0 0}
+/* prática no MySQL real e projeto */
+.real-card h3{display:flex;align-items:center;gap:8px;margin:0}
+ul.real{list-style:none;padding:0;margin:0 0 14px;display:grid;gap:8px}
+ul.real label{display:flex;gap:10px;align-items:flex-start;cursor:pointer;font-size:.9rem;color:var(--text-2)}
+ul.real input{margin-top:4px;width:16px;height:16px;accent-color:var(--accent);flex:none}
+ul.real input:checked+span{color:var(--muted);text-decoration:line-through}
+ul.req{list-style:none;padding:0;margin:0 0 10px;display:grid;gap:6px;font-size:.88rem}
+ul.req li{display:flex;gap:8px;align-items:center;color:var(--muted)}
+ul.req li.ok{color:var(--ok)}
+#pjf textarea.txt{width:100%;resize:vertical;font:inherit}
+details.pj{margin:8px 0;border:1px solid var(--border);border-radius:var(--r-sm);padding:6px 10px}
+details.pj summary{cursor:pointer;font-weight:600;font-size:.88rem}
+details.pj pre{max-height:360px;overflow:auto}
+/* análise do professor */
+.tbl.diff tr.dr{cursor:pointer}
+.ans-list{display:grid;gap:6px;padding:4px 0 8px}
+.ans-list div{display:flex;gap:8px;align-items:flex-start}
+.ans-list code{white-space:pre-wrap;overflow-wrap:anywhere}
+.mono{font-family:var(--mono);font-size:.78rem}
+.card-h .seg,#rkTools .seg{margin-bottom:0}
+.seg button{display:inline-flex;align-items:center;gap:6px}
+.seg button svg.i{width:15px;height:15px}

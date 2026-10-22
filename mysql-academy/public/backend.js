@@ -5,7 +5,8 @@
 (function (root) {
   const cfg = root.APP_CONFIG || {};
   const here = () => location.origin + location.pathname;
-  const summaryOf = (s) => ({ xp: s.xp, level: s.level, pct: s.pct, ex_done: s.exDone, chapters_done: s.chaptersDone.length, streak: s.streak, badges: s.badges.length });
+  const summaryOf = (s) => ({ xp: s.xp, week_xp: s.weekXp, level: s.level, pct: s.pct, ex_done: s.exDone, chapters_done: s.chaptersDone.length, streak: s.streak, badges: s.badges.length });
+  const cleanTurma = (t) => String(t || '').trim().replace(/\s+/g, ' ').slice(0, 30);
 
   /* ---------- Supabase ---------- */
   const SB_ERRORS = [
@@ -28,20 +29,20 @@
     });
     async function loadUser(session) {
       if (!session) { B.user = null; return null; }
-      const { data, error } = await sb.from('profiles').select('name, is_teacher').eq('id', session.user.id).single();
+      const { data, error } = await sb.from('profiles').select('name, is_teacher, turma').eq('id', session.user.id).single();
       if (error) throw error;
-      B.user = { id: session.user.id, email: session.user.email, name: data.name, teacher: !!data.is_teacher };
+      B.user = { id: session.user.id, email: session.user.email, name: data.name, teacher: !!data.is_teacher, turma: data.turma || '' };
       return B.user;
     }
     B.init = async () => {
       const { data } = await sb.auth.getSession();
       try { return await loadUser(data.session); } catch { return null; }
     };
-    B.register = async ({ name, email, password }) => {
+    B.register = async ({ name, email, password, turma }) => {
       const { data: free, error: e1 } = await sb.rpc('name_available', { n: name });
       if (e1) throw e1;
       if (!free) throw new Error('Esse nome já está a ser usado. Escolha outro.');
-      const { data, error } = await sb.auth.signUp({ email, password, options: { data: { name }, emailRedirectTo: here() } });
+      const { data, error } = await sb.auth.signUp({ email, password, options: { data: { name, turma: cleanTurma(turma) }, emailRedirectTo: here() } });
       if (error) throw error;
       if (!data.session) return { needsConfirm: true };
       return { user: await loadUser(data.session) };
@@ -65,15 +66,22 @@
       const { error } = await sb.from('progress').upsert({ user_id: B.user.id, state, ...summaryOf(summary) });
       if (error) throw error;
     };
-    B.leaderboard = async () => {
-      const { data, error } = await sb.rpc('leaderboard', { lim: 100 });
+    B.setTurma = async (turma) => {
+      if (!B.user) return;
+      const t = cleanTurma(turma);
+      const { error } = await sb.from('profiles').update({ turma: t || null }).eq('id', B.user.id);
       if (error) throw error;
-      return data.map((r) => ({ name: r.name, xp: r.xp, level: r.level, pct: r.pct, streak: r.streak }));
+      B.user.turma = t;
+    };
+    B.leaderboard = async () => {
+      const { data, error } = await sb.rpc('leaderboard', { lim: 300 });
+      if (error) throw error;
+      return data.map((r) => ({ name: r.name, xp: r.xp, weekXp: r.week_xp || 0, turma: r.turma || '', level: r.level, pct: r.pct, streak: r.streak }));
     };
     B.students = async () => {
-      const { data, error } = await sb.from('progress').select('state, updated_at, profiles(name, is_teacher)');
+      const { data, error } = await sb.from('progress').select('state, updated_at, profiles(name, is_teacher, turma)');
       if (error) throw error;
-      return data.filter((r) => r.profiles && !r.profiles.is_teacher).map((r) => ({ name: r.profiles.name, state: r.state || {}, updated: Date.parse(r.updated_at) }));
+      return data.filter((r) => r.profiles && !r.profiles.is_teacher).map((r) => ({ name: r.profiles.name, turma: r.profiles.turma || '', state: r.state || {}, updated: Date.parse(r.updated_at) }));
     };
     B.errorText = (e) => { const m = String((e && e.message) || e); const hit = SB_ERRORS.find(([re]) => re.test(m)); return hit ? hit[1] : m; };
     return B;
@@ -94,9 +102,10 @@
       return j;
     }
     const B = { kind: 'server', user: null };
-    const enter = (j) => { auth = { token: j.token, name: j.name }; keep(); B.user = { name: j.name, teacher: false }; return B.user; };
-    B.init = async () => (auth.token ? (B.user = { name: auth.name, teacher: false }) : null);
-    B.register = async ({ name, password, state }) => ({ user: enter(await api('/api/register', 'POST', { name, pin: password, state })) });
+    const enter = (j) => { auth = { token: j.token, name: j.name, turma: j.turma || '' }; keep(); B.user = { name: j.name, teacher: false, turma: auth.turma }; return B.user; };
+    B.init = async () => (auth.token ? (B.user = { name: auth.name, teacher: false, turma: auth.turma || '' }) : null);
+    B.register = async ({ name, password, state, turma }) => ({ user: enter(await api('/api/register', 'POST', { name, pin: password, state, turma: cleanTurma(turma) })) });
+    B.setTurma = async (turma) => { const j = await api('/api/turma', 'PUT', { turma: cleanTurma(turma) }); auth.turma = j.turma; keep(); if (B.user) B.user.turma = j.turma; };
     B.login = async ({ name, password }) => enter(await api('/api/login', 'POST', { name, pin: password }));
     B.logout = async () => { auth = {}; keep(); B.user = null; };
     B.load = async () => {
@@ -104,8 +113,8 @@
       try { return (await api('/api/progress', 'GET')).state; } catch (e) { if (e.status === 401) await B.logout(); throw e; }
     };
     B.save = async (state) => { if (B.user) await api('/api/progress', 'PUT', { state }); };
-    B.leaderboard = async () => (await api('/api/leaderboard', 'GET')).map((r) => ({ name: r.name, xp: r.xp, level: r.level, pct: r.pct, streak: r.streak }));
-    B.students = async (key) => (await api('/api/admin/students', 'GET', null, { 'x-teacher-key': key })).map((r) => ({ name: r.name, state: r.state || {}, updated: r.updated }));
+    B.leaderboard = async () => (await api('/api/leaderboard', 'GET')).map((r) => ({ name: r.name, xp: r.xp, weekXp: r.weekXp || 0, turma: r.turma || '', level: r.level, pct: r.pct, streak: r.streak }));
+    B.students = async (key) => (await api('/api/admin/students', 'GET', null, { 'x-teacher-key': key })).map((r) => ({ name: r.name, turma: r.turma || '', state: r.state || {}, updated: r.updated }));
     B.errorText = (e) => (e && e.status ? e.message : 'Servidor indisponível. Execute "npm start" para ativar as contas e a classificação.');
     return B;
   }

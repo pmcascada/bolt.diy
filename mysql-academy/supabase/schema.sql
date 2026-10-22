@@ -18,7 +18,7 @@ create unique index if not exists profiles_name_unique on public.profiles (lower
 create table if not exists public.progress (
   user_id        uuid primary key references public.profiles (id) on delete cascade,
   state          jsonb not null default '{}'::jsonb,
-  xp             int not null default 0 check (xp between 0 and 5000),
+  xp             int not null default 0 check (xp between 0 and 20000),
   level          int not null default 1 check (level between 1 and 50),
   pct            int not null default 0 check (pct between 0 and 100),
   ex_done        int not null default 0 check (ex_done between 0 and 1000),
@@ -28,6 +28,20 @@ create table if not exists public.progress (
   updated_at     timestamptz not null default now(),
   constraint progress_state_size check (pg_column_size(state) < 300000)
 );
+
+-- ------------------------------------------------------------
+-- Atualização (versão 2): turmas, XP da semana e limite de XP maior.
+-- Seguro de executar em bases de dados criadas com a versão anterior.
+-- ------------------------------------------------------------
+alter table public.profiles add column if not exists turma text;
+alter table public.profiles drop constraint if exists profiles_turma_check;
+alter table public.profiles add constraint profiles_turma_check check (turma is null or char_length(turma) <= 30);
+alter table public.progress add column if not exists week_xp int not null default 0;
+alter table public.progress drop constraint if exists progress_week_xp_check;
+alter table public.progress add constraint progress_week_xp_check check (week_xp between 0 and 20000);
+alter table public.progress drop constraint if exists progress_xp_check;
+alter table public.progress add constraint progress_xp_check check (xp between 0 and 20000);
+create index if not exists profiles_turma_idx on public.profiles (lower(turma));
 
 -- ============================================================
 -- Funções auxiliares
@@ -43,11 +57,14 @@ language sql stable security definer set search_path = public as $$
   select not exists (select 1 from public.profiles p where lower(p.name) = lower(trim(n)));
 $$;
 
--- Classificação pública: só nome e resumo, nunca o progresso detalhado.
-create or replace function public.leaderboard(lim int default 100)
-returns table (name text, xp int, level int, pct int, ex_done int, chapters_done int, streak int, badges int, updated_at timestamptz)
+-- Classificação pública: só nome, turma e resumo, nunca o progresso detalhado.
+-- O XP da semana só conta se o aluno teve atividade nos últimos 7 dias.
+drop function if exists public.leaderboard(int);
+create function public.leaderboard(lim int default 100)
+returns table (name text, turma text, xp int, week_xp int, level int, pct int, ex_done int, chapters_done int, streak int, badges int, updated_at timestamptz)
 language sql stable security definer set search_path = public as $$
-  select p.name, g.xp, g.level, g.pct, g.ex_done, g.chapters_done, g.streak, g.badges, g.updated_at
+  select p.name, p.turma, g.xp, case when g.updated_at > now() - interval '7 days' then g.week_xp else 0 end,
+         g.level, g.pct, g.ex_done, g.chapters_done, g.streak, g.badges, g.updated_at
   from public.progress g join public.profiles p on p.id = g.user_id
   where not p.is_teacher
   order by g.xp desc, g.updated_at asc
@@ -58,8 +75,9 @@ $$;
 create or replace function public.handle_new_user() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
-  insert into public.profiles (id, name)
-  values (new.id, left(coalesce(nullif(trim(new.raw_user_meta_data ->> 'name'), ''), split_part(new.email, '@', 1)), 24));
+  insert into public.profiles (id, name, turma)
+  values (new.id, left(coalesce(nullif(trim(new.raw_user_meta_data ->> 'name'), ''), split_part(new.email, '@', 1)), 24),
+          nullif(left(trim(coalesce(new.raw_user_meta_data ->> 'turma', '')), 30), ''));
   insert into public.progress (user_id) values (new.id);
   return new;
 end;
@@ -91,7 +109,8 @@ alter table public.progress enable row level security;
 revoke all on public.profiles from anon, authenticated;
 revoke all on public.progress from anon, authenticated;
 grant select on public.profiles to authenticated;
-grant update (name) on public.profiles to authenticated;          -- o aluno só pode mudar o nome
+revoke update on public.profiles from authenticated;
+grant update (name, turma) on public.profiles to authenticated;   -- o aluno só pode mudar o nome e a turma
 grant select, insert, update on public.progress to authenticated;
 
 revoke execute on function public.handle_new_user() from public, anon, authenticated;
