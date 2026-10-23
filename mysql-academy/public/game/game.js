@@ -12,6 +12,7 @@ import { OutputPass } from '../vendor/three/postprocessing/OutputPass.js';
 const ROOM_W = 22, ROOM_D = 24, ROOM_H = 5.5, CORR_L = 7, CORR_W = 3.2, SPACING = ROOM_D + CORR_L;
 const BAR = 2; // o campo de forças fica 2 m à frente do centro da sala (do lado da entrada)
 const EYE = 1.65, RADIUS = 0.35, WALK = 3.8, RUN = 6.6, EMP_TIME = 8;
+const TIME_BONUS = 45, CLOCK_STOP = 25; // cápsulas de tempo: +45 s; cápsula de relógio parado: 25 s sem contar
 const VIEW = 7.5, FOV = 0.62, CATCH = 1.25, PATROL = 2.2, CHASE = 3.6, GRACE = 2.5;
 const CAM_RANGE = 11, CAM_FOV = 0.28;
 const PALETTE = [0x22d3ee, 0xf59e0b, 0xa78bfa, 0x34d399, 0xfacc15, 0x818cf8];
@@ -383,21 +384,27 @@ export function startGame(container, opts) {
     const cone = new THREE.Mesh(new THREE.ConeGeometry(Math.tan(CAM_FOV) * CAM_RANGE, CAM_RANGE, 20, 1, true), coneM); cone.rotation.x = -Math.PI / 2; cone.position.z = CAM_RANGE / 2 + 0.4; tilt.add(cone);
     return { x, z, pivot, base, lensM, coneM, cone, phase: rnd(0, 6), speed: rnd(0.45, 0.7), dir: base, last: -99 };
   }
-  // Pulsos EMP: cápsulas que imobilizam drones e câmaras durante alguns segundos.
+  // Cápsulas (power-ups): EMP (azul) imobiliza drones e câmaras; tempo (verde) dá +45 s ao relógio da sala;
+  // relógio parado (roxo) suspende a contagem durante 25 s.
   const pickups = [];
-  function buildPickup(x, z) {
+  const PICKUP_COLOR = { emp: [0x38bdf8, 0x7dd3fc], time: [0x22c55e, 0x86efac], stop: [0xa855f7, 0xd8b4fe] };
+  function buildPickup(x, z, kind, room) {
+    const [c1, c2] = PICKUP_COLOR[kind];
     const g = new THREE.Group(); g.position.set(x, 0.9, z); world.add(g);
-    const core = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0), glow(0x38bdf8, 3.2)); g.add(core);
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.025, 8, 32), glow(0x7dd3fc, 2.2)); g.add(ring);
-    cyl(0.3, 0.38, 0.12, mat.metal, x, 0.06, z); box(0.5, 0.02, 0.5, glow(0x38bdf8, 1.4), x, 0.13, z);
-    pickups.push({ g, ring, x, z, taken: false });
+    if (kind === 'time') { // ampulheta
+      for (const s of [1, -1]) { const c = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.26, 16), glow(c1, 3)); c.position.y = s * 0.13; c.rotation.x = s > 0 ? Math.PI : 0; g.add(c); }
+    } else g.add(new THREE.Mesh(kind === 'stop' ? new THREE.IcosahedronGeometry(0.22, 0) : new THREE.OctahedronGeometry(0.22, 0), glow(c1, 3.2)));
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.025, 8, 32), glow(c2, 2.2)); g.add(ring);
+    cyl(0.3, 0.38, 0.12, mat.metal, x, 0.06, z); box(0.5, 0.02, 0.5, glow(c1, 1.4), x, 0.13, z);
+    pickups.push({ g, ring, x, z, kind, room, taken: false });
   }
-  function placePickup(room, zone) {
+  function placePickup(room, zone, kind, i, retry = true) {
     const b = zoneBounds(room, zone);
-    for (let k = 0; k < 100; k++) {
+    for (let k = 0; k < 150; k++) {
       const x = rnd(b.x1 + 1, b.x2 - 1), z = rnd(b.z1 + 1, b.z2 - 1);
-      if (Math.abs(x) > 2.2 && free(room, x, z, 0.6, 0.6) && !solids.some((o) => !o.on && x > o.x1 && x < o.x2 && z > o.z1 && z < o.z2)) { buildPickup(x, z); return; }
+      if (Math.abs(x) > 2.2 && free(room, x, z, 0.6, 0.6) && !solids.some((o) => !o.on && x > o.x1 && x < o.x2 && z > o.z1 && z < o.z2) && !pickups.some((q) => Math.hypot(q.x - x, q.z - z) < 2.5)) { buildPickup(x, z, kind, i); return; }
     }
+    if (retry) placePickup(room, 1 - zone, kind, i, false); // zona cheia: tenta a outra zona da sala
   }
 
   const doneRooms = new Set(opts.doneRooms || []);
@@ -419,7 +426,9 @@ export function startGame(container, opts) {
     for (let k = 0; k < (th.cameras || 0); k++) room.cameras.push(buildCamera(room));
     if (lv.dark) room.dark = true;
     buildCorridor(i); rooms.push(room);
-    if (i >= 1) placePickup(room, i >= 4 ? 1 : 0);
+    placePickup(room, 0, 'time', i); placePickup(room, 1, 'time', i);
+    if (i >= 1) placePickup(room, i >= 4 ? 1 : 0, 'emp', i);
+    if (i >= 2) placePickup(room, 1, 'stop', i);
   });
   // sala final: antecâmara do núcleo (parte 2 em preparação)
   const endRoom = buildRoom(levels.length, null);
@@ -461,7 +470,7 @@ export function startGame(container, opts) {
 
   /* ---------- estado do jogador e da missão ---------- */
   const start = Math.max(0, Math.min(opts.startRoom || 0, levels.length - 1));
-  const state = { room: start, hints: {}, rev: {}, tdone: new Set(), entered: new Set(), finished: false, mode: 'story', emp: 1, frozenUntil: 0, now: 0, safe: false, alertUntil: 0 };
+  const state = { room: start, hints: {}, rev: {}, tdone: new Set(), entered: new Set(), finished: false, mode: 'story', emp: 1, frozenUntil: 0, clockStop: 0, now: 0, safe: false, alertUntil: 0 };
   // registo da pontuação de cada sala nesta missão
   const rec = levels.map((lv) => ({ tasks: 0, hints: 0, caught: 0, alarms: 0, wrong: 0, rev: 0, left: lv.par, lockdown: false, started: false, done: false, used: 0, score: 0, wrongStreak: 0 }));
   const scoreOf = (i) => roomScore(rec[i]);
@@ -768,8 +777,16 @@ export function startGame(container, opts) {
       }
       if (!state.finished && p.z < endRoom.cz + ROOM_D / 2 - 2) finish();
       for (const k of pickups) if (!k.taken && Math.hypot(k.x - p.x, k.z - p.z) < 0.9) {
-        k.taken = true; k.g.visible = false; state.emp++; updateEmp(); sfx.key();
-        log(`Recolheu um pulso EMP. Prima Q para imobilizar drones e câmaras durante ${EMP_TIME} s.`, 'SISTEMA', 'ok');
+        k.taken = true; k.g.visible = false;
+        const rk = rec[k.room], live = rk.started && !rk.done;
+        if (k.kind === 'emp') { state.emp++; updateEmp(); sfx.key(); log(`Recolheu um pulso EMP. Prima Q para imobilizar drones e câmaras durante ${EMP_TIME} s.`, 'SISTEMA', 'ok'); }
+        else if (!live) log('Cápsula de tempo recolhida, mas o relógio desta sala já parou.', 'SISTEMA');
+        else if (k.kind === 'time') {
+          rk.left += TIME_BONUS; sfx.unlock(); flash('rgba(34,197,94,.3)');
+          if (rk.lockdown) { rk.lockdown = false; log(`+${TIME_BONUS} segundos! O bloqueio total foi cancelado.`, 'VEGA', 'vega'); }
+          else log(`+${TIME_BONUS} segundos no relógio da sala.`, 'SISTEMA', 'ok');
+          updateClock();
+        } else { state.clockStop = Math.max(state.now, state.clockStop) + CLOCK_STOP; sfx.emp(); flash('rgba(168,85,247,.3)'); log(`Relógio parado durante ${CLOCK_STOP} segundos.`, 'SISTEMA', 'ok'); updateClock(); }
       }
       // objeto com que se pode interagir: até 2,6 m e mais ou menos à frente; encostado (≤ 1,3 m) basta estar ao lado
       near = null; let best = Infinity;
@@ -784,7 +801,9 @@ export function startGame(container, opts) {
       if (near) { pr.hidden = false; pr.innerHTML = `<span class="gx-key">E</span> ${esc(near.label)}`; } else pr.hidden = true;
     }
     // cronómetro da sala (para no menu e nos ecrãs de história)
-    if (r.started && !r.done && ['play', 'terminal', 'keypad'].includes(state.mode)) {
+    const stopped = t < state.clockStop;
+    $('.gx-time').classList.toggle('stop', stopped);
+    if (r.started && !r.done && !stopped && ['play', 'terminal', 'keypad'].includes(state.mode)) {
       const before = r.left; r.left = Math.max(0, r.left - dt); r.used += dt;
       if (r.left <= 30 && Math.ceil(r.left) !== Math.ceil(before) && r.left > 0) sfx.tick(r.left <= 10);
       if (r.left === 0 && !r.lockdown) {
@@ -914,7 +933,7 @@ export function startGame(container, opts) {
   /* ---------- arranque ---------- */
   setupQuality(); updateHud(); updateClock(); updateEmp();
   raf = requestAnimationFrame(frame);
-  const rules = `<p class="gx-rules">⏱ Cada sala tem um tempo-limite: quanto mais depressa, mais pontos. Cada tarefa vale ${500} pontos; dicas, capturas, alarmes e códigos errados descontam. Os códigos mudam em cada jogo.</p>${CONTROLS}`;
+  const rules = `<p class="gx-rules">⏱ Cada sala tem um tempo-limite: quanto mais depressa, mais pontos. Cada tarefa vale ${500} pontos; dicas, capturas, alarmes e códigos errados descontam. Os códigos mudam em cada jogo.</p><p class="gx-rules">Cápsulas: <span style="color:#4ade80">⧗ verde</span> +${TIME_BONUS} s (e cancela o bloqueio total) · <span style="color:#c084fc">◆ roxa</span> para o relógio ${CLOCK_STOP} s · <span style="color:#38bdf8">◆ azul</span> pulso EMP.</p>${CONTROLS}`;
   if (start === 0) storyScreen(story.intro, story.title, opts.ranked ? 'Iniciar missão' : 'Iniciar treino', () => play(), rules);
   else storyScreen([`Regressa à sala ${start + 1}: ${levels[start].name}.`, 'Modo treino: a pontuação só conta para a tabela de melhores jogadores quando a missão começa na sala 1.'], story.title, 'Continuar missão', () => play(), rules);
 
@@ -931,6 +950,7 @@ export function startGame(container, opts) {
         drones: rooms.map((r) => r.drones.map((d) => d.active)), chasing: rooms.map((r) => r.drones.filter((d) => d.mode === 'chase').length),
         lasers: rooms.map((r) => r.lasers.map((l) => l.on)), tasks: [...state.tdone], score: totalScore(),
         rec: rec.map((r) => ({ left: Math.round(r.left), started: r.started, done: r.done, lockdown: r.lockdown, caught: r.caught, score: r.score })),
+        pickups: pickups.map((k) => ({ kind: k.kind, room: k.room, x: k.x, z: k.z, taken: k.taken })), clockStop: state.now < state.clockStop,
         pos: [yaw.position.x, yaw.position.z], finished: state.finished,
       }),
     },

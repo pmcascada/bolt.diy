@@ -585,3 +585,4 @@ details.pj pre{max-height:360px;overflow:auto}
 .gx-rules{font-size:.9rem!important;color:#fcd34d!important}
 .nx-lb .me td{background:var(--accent-soft,#F7941D22)}
 .gx-story{overflow:auto}
+.gx-time.stop{color:#c084fc;animation:none}

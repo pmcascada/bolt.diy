@@ -81,5 +81,7 @@ check('pontuação: sala perfeita', roomScore({ tasks: 2, left: 100 }).total ===
 check('pontuação: penalizações', roomScore({ tasks: 2, left: 0, hints: 1, caught: 2 }).total === 1000 - 100 - 300);
 check('pontuação: bloqueio sem bónus de tempo', roomScore({ tasks: 2, left: 50, lockdown: true }).time === 0);
 check('pontuação: nunca negativa', roomScore({ tasks: 0, caught: 9 }).total === 0);
+// tempos-limite (duplicados a pedido do professor): 5 a 10 minutos, a crescer de sala para sala
+check('tempos-limite 300…600 s', LEVELS.map((l) => l.par).join() === '300,360,420,480,540,600');
 console.log(`${n} verificações das salas do jogo (${SEEDS} jogos gerados), ${bad} falhadas`);
 if (bad) process.exit(1);

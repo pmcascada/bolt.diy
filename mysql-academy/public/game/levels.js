@@ -299,17 +299,17 @@
   // Metadados fixos de cada sala (XP, tempo-limite e ameaças); os dados vêm do gerador.
   // threats: drones por zona [zona 1, zona 2], lasers intermitentes e câmaras na zona 2.
   const LEVELS = [
-    { id: 'g1', name: 'Câmara de criogenia', skill: 'SELECT', xp: 30, par: 150, make: g1, threats: { drones: [0, 0], lasers: 0, cameras: 0 },
+    { id: 'g1', name: 'Câmara de criogenia', skill: 'SELECT', xp: 30, par: 300, make: g1, threats: { drones: [0, 0], lasers: 0, cameras: 0 },
       intro: 'Sistema de emergência ativo. A NEXUS selou a câmara. Há um terminal à sua esquerda.' },
-    { id: 'g2', name: 'Corredor de manutenção', skill: 'WHERE', xp: 30, par: 180, make: g2, threats: { drones: [0, 1], lasers: 0, cameras: 0 },
+    { id: 'g2', name: 'Corredor de manutenção', skill: 'WHERE', xp: 30, par: 360, make: g2, threats: { drones: [0, 1], lasers: 0, cameras: 0 },
       intro: 'NEXUS: «Intruso detetado. Os códigos foram distribuídos pela equipa técnica. Não os encontrará.»' },
-    { id: 'g3', name: 'Arquivo central', skill: 'ORDER BY / LIMIT', xp: 30, par: 210, make: g3, threats: { drones: [0, 2], lasers: 0, cameras: 1 },
+    { id: 'g3', name: 'Arquivo central', skill: 'ORDER BY / LIMIT', xp: 30, par: 420, make: g3, threats: { drones: [0, 2], lasers: 0, cameras: 1 },
       intro: 'NEXUS: «Os códigos do arquivo mudam a cada acesso. O que encontrar já estará ultrapassado.»' },
-    { id: 'g4', name: 'Laboratório de robótica', skill: 'LIKE + UPDATE', xp: 40, par: 240, make: g4, threats: { drones: [0, 0], lasers: 1, cameras: 1 },
+    { id: 'g4', name: 'Laboratório de robótica', skill: 'LIKE + UPDATE', xp: 40, par: 480, make: g4, threats: { drones: [0, 0], lasers: 1, cameras: 1 },
       intro: 'VEGA: Cuidado com as barreiras laser intermitentes: atravesse quando se apagarem.' },
-    { id: 'g5', name: 'Setor de energia', skill: 'UPDATE + GROUP BY', xp: 40, par: 270, make: g5, threats: { drones: [1, 1], lasers: 2, cameras: 0 },
+    { id: 'g5', name: 'Setor de energia', skill: 'UPDATE + GROUP BY', xp: 40, par: 540, make: g5, threats: { drones: [1, 1], lasers: 2, cameras: 0 },
       intro: 'NEXUS: «Às escuras, administrador? Os meus drones veem muito bem sem luz.»' },
-    { id: 'g6', name: 'Hangar', skill: 'JOIN', xp: 50, par: 300, make: g6, threats: { drones: [1, 2], lasers: 1, cameras: 1 },
+    { id: 'g6', name: 'Hangar', skill: 'JOIN', xp: 50, par: 600, make: g6, threats: { drones: [1, 2], lasers: 1, cameras: 1 },
       intro: 'NEXUS: «Bloqueio total iminente. Esta é a sua última sala.»' },
   ];
 
