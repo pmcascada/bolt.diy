@@ -366,31 +366,25 @@ function vChapter(id) {
   view.querySelectorAll('[data-dl]').forEach((b) => (b.onclick = () => downloadDb(b.dataset.dl)));
 }
 
-/* ---------- lição passo a passo ---------- */
-function vLesson(id) {
-  const f = findLesson(id); if (!f) return vHome();
-  const { c: C, l: L, i: idx } = f;
-  if (hiddenPage(C)) return;
-  crumbs = [['Conteúdos', '#/learn'], [`Capítulo ${C.idx + 1}`, '#/c/' + C.id], [`Lição ${idx + 1}`, '#/l/' + L.id]];
-  if (!lessonOpen(C, idx)) {
-    view.innerHTML = `<div class="card locked-card"><span class="side-i">${ic('lock')}</span><div><h2>Lição bloqueada</h2><p class="muted">A matéria é apresentada de forma gradual. Conclua primeiro a lição <b>${esc(C.lessons[idx - 1].title)}</b>.</p><div class="row"><a class="btn" href="#/l/${C.lessons[idx - 1].id}">Ir para a lição anterior</a><a class="btn sec-b" href="#/m/${C.id}">${ic('book')}Consultar o manual</a></div></div></div>`;
-    return;
-  }
-  const total = L.steps.length;
-  const pos = Math.min(st.pos[L.id] || 0, total - 1);
-  const shown = L.steps.slice(0, pos + 1);
-  let nConcept = 0, nEx = 0;
-  view.innerHTML = `<div class="lesson-wrap"><article class="prose">
-    <div class="lesson-head"><div class="eyebrow">Capítulo ${C.idx + 1} · Lição ${idx + 1} de ${C.lessons.length}</div><h1>${esc(L.title)}</h1>
-      <div class="row lesson-meta"><div class="grow"><div class="row small" style="justify-content:space-between;margin-bottom:6px"><span class="muted">Passo ${pos + 1} de ${total}</span><span class="muted num-t">${pctOf(pos + (lessonDone(L) ? 1 : 0), total)}%</span></div>${bar(pctOf(pos + (lessonDone(L) ? 1 : 0), total), lessonDone(L) ? 'ok' : '')}</div>
-      <button class="btn sec-b sm" id="openManual">${ic('book')}Manual</button></div></div>
-    ${L.intro ? `<div class="lesson-intro">${ic('compass')}<div><b>Enquadramento</b><p>${esc(L.intro)}</p></div></div>` : ''}
-    <div id="warm"></div>
-    <div id="steps">${shown.map((s, k) => s.t === 'learn' ? `<section class="step learn" data-k="${k}"><div class="step-l">${ic('book')}Conceito ${++nConcept}</div><h2>${esc(s.title)}</h2>${s.html}${s.examples.map((e, j) => codeBlock(e, `<button class="btn" data-copy="${j}" aria-label="Copiar">${ic('copy')}<span class="lbl">Copiar</span></button>${e.run ? `<a class="btn" href="#/lab" data-lab="${j}" aria-label="Abrir no laboratório">${ic('terminal')}<span class="lbl">Laboratório</span></a><button class="btn run" data-run="${j}">${ic('play')}Executar</button>` : ''}`)).join('')}</section>` : `<section class="step practice" data-k="${k}" data-n="${++nEx}"></section>`).join('')}</div>
-    <div id="next"></div>
-  </article>
-  <aside class="toc">${tocHtml(C, L)}</aside></div>`;
-  enhance(view);
+/* ---------- lição: por páginas (assistente) ou a lição inteira ----------
+   Cada página junta um conceito com os exercícios sobre ele. A página seguinte só abre depois de resolver
+   os exercícios da página atual. st.pos guarda o último passo já mostrado (comum aos dois modos). */
+const lessonPage = {};
+// Divide os passos em páginas: um conceito (learn) e os exercícios que o seguem.
+function pagesOf(L) {
+  const pages = [];
+  L.steps.forEach((s, k) => { if (s.t === 'learn' || !pages.length) pages.push([]); pages[pages.length - 1].push(k); });
+  return pages;
+}
+// HTML de um passo; os números de conceito/exercício contam desde o início da lição.
+function stepHtml(L, k) {
+  const s = L.steps[k];
+  if (s.t !== 'learn') return `<section class="step practice" data-k="${k}" data-n="${L.steps.slice(0, k + 1).filter((x) => x.t !== 'learn').length}"></section>`;
+  const nConcept = L.steps.slice(0, k + 1).filter((x) => x.t === 'learn').length;
+  return `<section class="step learn" data-k="${k}"><div class="step-l">${ic('book')}Conceito ${nConcept}</div><h2>${esc(s.title)}</h2>${s.html}${s.examples.map((e, j) => codeBlock(e, `<button class="btn" data-copy="${j}" aria-label="Copiar">${ic('copy')}<span class="lbl">Copiar</span></button>${e.run ? `<a class="btn" href="#/lab" data-lab="${j}" aria-label="Abrir no laboratório">${ic('terminal')}<span class="lbl">Laboratório</span></a><button class="btn run" data-run="${j}">${ic('play')}Executar</button>` : ''}`)).join('')}</section>`;
+}
+// Liga os botões dos exemplos e cria os exercícios dos passos mostrados.
+function bindSteps(L, onPass) {
   view.querySelectorAll('.step.learn').forEach((box) => {
     const s = L.steps[+box.dataset.k];
     box.querySelectorAll('[data-copy]').forEach((b) => (b.onclick = () => { navigator.clipboard?.writeText(s.examples[+b.dataset.copy].sql); toast('Copiado para a área de transferência', 'copy'); }));
@@ -400,11 +394,123 @@ function vLesson(id) {
   });
   view.querySelectorAll('.step.practice').forEach((box) => {
     const s = L.steps[+box.dataset.k];
-    box.append(taskEl(s, +box.dataset.n - 1, () => renderNext(C, L, idx)));
+    box.append(taskEl(s, +box.dataset.n - 1, onPass));
   });
+}
+const lessonHead = (C, L, idx, label, pct, done, paged) => `<div class="lesson-head"><div class="eyebrow">Capítulo ${C.idx + 1} · Lição ${idx + 1} de ${C.lessons.length}</div><h1>${esc(L.title)}</h1>
+  <div class="row lesson-meta"><div class="grow"><div class="row small" style="justify-content:space-between;margin-bottom:6px"><span class="muted">${label}</span><span class="muted num-t">${pct}%</span></div>${bar(pct, done ? 'ok' : '')}</div>
+  <button class="btn sec-b sm" id="openManual">${ic('book')}Manual</button><button class="btn link sm" id="lessonMode" title="Alternar a forma de apresentar a lição">${ic(paged ? 'list' : 'layers')}${paged ? 'Ver a lição inteira' : 'Ver por páginas'}</button></div></div>`;
+
+function vLesson(id) {
+  const f = findLesson(id); if (!f) return vHome();
+  const { c: C, l: L, i: idx } = f;
+  if (hiddenPage(C)) return;
+  crumbs = [['Conteúdos', '#/learn'], [`Capítulo ${C.idx + 1}`, '#/c/' + C.id], [`Lição ${idx + 1}`, '#/l/' + L.id]];
+  if (!lessonOpen(C, idx)) {
+    view.innerHTML = `<div class="card locked-card"><span class="side-i">${ic('lock')}</span><div><h2>Lição bloqueada</h2><p class="muted">A matéria é apresentada de forma gradual. Conclua primeiro a lição <b>${esc(C.lessons[idx - 1].title)}</b>.</p><div class="row"><a class="btn" href="#/l/${C.lessons[idx - 1].id}">Ir para a lição anterior</a><a class="btn sec-b" href="#/m/${C.id}">${ic('book')}Consultar o manual</a></div></div></div>`;
+    return;
+  }
+  if (st.lessonView === 'all') vLessonAll(C, L, idx); else vLessonPaged(C, L, idx);
   $('#openManual').onclick = () => openDrawer(C);
+  $('#lessonMode').onclick = () => { st.lessonView = st.lessonView === 'all' ? 'pages' : 'all'; persist(); vLesson(L.id); window.scrollTo(0, 0); };
+}
+
+// Modo assistente: uma página de cada vez.
+function vLessonPaged(C, L, idx) {
+  const pages = pagesOf(L), total = L.steps.length;
+  const pos = Math.min(st.pos[L.id] || 0, total - 1);
+  const pageOf = (k) => pages.findIndex((p) => p.includes(k));
+  const reached = pageOf(pos); // última página desbloqueada
+  const pageDone = (p) => pages[p].every((k) => L.steps[k].t === 'learn' || passed(L.steps[k]));
+  let cur = lessonPage[L.id];
+  if (cur === undefined || cur > reached) cur = lessonDone(L) ? 0 : reached;
+  lessonPage[L.id] = cur;
+  // Ao abrir uma página, todos os seus passos ficam "mostrados".
+  const last = pages[cur][pages[cur].length - 1];
+  if (last > (st.pos[L.id] || 0)) { st.pos[L.id] = last; touchDay(); persist(); }
+  const doneAll = lessonDone(L);
+  const pct = pctOf(pages.filter((p, i) => i <= reached && pageDone(i)).length, pages.length);
+  const title = (p) => { const s = L.steps[pages[p][0]]; return s.t === 'learn' ? s.title : 'Exercícios'; };
+  view.innerHTML = `<div class="lesson-wrap"><article class="prose paged">
+    ${lessonHead(C, L, idx, `Página ${cur + 1} de ${pages.length}`, doneAll ? 100 : pct, doneAll, true)}
+    <nav class="lpager" aria-label="Páginas da lição">${pages.map((p, i) => {
+      const state = i === cur ? 'on' : i > reached ? 'locked' : pageDone(i) ? 'done' : 'open';
+      return `<button type="button" class="pg ${state}" data-pg="${i}" ${i > reached ? 'disabled' : ''} title="${esc(title(i))}" aria-label="Página ${i + 1}: ${esc(title(i))}"${i === cur ? ' aria-current="step"' : ''}>${state === 'done' ? ic('check') : state === 'locked' ? ic('lock') : i + 1}</button>`;
+    }).join('<span class="pg-line"></span>')}</nav>
+    ${cur === 0 && L.intro ? `<div class="lesson-intro">${ic('compass')}<div><b>Enquadramento</b><p>${esc(L.intro)}</p></div></div>` : ''}
+    ${cur === 0 ? '<div id="warm"></div>' : ''}
+    <div id="steps">${pages[cur].map((k) => stepHtml(L, k)).join('')}</div>
+    <div id="next"></div>
+  </article>
+  <aside class="toc">${tocHtml(C, L)}</aside></div>`;
+  enhance(view);
+  // Pode ir-se a qualquer página já aberta e à seguinte, se a atual estiver resolvida.
+  const go = (p) => {
+    const open = pageOf(Math.min(st.pos[L.id] || 0, total - 1));
+    if (p < 0 || p >= pages.length || (p > open && !(p === cur + 1 && pageDone(cur)))) return;
+    if (p > open) { st.pos[L.id] = pages[p][0]; touchDay(); persist(); } // abre a página seguinte
+    lessonPage[L.id] = p; vLesson(L.id); renderChrome(); window.scrollTo(0, 0);
+  };
+  const nav = () => {
+    const box = $('#next'); if (!box) return;
+    const ok = pageDone(cur), lastPage = cur === pages.length - 1;
+    // Atualiza a barra de progresso do topo sem redesenhar a página (mantém a correção do exercício visível).
+    const pctNow = lessonDone(L) ? 100 : pctOf(pages.filter((pg, i) => i <= Math.max(cur, reached) && pageDone(i)).length, pages.length);
+    const hb = view.querySelector('.lesson-head .bar'); if (hb) { hb.querySelector('i').style.width = pctNow + '%'; hb.classList.toggle('ok', lessonDone(L)); hb.setAttribute('aria-valuenow', pctNow); }
+    const hn = view.querySelector('.lesson-head .num-t'); if (hn) hn.textContent = pctNow + '%';
+    if (lastPage && ok && lessonDone(L)) { box.innerHTML = doneCardHtml(C, L, idx, true); box.querySelector('[data-prev]').onclick = () => go(cur - 1); }
+    else {
+      const nxt = !lastPage ? title(cur + 1) : '';
+      box.innerHTML = `<div class="pager-nav"><button class="btn sec-b" data-prev ${cur ? '' : 'disabled'}>${ic('chevL')}Anterior</button>
+        <span class="small muted pn-mid">${ok ? (lastPage ? '' : `A seguir: <b>${esc(nxt)}</b>`) : `${ic('edit')}Resolva ${pages[cur].filter((k) => L.steps[k].t !== 'learn').length > 1 ? 'os exercícios' : 'o exercício'} desta página para continuar.`}</span>
+        <button class="btn" data-next ${ok && !lastPage ? '' : 'disabled'}>Seguinte${ic('chevR')}</button></div>`;
+      box.querySelector('[data-prev]').onclick = () => go(cur - 1);
+      box.querySelector('[data-next]').onclick = () => go(cur + 1);
+    }
+    view.querySelectorAll('.pg').forEach((b) => {
+      const i = +b.dataset.pg;
+      if (i === cur + 1 && ok) { b.disabled = false; b.classList.remove('locked'); b.classList.add('open'); b.innerHTML = String(i + 1); }
+      if (i === cur && ok) b.classList.add('done');
+    });
+    const toc = view.querySelector('.toc'); if (toc) toc.innerHTML = tocHtml(C, L);
+  };
+  view.querySelectorAll('.pg').forEach((b) => (b.onclick = () => go(+b.dataset.pg)));
+  bindSteps(L, nav);
+  nav();
+  if (cur === 0) renderWarm(C, L, 0);
+  lessonKeys = (e) => { if (e.key === 'ArrowRight') { const n = $('#next [data-next]'); if (n && !n.disabled) n.click(); } if (e.key === 'ArrowLeft') { const p = $('#next [data-prev]'); if (p && !p.disabled) p.click(); } };
+}
+
+// Modo "lição inteira": todos os passos já mostrados, um por baixo do outro.
+function vLessonAll(C, L, idx) {
+  const total = L.steps.length;
+  const pos = Math.min(st.pos[L.id] || 0, total - 1);
+  view.innerHTML = `<div class="lesson-wrap"><article class="prose">
+    ${lessonHead(C, L, idx, `Passo ${pos + 1} de ${total}`, pctOf(pos + (lessonDone(L) ? 1 : 0), total), lessonDone(L), false)}
+    ${L.intro ? `<div class="lesson-intro">${ic('compass')}<div><b>Enquadramento</b><p>${esc(L.intro)}</p></div></div>` : ''}
+    <div id="warm"></div>
+    <div id="steps">${L.steps.slice(0, pos + 1).map((s, k) => stepHtml(L, k)).join('')}</div>
+    <div id="next"></div>
+  </article>
+  <aside class="toc">${tocHtml(C, L)}</aside></div>`;
+  enhance(view);
+  bindSteps(L, () => renderNext(C, L, idx));
   renderNext(C, L, idx);
   renderWarm(C, L, pos);
+  lessonKeys = null;
+}
+let lessonKeys = null;
+addEventListener('keydown', (e) => {
+  if (!lessonKeys || !(location.hash || '').startsWith('#/l/') || e.altKey || e.ctrlKey || e.metaKey) return;
+  if (e.target.closest('input, textarea, select, [contenteditable]') || !$('#modal').hidden || !$('#drawer').hidden) return;
+  lessonKeys(e);
+});
+// Cartão de fim de lição (comum aos dois modos).
+function doneCardHtml(C, L, idx, paged) {
+  const next = C.lessons[idx + 1], p = sum().perChapter[C.id];
+  return `<div class="card done-card"><span class="side-i ok">${ic('checkCircle')}</span><div><h2>Lição concluída</h2>
+    <p class="muted">${next ? `Pode avançar para a lição seguinte: <b>${esc(next.title)}</b>.` : p.test.passed ? 'Este capítulo já está concluído. Pode repetir o miniteste para melhorar o resultado.' : `Concluiu todas as lições deste capítulo. Faça agora o miniteste final (mínimo ${PASS_MARK}%) para o dar como concluído.`}</p>
+    <div class="row">${paged ? `<button class="btn sec-b" data-prev>${ic('chevL')}Anterior</button>` : ''}${next ? `<a class="btn" href="#/l/${next.id}">Lição seguinte ${ic('chevR')}</a>` : `<a class="btn" href="#/t/${C.id}">${ic('clipboard')}${p.test.passed ? 'Repetir miniteste' : 'Fazer o miniteste'}</a>`}<a class="btn sec-b" href="#/m/${C.id}">${ic('book')}Rever no manual</a></div></div></div>`;
 }
 
 /* ---------- aquecimento: um exercício de uma lição anterior no início de cada lição (prática intercalada) ---------- */
@@ -454,11 +560,7 @@ function renderNext(C, L, idx) {
     };
     return;
   }
-  const next = C.lessons[idx + 1];
-  const p = sum().perChapter[C.id];
-  box.innerHTML = `<div class="card done-card"><span class="side-i ok">${ic('checkCircle')}</span><div><h2>Lição concluída</h2>
-    <p class="muted">${next ? `Pode avançar para a lição seguinte: <b>${esc(next.title)}</b>.` : p.test.passed ? 'Este capítulo já está concluído. Pode repetir o miniteste para melhorar o resultado.' : `Concluiu todas as lições deste capítulo. Faça agora o miniteste final (mínimo ${PASS_MARK}%) para o dar como concluído.`}</p>
-    <div class="row">${next ? `<a class="btn" href="#/l/${next.id}">Lição seguinte ${ic('chevR')}</a>` : `<a class="btn" href="#/t/${C.id}">${ic('clipboard')}${p.test.passed ? 'Repetir miniteste' : 'Fazer o miniteste'}</a>`}<a class="btn sec-b" href="#/m/${C.id}">${ic('book')}Rever no manual</a></div></div></div>`;
+  box.innerHTML = doneCardHtml(C, L, idx, false);
   const toc = view.querySelector('.toc'); if (toc) toc.innerHTML = tocHtml(C, L);
 }
 function tocHtml(C, cur) {
@@ -1435,7 +1537,7 @@ function route() {
   if (a !== 'rev') revRun = null;
   ({ '': vHome, learn: vLearn, c: () => vChapter(b), l: () => vLesson(b), m: () => vManual(b), t: () => vTest(b), rev: vRev, lab: vLab, progress: vProgress, rank: vRank, me: vMe, prof: vProf, jogo: vGame, projeto: vProject }[a || ''] || vHome)();
   renderChrome();
-  const steps = a === 'l' ? view.querySelectorAll('.step') : [];
+  const steps = a === 'l' && st.lessonView === 'all' ? view.querySelectorAll('.step') : [];
   if (steps.length > 1) steps[steps.length - 1].scrollIntoView({ block: 'start' }); else window.scrollTo(0, 0);
 }
 addEventListener('hashchange', route);
