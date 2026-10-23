@@ -1477,6 +1477,7 @@ function vGame() {
         <ul class="nx-how"><li><span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> mover · <b>rato</b> olhar · <span class="kbd">Shift</span> correr</li>
         <li><span class="kbd">E</span> usar terminais e painéis</li>
         <li><span class="kbd">Q</span> pulso EMP: imobiliza drones e câmaras durante 8 segundos (recolha as cápsulas azuis)</li>
+        <li>Cápsulas de tempo: <b style="color:#16a34a">verde</b> +45 s no relógio da sala (e cancela o bloqueio total) · <b style="color:#9333ea">roxa</b> para o relógio durante 25 s</li>
         <li><span class="kbd">Esc</span> pausa (o relógio para), qualidade gráfica, som e sensibilidade do rato</li></ul>
         <p class="small muted">Cada sala tem duas zonas separadas por um campo de forças, com um terminal em cada uma. As tarefas SQL desligam o campo de forças, restauram a luz, desativam drones e lasers e abrem a porta. Os códigos e os dados mudam em cada missão.</p>
         <p class="small muted"><b>Pontuação:</b> ${G.POINTS.task} por tarefa, ${G.POINTS.perSecond} por cada segundo que sobra no relógio da sala e ${G.POINTS.perfect} por sala perfeita. Descontam: dica −${G.POINTS.hint}, captura −${G.POINTS.caught}, alarme ou câmara −${G.POINTS.alarm}, código errado −${G.POINTS.wrong}. Quando o tempo acaba, a NEXUS ativa o bloqueio total. Só as missões completas, a começar na sala 1, entram na tabela.</p></div>
