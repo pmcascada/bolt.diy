@@ -81,7 +81,7 @@ const sum = () => S.summarize(st);
 
 /* ---------- sincronização com a conta do aluno (Supabase ou servidor local) ---------- */
 const BK = window.BACKEND;
-const payload = () => ({ ...(st.resetAt ? { resetAt: st.resetAt } : {}), done: st.done, rev: st.rev, pos: st.pos, tests: st.tests, game: { done: st.game.done }, days: st.days, log: st.log, review: st.review, real: st.real, project: st.project });
+const payload = () => ({ ...(st.resetAt ? { resetAt: st.resetAt } : {}), done: st.done, rev: st.rev, pos: st.pos, tests: st.tests, game: { done: st.game.done, ...(st.game.best ? { best: st.game.best } : {}) }, days: st.days, log: st.log, review: st.review, real: st.real, project: st.project });
 let resetNotice = false;
 function merge(remote) {
   // O gestor aprovou um pedido de reinício: apaga também o progresso guardado neste dispositivo.
@@ -102,6 +102,8 @@ function merge(remote) {
   if (remote.project && (remote.project.at || 0) > ((st.project && st.project.at) || 0)) st.project = remote.project;
   for (const [id, p] of Object.entries(remote.pos || {})) st.pos[id] = Math.max(st.pos[id] || 0, p);
   for (const [id, d] of Object.entries((remote.game && remote.game.done) || {})) if (!st.game.done[id] || st.game.done[id].at > d.at) st.game.done[id] = d;
+  const rb = remote.game && remote.game.best;
+  if (rb && (!st.game.best || rb.score > st.game.best.score)) st.game.best = rb;
   st.days = [...new Set([...st.days, ...(remote.days || [])])].sort().slice(-400);
   const seen = new Set(st.log.map((e) => e.at + e.id));
   st.log = [...st.log, ...(remote.log || []).filter((e) => !seen.has(e.at + e.id))].sort((a, b) => a.at - b.at).slice(-500);
@@ -1459,29 +1461,43 @@ const gameSupported = () => {
 };
 function vGame() {
   crumbs = [['Protocolo NEXUS', '#/jogo']];
-  const G = window.GAME, done = (st.game && st.game.done) || {};
+  const G = window.GAME, done = (st.game && st.game.done) || {}, best = st.game && st.game.best;
   const next = G.LEVELS.findIndex((l) => !done[l.id]);
-  const all = next < 0, sup = gameSupported();
+  const sup = gameSupported(), canPlay = sup.desktop && sup.webgl;
   view.innerHTML = `<div class="nx-hero"><div class="nx-hero-in">
-      <div class="eyebrow" style="color:#7dd3fc">Jogo · aplicar SQL</div><h1>${esc(G.STORY.title)}</h1>
+      <div class="eyebrow" style="color:#7dd3fc">Jogo · aplicar SQL contra o relógio</div><h1>${esc(G.STORY.title)}</h1>
       ${G.STORY.intro.map((p) => `<p>${esc(p)}</p>`).join('')}
-      <div class="row" style="margin-top:18px">${sup.desktop && sup.webgl ? `<button class="btn" id="nxPlay">${ic('play')}${all ? 'Jogar de novo' : next > 0 ? `Continuar na sala ${next + 1}` : 'Iniciar missão'}</button>${next > 0 || all ? '<button class="btn sec-b" id="nxRestart">Recomeçar do início</button>' : ''}` : ''}</div>
+      <div class="row" style="margin-top:18px">${canPlay ? `<button class="btn" id="nxPlay">${ic('play')}Nova missão (com pontuação)</button>${next > 0 ? `<button class="btn sec-b" id="nxTrain">Treinar a partir da sala ${next + 1}</button>` : ''}` : ''}</div>
+      ${best ? `<p class="small" style="color:#fcd34d;margin-top:12px">O seu recorde: <b>${best.score}</b> pontos em ${fmtTime(best.time)}.</p>` : ''}
       ${!sup.webgl ? alertBox('bad', 'alert', 'Este browser não suporta gráficos 3D (WebGL). Experimente uma versão recente do Chrome, Edge ou Firefox.') : !sup.desktop ? alertBox('info', 'info', 'O Protocolo NEXUS foi pensado para computador, com teclado e rato. Abra a MySQL Academy num computador para jogar.') : ''}
     </div></div>
     <div class="two" style="margin-top:16px">
-      <div class="card"><div class="card-h"><h3>Salas da missão — parte 1</h3><span class="small muted">${Object.keys(done).filter((k) => G.LEVELS.some((l) => l.id === k)).length}/${G.LEVELS.length}</span></div>
-        <div class="list" style="box-shadow:none">${G.LEVELS.map((l, i) => { const d = done[l.id]; return `<div class="item lesson-i"><span class="status ${d ? 'done' : i === next ? 'part' : ''}">${d ? ic('check') : i + 1}</span><span><b>${esc(l.name)}</b><span class="d">Treina: ${esc(l.skill)}</span></span><span class="chip ${d ? 'ok' : ''}">${d ? `+${S.roomXp(l, d)} XP` : `${l.xp} XP`}</span><span></span></div>`; }).join('')}
-          <div class="item lesson-i locked"><span class="status">${ic('lock')}</span><span><b>Energia, hangar, segurança e núcleo da NEXUS</b><span class="d">Em preparação (parte 2)</span></span><span class="chip">Brevemente</span><span></span></div></div></div>
+      <div class="card nx-lb"><div class="card-h"><h3>Melhores agentes</h3><span class="small muted">melhor missão de cada jogador</span></div><div id="nxLb"><div class="empty">A carregar…</div></div></div>
       <div class="card"><h3>Como se joga</h3>
         <ul class="nx-how"><li><span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> mover · <b>rato</b> olhar · <span class="kbd">Shift</span> correr</li>
-        <li><span class="kbd">E</span> usar terminais e painéis das portas</li>
-        <li><span class="kbd">Q</span> pulso EMP: imobiliza os drones durante 8 segundos (recolha as cápsulas azuis)</li>
-        <li><span class="kbd">Esc</span> pausa, qualidade gráfica e sensibilidade do rato</li></ul>
-        <p class="small muted">Em cada sala, use o terminal para consultar ou alterar a base de dados e descobrir como abrir a porta. Cada sala vale XP (−5 por dica; sem XP se vir a solução). Se um drone o detetar, volta à entrada da sala.</p></div>
-    </div>`;
-  const go = (start) => openGame(start);
-  if ($('#nxPlay')) $('#nxPlay').onclick = () => go(all ? 0 : Math.max(0, next));
-  if ($('#nxRestart')) $('#nxRestart').onclick = () => go(0);
+        <li><span class="kbd">E</span> usar terminais e painéis</li>
+        <li><span class="kbd">Q</span> pulso EMP: imobiliza drones e câmaras durante 8 segundos (recolha as cápsulas azuis)</li>
+        <li><span class="kbd">Esc</span> pausa (o relógio para), qualidade gráfica, som e sensibilidade do rato</li></ul>
+        <p class="small muted">Cada sala tem duas zonas separadas por um campo de forças, com um terminal em cada uma. As tarefas SQL desligam o campo de forças, restauram a luz, desativam drones e lasers e abrem a porta. Os códigos e os dados mudam em cada missão.</p>
+        <p class="small muted"><b>Pontuação:</b> ${G.POINTS.task} por tarefa, ${G.POINTS.perSecond} por cada segundo que sobra no relógio da sala e ${G.POINTS.perfect} por sala perfeita. Descontam: dica −${G.POINTS.hint}, captura −${G.POINTS.caught}, alarme ou câmara −${G.POINTS.alarm}, código errado −${G.POINTS.wrong}. Quando o tempo acaba, a NEXUS ativa o bloqueio total. Só as missões completas, a começar na sala 1, entram na tabela.</p></div>
+    </div>
+    <div class="card" style="margin-top:16px"><div class="card-h"><h3>Salas da missão — parte 1</h3><span class="small muted">${Object.keys(done).filter((k) => G.LEVELS.some((l) => l.id === k)).length}/${G.LEVELS.length}</span></div>
+      <div class="list" style="box-shadow:none">${G.LEVELS.map((l, i) => { const d = done[l.id]; return `<div class="item lesson-i"><span class="status ${d ? 'done' : i === next ? 'part' : ''}">${d ? ic('check') : i + 1}</span><span><b>${esc(l.name)}</b><span class="d">Treina: ${esc(l.skill)} · tempo-limite ${fmtTime(l.par)}</span></span><span class="chip ${d ? 'ok' : ''}">${d ? `+${S.roomXp(l, d)} XP` : `${l.xp} XP`}</span><span></span></div>`; }).join('')}
+        <div class="item lesson-i locked"><span class="status">${ic('lock')}</span><span><b>Núcleo da NEXUS</b><span class="d">Em preparação (parte 2)</span></span><span class="chip">Brevemente</span><span></span></div></div></div>`;
+  if ($('#nxPlay')) $('#nxPlay').onclick = () => openGame(0);
+  if ($('#nxTrain')) $('#nxTrain').onclick = () => openGame(next);
+  renderGameBoard();
+}
+const fmtTime = (s) => `${Math.floor((s || 0) / 60)}:${String(Math.round(s || 0) % 60).padStart(2, '0')}`;
+async function renderGameBoard() {
+  const el = $('#nxLb'); if (!el) return;
+  const me = (BK.user ? BK.user.name : '').toLowerCase();
+  try {
+    const rows = BK.gameLeaderboard ? await BK.gameLeaderboard() : [];
+    if (!$('#nxLb')) return;
+    el.innerHTML = (BK.user ? '' : `<p class="small muted" style="margin:0 0 10px">Crie uma conta na página <a href="#/me">Perfil</a> para entrar na tabela.</p>`) +
+      (rows.length ? `<div class="scroll"><table class="tbl"><thead><tr><th style="width:50px">#</th><th>Agente</th><th class="r">Pontos</th><th class="r">Tempo</th><th class="r">Missões</th></tr></thead><tbody>${rows.slice(0, 20).map((r, i) => `<tr class="${r.name.toLowerCase() === me ? 'me' : ''}"><td><span class="pos ${i < 3 ? 'p' + (i + 1) : ''}">${i + 1}</span></td><td><b>${esc(r.name)}</b>${r.turma ? ` <span class="small muted">${esc(r.turma)}</span>` : ''}</td><td class="r"><b>${r.score}</b></td><td class="r">${fmtTime(r.time)}</td><td class="r">${r.runs}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Ainda ninguém completou a missão. Seja o primeiro!</div>');
+  } catch (e) { el.innerHTML = `<div class="empty">Tabela indisponível: ${esc(BK.errorText(e))}</div>`; }
 }
 async function openGame(startRoom) {
   const root = document.createElement('div'); root.id = 'gameRoot'; root.innerHTML = '<div class="gx-loading">A carregar a estação Órion…</div>';
@@ -1490,11 +1506,12 @@ async function openGame(startRoom) {
     const { startGame } = await import('./game/game.js');
     const G = window.GAME; st.game = st.game || { done: {} };
     const settings = st.game.settings || {};
+    const seed = (Math.random() * 2 ** 31) >>> 0;
     root.innerHTML = '';
     gameCtl = startGame(root, {
-      levels: G.LEVELS, story: G.STORY, startRoom,
-      doneRooms: Object.keys(st.game.done), quality: settings.quality, sensitivity: settings.sensitivity,
-      ui: { esc, table, sqlError },
+      levels: G.generate(seed), story: G.STORY, startRoom, seed, ranked: startRoom === 0, best: st.game.best && st.game.best.score,
+      doneRooms: Object.keys(st.game.done), quality: settings.quality, sensitivity: settings.sensitivity, sound: settings.sound,
+      ui: { esc, table, sqlError }, roomScore: G.roomScore,
       onRoomDone(id, info) {
         st.game.done = st.game.done || {};
         if (st.game.done[id]) return; // repetir uma sala não volta a dar XP
@@ -1506,7 +1523,18 @@ async function openGame(startRoom) {
         toast(`Protocolo NEXUS · ${room.name} · +${S.roomXp(room, st.game.done[id])} XP`, 'zap');
         celebrate(before, sum());
       },
+      async onRunEnd(run) {
+        if (!run.ranked) return '';
+        const old = st.game.best;
+        const record = !old || run.score > old.score;
+        if (record) { st.game.best = { score: run.score, time: run.time, at: Date.now() }; persist(); }
+        let msg = record ? `🏆 Novo recorde pessoal: ${run.score} pontos!` : `O seu recorde continua a ser ${old.score} pontos.`;
+        if (!BK.user) return msg + ' Crie uma conta para entrar na tabela de melhores jogadores.';
+        try { await BK.submitGameScore(run); msg += ' Pontuação registada na tabela de melhores jogadores.'; } catch (e) { msg += ' Não foi possível registar a pontuação: ' + BK.errorText(e); }
+        return msg;
+      },
       onSettings(s) { st.game.settings = s; persist(); },
+      onRestart() { closeGame(); openGame(0); },
       onExit: closeGame,
     });
     if (/[?&]nxdebug\b/.test(location.search)) window.__nexus = gameCtl;

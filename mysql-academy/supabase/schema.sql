@@ -324,6 +324,53 @@ revoke execute on function public.decide_reset(bigint, boolean) from public, ano
 grant execute on function public.admin_reset_requests() to authenticated;
 grant execute on function public.decide_reset(bigint, boolean) to authenticated;
 
+-- ------------------------------------------------------------
+-- Versão 7: pontuação do jogo Protocolo NEXUS. Guarda-se o melhor resultado de cada jogador
+-- (missão completa, a começar na sala 1); a tabela de melhores jogadores é pública dentro do site.
+-- ------------------------------------------------------------
+create table if not exists public.game_scores (
+  user_id    uuid primary key references auth.users (id) on delete cascade,
+  score      int not null default 0 check (score between 0 and 30000),
+  time_s     int not null default 0,
+  rooms      int not null default 0,
+  runs       int not null default 0,
+  updated_at timestamptz not null default now()
+);
+alter table public.game_scores enable row level security;
+revoke all on public.game_scores from anon, authenticated;
+
+-- Regista uma missão: guarda a melhor pontuação (em empate, o menor tempo) e conta as missões jogadas.
+create or replace function public.submit_game_score(s int, secs int, n int) returns int
+language plpgsql volatile security definer set search_path = public as
+'declare uid uuid := auth.uid(); b int;
+begin
+  if uid is null or s is null or s < 0 or s > 30000 or secs < 60 or secs > 86400 or n < 1 or n > 12 then return null; end if;
+  insert into public.game_scores as g (user_id, score, time_s, rooms, runs, updated_at)
+  values (uid, s, secs, n, 1, now())
+  on conflict (user_id) do update set
+    runs = g.runs + 1,
+    score = greatest(g.score, excluded.score),
+    time_s = case when excluded.score > g.score or (excluded.score = g.score and excluded.time_s < g.time_s) then excluded.time_s else g.time_s end,
+    rooms = case when excluded.score >= g.score then excluded.rooms else g.rooms end,
+    updated_at = case when excluded.score > g.score then now() else g.updated_at end
+  returning g.score into b;
+  return b;
+end';
+
+create or replace function public.game_leaderboard(lim int default 50)
+returns table (name text, turma text, score int, time_s int, runs int, updated_at timestamptz)
+language sql stable security definer set search_path = public as
+'select p.name, p.turma, g.score, g.time_s, g.runs, g.updated_at
+   from public.game_scores g join public.profiles p on p.id = g.user_id
+  where g.score > 0
+  order by g.score desc, g.time_s asc, g.updated_at asc
+  limit least(greatest(coalesce(lim, 50), 1), 300)';
+
+revoke execute on function public.submit_game_score(int, int, int) from public, anon;
+revoke execute on function public.game_leaderboard(int) from public;
+grant execute on function public.submit_game_score(int, int, int) to authenticated;
+grant execute on function public.game_leaderboard(int) to anon, authenticated;
+
 -- ============================================================
 -- Gestor do site: executar uma única vez, com o email da conta do gestor. A partir daí,
 -- o gestor atribui o perfil de professor a outras contas na Área do professor.
