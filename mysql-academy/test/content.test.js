@@ -23,7 +23,7 @@ function checkEx(s) {
   if (['code', 'dml', 'ddl'].includes(s.t) && !accepts(s.solution)) fail('solução não aceite', s.id, s.t === 'ddl' ? DDL.check(s.solution, s).msgs : '');
   if (s.t === 'ddl' && DDL.check('CREATE TABLE resposta_errada (a INT);', s).ok) fail('DDL aceita uma resposta errada', s.id);
   if (s.t === 'dml') {
-    if (D.checkDml(`DELETE FROM ${D.writtenIn(s.solution)[0]} WHERE 1 = 0`, s).ok) fail('DML aceita uma instrução sem efeito', s.id);
+    if (D.checkDml(`DELETE FROM ${(s.tables || D.writtenIn(s.solution))[0]} WHERE 1 = 0`, s).ok) fail('DML aceita uma instrução sem efeito', s.id);
     if (!D.checkDml(s.solution, s).tables.length) fail('DML sem tabela a mostrar', s.id);
   }
   if (s.start) { let ok; try { ok = accepts(s.start); } catch { ok = false; } if (ok) fail('"corrija o erro": o texto inicial já é aceite', s.id); }
@@ -40,7 +40,14 @@ for (const c of CHAPTERS) {
     if (l.steps.at(-1).t === 'learn') fail('lição termina sem exercício', l.id);
     for (const s of l.steps) {
       if (s.t === 'learn') {
-        for (const x of s.examples) if (x.run) { try { D.run(D.create(x.db), x.sql); } catch (e) { fail('exemplo falha', l.id, s.title, e.message); } }
+        // Exemplos executáveis; numa caixa de sessão correm por ordem na mesma BD. Os marcados com fails têm de dar erro.
+        let sdb = null;
+        for (const x of s.examples) if (x.run) {
+          const db = s.session ? sdb || (sdb = D.create(x.db)) : D.create(x.db);
+          let err = null; try { D.runMany(db, x.sql); } catch (e) { err = e; }
+          if (err && !x.fails) fail('exemplo falha', l.id, s.title, err.message);
+          if (!err && x.fails) fail('exemplo devia dar erro', l.id, s.title, x.sql);
+        }
         continue;
       }
       n++;

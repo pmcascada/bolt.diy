@@ -25,6 +25,7 @@ const P = {
   x: 'M18 6 6 18 M6 6l12 12',
   bulb: 'M9 18h6 M10 22h4 M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z',
   play: 'M7 4.5v15l12-7.5z',
+  clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M12 7v5l3 2',
   copy: 'M9 9h11v11H9z M5 15H4V4h11v1',
   eye: 'M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
   download: 'M12 3v12 M7 10l5 5 5-5 M5 21h14',
@@ -383,16 +384,22 @@ function stepHtml(L, k) {
   const s = L.steps[k];
   if (s.t !== 'learn') return `<section class="step practice" data-k="${k}" data-n="${L.steps.slice(0, k + 1).filter((x) => x.t !== 'learn').length}"></section>`;
   const nConcept = L.steps.slice(0, k + 1).filter((x) => x.t === 'learn').length;
-  return `<section class="step learn" data-k="${k}"><div class="step-l">${ic('book')}Conceito ${nConcept}</div><h2>${esc(s.title)}</h2>${s.html}${s.examples.map((e, j) => codeBlock(e, `<button class="btn" data-copy="${j}" aria-label="Copiar">${ic('copy')}<span class="lbl">Copiar</span></button>${e.run ? `<a class="btn" href="#/lab" data-lab="${j}" aria-label="Abrir no laboratório">${ic('terminal')}<span class="lbl">Laboratório</span></a><button class="btn run" data-run="${j}">${ic('play')}Executar</button>` : ''}`)).join('')}</section>`;
+  const sess = s.session ? `<div class="sess-bar">${ic('terminal')}<span>Estes exemplos correm todos na <b>mesma sessão</b>, como num cliente mysql: execute-os pela ordem.</span><button class="btn sec-b" data-sreset>${ic('refresh')}Repor os dados</button></div>` : '';
+  return `<section class="step learn" data-k="${k}"><div class="step-l">${ic('book')}Conceito ${nConcept}</div><h2>${esc(s.title)}</h2>${s.html}${sess}${s.examples.map((e, j) => codeBlock(e, `<button class="btn" data-copy="${j}" aria-label="Copiar">${ic('copy')}<span class="lbl">Copiar</span></button>${e.run ? `<a class="btn" href="#/lab" data-lab="${j}" aria-label="Abrir no laboratório">${ic('terminal')}<span class="lbl">Laboratório</span></a><button class="btn run" data-run="${j}">${ic('play')}Executar</button>` : ''}`)).join('')}</section>`;
 }
 // Liga os botões dos exemplos e cria os exercícios dos passos mostrados.
 function bindSteps(L, onPass) {
   view.querySelectorAll('.step.learn').forEach((box) => {
     const s = L.steps[+box.dataset.k];
     box.querySelectorAll('[data-copy]').forEach((b) => (b.onclick = () => { navigator.clipboard?.writeText(s.examples[+b.dataset.copy].sql); toast('Copiado para a área de transferência', 'copy'); }));
-    box.querySelectorAll('[data-run]').forEach((b) => (b.onclick = () => { const e = s.examples[+b.dataset.run]; b.closest('.code').querySelector('.out').innerHTML = runSql(D.create(e.db), e.sql); }));
+    // Numa caixa de sessão, todos os exemplos usam a mesma base de dados (a transação continua de um exemplo para o outro).
+    const sdb = (e) => (s.session ? box._db || (box._db = D.create(e.db)) : D.create(e.db));
+    box.querySelectorAll('[data-run]').forEach((b) => (b.onclick = () => { const e = s.examples[+b.dataset.run]; b.closest('.code').querySelector('.out').innerHTML = runSql(sdb(e), e.sql); }));
+    const rs = box.querySelector('[data-sreset]');
+    if (rs) rs.onclick = () => { box._db = null; box.querySelectorAll('.code .out').forEach((o) => (o.innerHTML = '')); toast('Dados de exemplo repostos', 'refresh'); };
     box.querySelectorAll('[data-lab]').forEach((b) => (b.onclick = () => { const e = s.examples[+b.dataset.lab]; labSql = e.sql; labWhich = e.db || 'escola'; labDb = null; }));
     if (s.viz) box.append(vizEl(s.viz));
+    if (s.race) box.append(raceEl(s.race));
   });
   view.querySelectorAll('.step.practice').forEach((box) => {
     const s = L.steps[+box.dataset.k];
@@ -573,6 +580,7 @@ function tocHtml(C, cur) {
 }
 // Mensagens do motor do simulador traduzidas para o equivalente do MySQL.
 const SQL_ERRORS = [
+  [/Check constraint '(\w+)' is violated\. \((\w+): (.+)\)/, (m) => `Violação da restrição CHECK ${m[1]} (${m[3]}) da tabela ${m[2]}: a instrução foi recusada e não alterou nada. (No MySQL: ERROR 3819)`],
   [/violation of check constraint/i, 'Violação da restrição CHECK: o valor não cumpre a condição. A linha não foi guardada. (No MySQL: ERROR 3819)'],
   [/table does not exist: (\w+)/i, (m) => `A tabela ou vista '${m[1]}' não existe. (No MySQL: ERROR 1146)`],
   [/already exists/i, 'Já existe um objeto com esse nome. (No MySQL: ERROR 1050)'],
@@ -584,12 +592,42 @@ function sqlError(err) {
 }
 // Executa uma ou mais instruções e mostra o resultado da última (ou quantas linhas foram afetadas).
 function runSql(db, sql) {
+  // Aviso enquanto houver uma transação por terminar (START TRANSACTION sem COMMIT nem ROLLBACK).
+  const txNote = () => (db.tx ? `<div class="tx-note">${ic('lock')}<span><b>Transação aberta:</b> as alterações ainda não estão gravadas. Termine com <code>COMMIT</code> (gravar) ou <code>ROLLBACK</code> (anular).</span></div>` : '');
   try {
     const r = D.runMany(db, sql);
-    if (r.affected !== null && !r.rows.length) return alertBox('ok', 'check', `Instrução executada: ${r.affected} ${r.affected === 1 ? 'linha afetada' : 'linhas afetadas'}.`);
-    if (r.count > 1 && !r.rows.length) return alertBox('ok', 'check', `${r.count} instruções executadas.`);
-    return table(r.rows);
-  } catch (err) { return alertBox('bad', 'alert', `<b>Erro:</b> ${esc(sqlError(err))}`); }
+    let out;
+    if (r.msg && !r.rows.length) out = alertBox('ok', 'check', esc(r.msg) + (r.count > 1 ? ` (${r.count} instruções executadas)` : ''));
+    else if (r.affected !== null && !r.rows.length) out = alertBox('ok', 'check', `Instrução executada: ${r.affected} ${r.affected === 1 ? 'linha afetada' : 'linhas afetadas'}.`);
+    else if (r.count > 1 && !r.rows.length) out = alertBox('ok', 'check', `${r.count} instruções executadas.`);
+    else out = table(r.rows);
+    return out + txNote();
+  } catch (err) {
+    const where = err.total > 1 ? ` na instrução ${err.done + 1} de ${err.total}` : '';
+    const rest = err.total > 1 ? ` ${err.done ? `As ${err.done} instruções anteriores foram executadas; ` : ''}as seguintes não foram executadas.` : '';
+    return alertBox('bad', 'alert', `<b>Erro${where}:</b> ${esc(sqlError(err))}${rest}`) + txNote();
+  }
+}
+
+/* ---------- concorrência: duas sessões lado a lado, passo a passo ---------- */
+function raceEl(spec) {
+  const el = document.createElement('div'); el.className = 'race';
+  let sc = 0, k = 0;
+  const cell = (v, who) => (!v ? '<div class="rc-cell"></div>' : v === 'wait' ? `<div class="rc-cell wait">${ic('clock')}À espera: a linha está bloqueada pela sessão ${who === 'b' ? 'A' : 'B'}…</div>` : `<div class="rc-cell"><pre><code>${hl(v)}</code></pre></div>`);
+  const draw = () => {
+    const S = spec.scenarios[sc], shown = S.steps.slice(0, k);
+    el.innerHTML = `<div class="seg" role="tablist">${spec.scenarios.map((x, i) => `<button class="${i === sc ? 'on' : ''}" data-sc="${i}">${esc(x.name)}</button>`).join('')}</div>
+      <p class="small muted" style="margin:10px 0">${S.intro}</p>
+      <div class="rc-grid"><div class="rc-h">t</div><div class="rc-h">Cliente A · sessão 1</div><div class="rc-h">Cliente B · sessão 2</div><div class="rc-h">stock</div>
+      ${shown.map((st, i) => `<div class="rc-t">${i + 1}</div>${cell(st.a, 'a')}${cell(st.b, 'b')}<div class="rc-stock ${st.stock < 0 ? 'bad' : ''}">${st.stock}</div><div class="rc-note ${st.bad ? 'bad' : st.good ? 'good' : ''}">${st.note}</div>`).join('')}</div>
+      ${k >= S.steps.length ? `<div class="rc-end ${S.ok ? 'ok' : 'bad'}">${S.ok ? ic('check') : ic('alert')}<span>${S.result}</span></div>` : ''}
+      <div class="row" style="margin-top:12px">${k < S.steps.length ? `<button class="btn" data-next>${ic('play')}${k ? 'Passo seguinte' : 'Começar'}</button>` : ''}<button class="btn sec-b" data-restart>${ic('refresh')}Recomeçar</button><span class="small muted">Passo ${k} de ${S.steps.length}</span></div>`;
+    el.querySelectorAll('[data-sc]').forEach((b) => (b.onclick = () => { sc = +b.dataset.sc; k = 0; draw(); }));
+    const n = el.querySelector('[data-next]'); if (n) n.onclick = () => { k++; draw(); };
+    el.querySelector('[data-restart]').onclick = () => { k = 0; draw(); };
+  };
+  draw();
+  return el;
 }
 
 /* ---------- visualização da execução de um SELECT (FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY → LIMIT) ---------- */

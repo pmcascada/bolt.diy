@@ -123,16 +123,21 @@
         ['cidade', 'VARCHAR(50)', '', 'Cidade'], ['data_registo', 'DATE', '', 'Data em que criou conta'] ] },
       produtos: { desc: 'Produtos à venda', cols: [
         ['id_produto', 'INT', 'PK', 'Identificador do produto'], ['nome', 'VARCHAR(100)', '', 'Nome do produto'], ['categoria', 'VARCHAR(30)', '', 'Informática, Livros, Casa ou Desporto'],
-        ['preco', 'DECIMAL(8,2)', '', 'Preço atual de venda'], ['stock', 'INT', '', 'Unidades em armazém'] ] },
+        ['preco', 'DECIMAL(8,2)', '', 'Preço atual de venda'], ['stock', 'INT', '', 'Unidades em armazém (CHECK: nunca negativo)'] ] },
       encomendas: { desc: 'Encomendas feitas pelos clientes', cols: [
         ['id_encomenda', 'INT', 'PK', 'Identificador da encomenda'], ['id_cliente', 'INT', 'FK → clientes.id_cliente', 'Cliente que fez a encomenda'],
         ['data', 'DATE', '', 'Data da encomenda'], ['estado', 'VARCHAR(20)', '', 'pendente, enviada, entregue ou cancelada'] ] },
       linhas_encomenda: { desc: 'Produtos de cada encomenda (tabela de ligação N:M)', cols: [
         ['id_encomenda', 'INT', 'PK, FK → encomendas', 'Encomenda'], ['id_produto', 'INT', 'PK, FK → produtos', 'Produto'],
-        ['quantidade', 'INT', '', 'Unidades compradas'], ['preco_unitario', 'DECIMAL(8,2)', '', 'Preço de cada unidade nessa venda'] ] },
+        ['quantidade', 'INT', '', 'Unidades compradas (CHECK: maior que 0)'], ['preco_unitario', 'DECIMAL(8,2)', '', 'Preço de cada unidade nessa venda'] ] },
     },
     views: {},
     auto: { clientes: 'id_cliente', produtos: 'id_produto', encomendas: 'id_encomenda' },
+    // Restrições CHECK verificadas pelo motor (o MySQL recusa a instrução com o erro 3819).
+    checks: {
+      produtos: [{ name: 'chk_produtos_stock', sql: 'stock >= 0', ok: (r) => r.stock === null || r.stock === undefined || Number(r.stock) >= 0 }],
+      linhas_encomenda: [{ name: 'chk_linhas_quantidade', sql: 'quantidade > 0', ok: (r) => r.quantidade === null || r.quantidade === undefined || Number(r.quantidade) > 0 }],
+    },
   };
 
   const DBS = { escola: ESCOLA, loja: LOJA };
@@ -162,6 +167,7 @@
       if (auto && tb.identities && tb.identities[auto]) tb.identities[auto].value = Math.max(0, ...d.seed[t].map((x) => x[0])) + 1;
     }
     for (const v of Object.values(d.views)) db.exec(v);
+    db.checks = d.checks || {}; db.autocommit = true; db.tx = null;
     return db;
   }
   const dispose = (db) => { try { A('DROP DATABASE ' + db.databaseid); } catch { /* ignorar */ } };
@@ -206,24 +212,97 @@
     return out;
   }
 
+  /* ---------- transações (simuladas): START TRANSACTION / BEGIN, COMMIT, ROLLBACK, autocommit, SAVEPOINT ----------
+     Ao abrir uma transação guarda-se uma cópia dos dados; o ROLLBACK repõe-na. Como no MySQL, um erro só anula a
+     instrução que falhou (a transação continua aberta), e os comandos DDL gravam (COMMIT) a transação em curso. */
+  const snapshot = (db) => Object.fromEntries(Object.entries(db.tables).map(([t, tb]) => [t, { data: JSON.parse(JSON.stringify(tb.data)) }]));
+  function restore(db, snap, only) {
+    for (const [t, v] of Object.entries(snap)) {
+      const tb = db.tables[t]; if (!tb || (only && !only.includes(t))) continue;
+      tb.data.length = 0; v.data.forEach((r) => tb.data.push(r));
+      // Como no InnoDB, o contador AUTO_INCREMENT não volta atrás: os números usados na transação anulada ficam por usar.
+    }
+  }
+  const txOpen = (db) => !!db.tx;
+  function control(db, s) {
+    const c = s.replace(/\s+/g, ' ').trim();
+    let m;
+    if (/^(start transaction|begin( work)?)$/i.test(c)) {
+      const implicit = !!db.tx; db.tx = { snap: snapshot(db), saves: [] };
+      return { msg: implicit ? 'Transação anterior gravada (COMMIT implícito) e nova transação iniciada.' : 'Transação iniciada. As alterações só ficam gravadas com COMMIT.' };
+    }
+    if (/^commit( work)?$/i.test(c)) { const had = !!db.tx; db.tx = null; return { msg: had ? 'COMMIT: as alterações da transação foram gravadas.' : 'COMMIT: não havia alterações pendentes.' }; }
+    if ((m = /^rollback( work)? to (savepoint )?(\w+)$/i.exec(c))) {
+      const k = db.tx ? db.tx.saves.findIndex((x) => x.name === m[3].toLowerCase()) : -1;
+      if (k < 0) throw new Error(`ERROR 1305 (42000): SAVEPOINT ${m[3]} does not exist`);
+      restore(db, db.tx.saves[k].snap); db.tx.saves.length = k + 1;
+      return { msg: `Alterações feitas depois do SAVEPOINT ${m[3]} anuladas. A transação continua aberta.` };
+    }
+    if (/^rollback( work)?$/i.test(c)) {
+      if (!db.tx) return { msg: 'ROLLBACK: não havia nenhuma transação aberta. Com autocommit ativo, cada instrução já tinha sido gravada.' };
+      restore(db, db.tx.snap); db.tx = null;
+      return { msg: 'ROLLBACK: todas as alterações da transação foram anuladas.' };
+    }
+    if ((m = /^savepoint (\w+)$/i.exec(c))) {
+      if (!db.tx) db.tx = { snap: snapshot(db), saves: [], implicit: true };
+      db.tx.saves.push({ name: m[1].toLowerCase(), snap: snapshot(db) });
+      return { msg: `SAVEPOINT ${m[1]} criado.` };
+    }
+    if ((m = /^release savepoint (\w+)$/i.exec(c))) { if (db.tx) db.tx.saves = db.tx.saves.filter((x) => x.name !== m[1].toLowerCase()); return { msg: `SAVEPOINT ${m[1]} removido.` }; }
+    if ((m = /^set (?:@@(?:session\.)?|session )?autocommit ?= ?(0|1|on|off|true|false)$/i.exec(c))) {
+      const on = /^(1|on|true)$/i.test(m[1]);
+      if (on && db.tx) db.tx = null; // ligar o autocommit grava a transação em curso
+      db.autocommit = on;
+      return { msg: on ? 'autocommit ligado: cada instrução é gravada logo que termina.' : 'autocommit desligado: as alterações só ficam gravadas com COMMIT (ou anuladas com ROLLBACK).' };
+    }
+    if (/^select @@(session\.)?autocommit$/i.test(c)) return { rows: [{ '@@autocommit': db.autocommit === false ? 0 : 1 }] };
+    if (/^set (session |global )?transaction isolation level /i.test(c) || /^lock tables? /i.test(c) || /^unlock tables?$/i.test(c)) return { msg: 'Instrução aceite (no simulador há um só utilizador, por isso não tem efeito).' };
+    return null;
+  }
+  // Executa uma instrução, tratando as transações e as restrições CHECK da BD.
+  function execOne(db, raw) {
+    const s0 = String(raw).trim();
+    const ctl = control(db, s0);
+    if (ctl) return ctl;
+    // Leituras com bloqueio: com um só utilizador, comportam-se como um SELECT normal.
+    const s = clean(s0.replace(/\s+(for\s+update|for\s+share|lock\s+in\s+share\s+mode)(\s+(nowait|skip\s+locked))?\s*;?\s*$/i, ''));
+    if (/^(create|alter|drop|rename|truncate)\b/i.test(s)) db.tx = null; // DDL: COMMIT implícito
+    const writes = /^(insert|update|delete|replace)\b/i.test(s);
+    if (writes && db.autocommit === false && !db.tx) db.tx = { snap: snapshot(db), saves: [], implicit: true };
+    const checked = writes && db.checks ? Object.keys(db.checks).filter((t) => db.tables[t] && new RegExp(`\\b${t}\\b`, 'i').test(s)) : [];
+    const before = checked.length ? snapshot(db) : null;
+    const res = db.exec(s);
+    for (const t of checked) for (const k of db.checks[t]) {
+      if (db.tables[t].data.some((r) => !k.ok(r))) { restore(db, before, checked); throw new Error(`ERROR 3819 (HY000): Check constraint '${k.name}' is violated. (${t}: ${k.sql})`); }
+    }
+    return { res };
+  }
   function run(db, sql) {
     const s = clean(sql);
     if (!s) throw new Error('Escreva uma instrução SQL.');
     if (split(s).length > 1) throw new Error('Execute uma instrução de cada vez.');
-    const res = db.exec(s);
-    return Array.isArray(res) ? tidy(res) : [];
+    const r = execOne(db, s);
+    if (r.rows) return r.rows;
+    return Array.isArray(r.res) ? tidy(r.res) : [];
   }
   // Executa uma ou mais instruções; devolve o resultado da última e quantas linhas foram afetadas.
+  // Se uma instrução falhar, as seguintes não são executadas (como num script no cliente mysql).
   function runMany(db, sql) {
     const parts = split(sql);
     if (!parts.length) throw new Error('Escreva uma instrução SQL.');
-    let last = [], affected = null;
+    let last = [], affected = null, msg = null, done = 0;
     for (const p of parts) {
-      const res = db.exec(clean(p));
-      if (Array.isArray(res)) { last = tidy(res); affected = null; } else { last = []; affected = typeof res === 'number' ? res : null; }
+      let r;
+      try { r = execOne(db, p); } catch (e) { e.done = done; e.total = parts.length; e.tx = txOpen(db); throw e; }
+      done++;
+      if (r.rows) { last = r.rows; affected = null; msg = null; continue; }
+      if (r.msg) { last = []; affected = null; msg = r.msg; continue; }
+      if (Array.isArray(r.res)) { last = tidy(r.res); affected = null; msg = null; } else { last = []; affected = typeof r.res === 'number' ? r.res : null; msg = null; }
     }
-    return { rows: last, affected, count: parts.length };
+    return { rows: last, affected, count: parts.length, msg, tx: txOpen(db) };
   }
+  // Fim da sessão: uma transação que ficou aberta é anulada (como quando a ligação ao MySQL termina).
+  function endSession(db) { if (!db.tx) return false; restore(db, db.tx.snap); db.tx = null; return true; }
 
   const val = (v) => (v === null || v === undefined ? null : typeof v === 'number' ? Math.round(v * 1e6) / 1e6 : String(v));
   const rowVals = (r) => Object.values(r).map(val);
@@ -309,11 +388,24 @@
       if (ex.setup) { runMany(dbU, ex.setup); runMany(dbS, ex.setup); }
       const parts = split(sql);
       if (parts.some((p) => /^\s*(select|show|describe|desc)\b/i.test(p)) && parts.every((p) => /^\s*(select|show|describe|desc)\b/i.test(p))) throw new Error('Este exercício pede uma alteração aos dados (INSERT, UPDATE ou DELETE), não uma consulta.');
-      runMany(dbU, sql);
-      runMany(dbS, ex.solution);
+      const msgs = [];
+      const code = split(sql).join(';\n'); // sem comentários
+      for (const [re, m] of ex.need || []) if (!new RegExp(re, 'i').test(code)) msgs.push(m);
+      const times = ex.repeat || 1;
+      for (let k = 0; k < times; k++) {
+        try { runMany(dbU, sql); } catch (e) {
+          if (k === 0) throw e;
+          const c = /Check constraint '\w+' is violated\. \((\w+): (.+)\)/.exec(String(e.message));
+          msgs.push(`Na ${k + 1}.ª execução (outro cliente a fazer a mesma compra) a sua instrução deu erro: ${c ? `a restrição CHECK (${c[2]}) da tabela ${c[1]} seria violada (ERROR 3819)` : e.message}. A venda deve simplesmente não acontecer quando já não há stock.`);
+        }
+        runMany(dbS, ex.solution);
+      }
+      const open = endSession(dbU);
+      endSession(dbS);
+      const target0 = ex.tables || writtenIn(ex.solution), show0 = target0.length ? target0 : writtenIn(sql);
+      if (open) return { ok: false, msgs: ['A transação ficou aberta (falta o COMMIT): quando a sessão termina, o MySQL anula todas as alterações que ela fez.'], tables: show0.filter((t) => d.seed[t]).map((t) => ({ name: t, rows: run(dbU, `SELECT * FROM ${t}`), expected: run(dbS, `SELECT * FROM ${t}`) })) };
       const target = ex.tables || writtenIn(ex.solution);
       const all = Object.keys(d.seed);
-      const msgs = [];
       // As colunas DECIMAL(p,2) do MySQL arredondam os valores guardados a 2 casas decimais.
       const dec = (t, rows) => { const cs = (d.schema[t] ? d.schema[t].cols : []).filter((c) => /^DECIMAL/.test(c[1])).map((c) => c[0]); return cs.length ? rows.map((r) => { const o = { ...r }; cs.forEach((c) => { if (typeof o[c] === 'number') o[c] = Math.round(o[c] * 100) / 100; }); return o; }) : rows; };
       const read = (db, t) => dec(t, run(db, `SELECT * FROM ${t}`));
@@ -334,10 +426,11 @@
           if (userChanged && bagDiff(bag(before.filter((r) => !U.has(keyOf(r)))), bag(before.filter((r) => !S.has(keyOf(r)))))) { msgs.push(`O número de linhas ${u.length < before.length ? 'apagadas' : 'alteradas'} em <b>${t}</b> está certo, mas não são as linhas certas. Confirme a condição do WHERE.`); continue; }
           if (userNew === solNew) { msgs.push(`As linhas certas de <b>${t}</b> foram ${solNew ? 'alteradas/inseridas' : 'afetadas'}, mas os valores finais não são os pedidos. Confirme os valores (texto entre plicas, números sem plicas).`); continue; }
         }
-        msgs.push(`O conteúdo final da tabela <b>${t}</b> não é o esperado (${bagDiff(S, U)} linha(s) em falta ou diferentes).`);
+        const miss = bagDiff(S, U), extra = bagDiff(U, S);
+        msgs.push(miss ? `O conteúdo final da tabela <b>${t}</b> não é o esperado (${miss} linha(s) em falta ou diferentes).` : `A tabela <b>${t}</b> ficou com ${extra} linha(s) a mais do que devia.`);
       }
       const show = target.length ? target : writtenIn(sql);
-      return { ok: !msgs.length, msgs, tables: show.filter((t) => d.seed[t]).map((t) => ({ name: t, rows: read(dbU, t), expected: read(dbS, t) })) };
+      return { ok: !msgs.length, msgs: [...new Set(msgs)], tables: show.filter((t) => d.seed[t]).map((t) => ({ name: t, rows: read(dbU, t), expected: read(dbS, t) })) };
     } finally { dispose(dbU); dispose(dbS); }
   }
 
@@ -376,6 +469,7 @@
       const lines = s.cols.map(([c, ty]) => `  ${c} ${ty}${pk.includes(c) ? ' NOT NULL' : ''}${c === d.auto[t] ? ' AUTO_INCREMENT' : ''}`);
       if (pk.length) lines.push(`  PRIMARY KEY (${pk.join(', ')})`);
       for (const [c] of s.cols) { const f = fk(t, c); if (f && d.schema[f[0]]) lines.push(`  FOREIGN KEY (${c}) REFERENCES ${f[0]}(${f[1] === c || !f[1] ? c : f[1]}) ON UPDATE CASCADE ON DELETE RESTRICT`); }
+      for (const k of (d.checks && d.checks[t]) || []) lines.push(`  CONSTRAINT ${k.name} CHECK (${k.sql})`);
       out += `CREATE TABLE ${t} (\n${lines.join(',\n')}\n);\n\n`;
     }
     const order = Object.keys(d.seed);
@@ -387,7 +481,7 @@
   }
 
   const api = {
-    DBS, create, dispose, run, runMany, split, check, checkDml, checkCode, norm, explain, sameResult,
+    DBS, create, dispose, run, runMany, endSession, split, check, checkDml, checkCode, norm, explain, sameResult,
     schemaOf, tablesIn, rowsOf, toMySQL, writtenIn,
     // compatibilidade: a BD escola
     SEED: ESCOLA.seed, COLS: ESCOLA.cols, SCHEMA: ESCOLA.schema,
