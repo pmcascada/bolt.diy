@@ -23,6 +23,8 @@ const query = (q, solution, hint, ordered, opts = {}) => ({ t: 'query', q, solut
 const dml = (q, solution, hint, opts = {}) => ({ t: 'dml', q, solution, hint, ...opts });
 const order = (q, parts, why) => ({ t: 'order', q, parts, why });
 const key = (k, step) => ({ ...step, key: k });
+// Exercício que mudou de lição: mantém o ID original, para não se perder o progresso já guardado.
+const withId = (id, step) => ({ ...step, id });
 // Explicação com visualização passo a passo da execução de uma consulta (FROM → WHERE → … → LIMIT).
 const viz = (title, html, spec) => ({ t: 'learn', title, html, examples: [], viz: spec });
 // ddl: CREATE/ALTER/DROP TABLE verificado pela estrutura obtida. opts: setup (tabelas que já existem), loose (só o essencial), xp.
@@ -80,35 +82,10 @@ const CHAPTERS = [
       [ex('USE escola;\nSHOW TABLES;', 'Primeiro escolhe-se a base de dados; depois listam-se as suas tabelas.')]),
     key('o1', order('Ordene os passos de uma primeira sessão no cliente mysql: entrar no servidor, ver as bases de dados, escolher a escola, listar as suas tabelas e sair.',
       ['mysql -u root -p', 'SHOW DATABASES;', 'USE escola;', 'SHOW TABLES;', 'EXIT;'], 'Primeiro liga-se ao servidor; só depois de escolher a base de dados com USE é que SHOW TABLES lista as tabelas dela.')),
-  ] },
-  { title: 'Tipos de dados', steps: [
-    learn('Para que servem os tipos de dados', `<p>Quando se cria uma tabela, é preciso dizer ao MySQL que colunas vai ter e <b>que tipo de valor</b> cada coluna guarda: números, texto, datas… Isso faz-se com o comando <code>CREATE TABLE</code>, que vai aprender a escrever no capítulo 2. Fica aqui um primeiro exemplo, só para ver onde os tipos são usados:</p>
-      <pre><code>CREATE TABLE produtos (
-  id_produto INT,          -- número inteiro
-  nome       VARCHAR(60),  -- texto até 60 caracteres
-  preco      DECIMAL(8,2), -- valor com 2 casas decimais
-  validade   DATE          -- data
-);</code></pre>
-      <p>O tipo certo garante que os dados são válidos (não se guarda texto numa coluna de preços), ocupam o espaço adequado e podem ser comparados e ordenados corretamente. Nesta lição vai conhecer os tipos mais usados.</p>`),
-    learn('Tipos numéricos', `<p>Cada coluna tem um <b>tipo de dados</b> que define o que pode guardar.</p>
-      <ul><li><b>Inteiros</b>: <code>TINYINT</code>, <code>INT</code>, <code>BIGINT</code> — idades, quantidades, identificadores.</li>
-      <li><b>Decimais exatos</b>: <code>DECIMAL(p,d)</code> — por exemplo <code>DECIMAL(8,2)</code> guarda até 999999,99. Ideal para dinheiro.</li>
-      <li><b>Vírgula flutuante</b>: <code>FLOAT</code>, <code>DOUBLE</code> — valores científicos; podem ter pequenos erros de arredondamento.</li></ul>`),
-    quiz('Que tipo deve usar para guardar um preço como 19,99 €?', ['FLOAT', 'DECIMAL(8,2)', 'VARCHAR(10)', 'DATE'], 1, 'DECIMAL guarda valores exatos, ideal para valores monetários.'),
-    learn('Tipos de texto', `<ul><li><code>CHAR(n)</code> — texto de tamanho <b>fixo</b> (ex.: códigos postais, siglas).</li>
-      <li><code>VARCHAR(n)</code> — texto de tamanho <b>variável</b> até n caracteres (ex.: nomes, emails).</li>
-      <li><code>TEXT</code> — textos longos (ex.: descrições, comentários).</li></ul>
-      <p>Os valores de texto escrevem-se entre <b>plicas</b>: <code>'Lisboa'</code>.</p>`),
-    quiz('Qual é o tipo mais adequado para o nome de uma pessoa?', ['INT', 'VARCHAR(80)', 'DECIMAL(5,2)', 'BOOLEAN'], 1, 'VARCHAR guarda texto de tamanho variável.'),
-    learn('Datas e valores lógicos', `<ul><li><code>DATE</code> — data no formato <code>'AAAA-MM-DD'</code>, por exemplo <code>'2025-03-14'</code>.</li>
-      <li><code>DATETIME</code> / <code>TIMESTAMP</code> — data e hora.</li><li><code>TIME</code> — apenas a hora.</li>
-      <li><code>BOOLEAN</code> — verdadeiro/falso (internamente <code>TINYINT(1)</code>).</li></ul>`,
-      [ex('SELECT CURDATE();', 'Devolve a data atual no formato AAAA-MM-DD.')]),
-    quiz("Qual o formato de uma DATE no MySQL?", ['DD/MM/AAAA', 'MM-DD-AAAA', 'AAAA-MM-DD', 'DD.MM.AA'], 2, "Ex.: '2025-03-14'."),
   ] }],
   cheat: [
     ['mysql -u root -p', 'Ligar ao servidor (terminal)'], ['SHOW DATABASES;', 'Listar bases de dados'], ['SELECT VERSION();', 'Versão do servidor'], ['EXIT;', 'Sair do cliente'],
-    ['INT, DECIMAL(p,d)', 'Números inteiros / decimais exatos'], ['VARCHAR(n), CHAR(n), TEXT', 'Texto variável / fixo / longo'], ["DATE 'AAAA-MM-DD'", 'Datas'],
+    ['USE bd; · SHOW TABLES; · DESCRIBE t;', 'Escolher a BD, listar tabelas, ver a estrutura'],
   ],
   test: [
     quiz('O que é um SGBD?', ['Uma linguagem de programação', 'Um sistema que gere o armazenamento e acesso a bases de dados', 'Um tipo de tabela', 'Um comando SQL'], 1, 'Sistema de Gestão de Bases de Dados.'),
@@ -116,16 +93,14 @@ const CHAPTERS = [
     quiz('Que opção do cliente mysql pede a palavra-passe?', ['-u', '-h', '-p', '-d'], 2, '-p (password).'),
     quiz('Como termina uma instrução SQL no cliente mysql?', ['Com ponto final', 'Com ponto e vírgula', 'Com dois pontos', 'Com Enter apenas'], 1, 'O ; indica o fim da instrução.'),
     quiz('INSERT, UPDATE e DELETE pertencem a que família?', ['DDL', 'DML', 'DCL', 'DQL'], 1, 'São comandos de manipulação de dados.'),
-    quiz('Qual o tipo indicado para valores monetários?', ['FLOAT', 'DOUBLE', 'DECIMAL', 'TEXT'], 2, 'DECIMAL é exato.'),
-    quiz('Qual a diferença entre CHAR e VARCHAR?', ['Nenhuma', 'CHAR tem tamanho fixo; VARCHAR é variável', 'VARCHAR só guarda números', 'CHAR só guarda uma letra'], 1, 'CHAR(n) ocupa sempre n caracteres.'),
-    quiz('Qual destas datas está no formato correto do MySQL?', ["'14/03/2025'", "'2025-03-14'", "'03-14-2025'", "'14.03.25'"], 1, 'AAAA-MM-DD.'),
     quiz('Qual destes NÃO é um SGBD relacional?', ['MySQL', 'PostgreSQL', 'Microsoft Excel', 'MariaDB'], 2, 'O Excel é uma folha de cálculo, não um sistema de gestão de bases de dados.'),
     quiz('O que identifica de forma única cada linha de uma tabela?', ['A primeira coluna', 'A chave primária', 'O nome da tabela', 'O tipo de dados'], 1, 'Não podem existir duas linhas com a mesma chave primária.'),
+    quiz('Que comando escolhe a base de dados com que se vai trabalhar?', ['SHOW escola;', 'USE escola;', 'OPEN escola;', 'SELECT escola;'], 1, 'USE define a base de dados ativa.'),
+    quiz('Que comando lista as tabelas da base de dados ativa?', ['SHOW DATABASES;', 'SHOW TABLES;', 'DESCRIBE;', 'LIST TABLES;'], 1, 'SHOW TABLES; — depois de escolher a base de dados com USE.'),
+    quiz('O que mostra DESCRIBE alunos;?', ['Os dados da tabela alunos', 'A estrutura da tabela: colunas e tipos', 'As bases de dados', 'Os utilizadores'], 1, 'DESCRIBE mostra as colunas e o tipo de cada uma.'),
     quiz('Qual o comando que sai do cliente mysql?', ['STOP;', 'EXIT;', 'CLOSE;', 'END;'], 1, 'EXIT; (ou QUIT;).'),
     quiz('No modelo cliente/servidor, o MySQL Workbench é…', ['O servidor', 'Um cliente', 'Uma base de dados', 'Um tipo de dados'], 1, 'O Workbench envia pedidos SQL ao servidor, tal como o terminal mysql.'),
     quiz('A que família pertence o SELECT?', ['DDL', 'DML', 'DCL', 'DQL'], 3, 'DQL — Data Query Language (consulta).'),
-    quiz('Que tipo guarda data e hora?', ['DATE', 'TIME', 'DATETIME', 'YEAR'], 2, 'DATETIME guarda as duas; DATE só a data e TIME só a hora.'),
-    quiz('Qual o tipo mais adequado para a quantidade em stock de um produto?', ['VARCHAR(10)', 'INT', 'DECIMAL(8,2)', 'DATE'], 1, 'Um número inteiro.'),
     predict('O que mostra esta instrução?', 'SHOW DATABASES;', ['As tabelas da base de dados ativa', 'As bases de dados existentes no servidor', 'A estrutura de uma tabela', 'Os utilizadores do servidor'], 1, 'SHOW TABLES lista as tabelas; SHOW DATABASES lista as bases de dados.'),
   ],
   real: [
@@ -160,12 +135,27 @@ const CHAPTERS = [
     quiz('O que faz DROP DATABASE escola?', ['Esconde a base de dados', 'Elimina a base de dados e todo o seu conteúdo', 'Faz uma cópia', 'Renomeia a base de dados'], 1, 'DROP é irreversível.'),
   ] },
   { title: 'Criar tabelas', steps: [
-    learn('CREATE TABLE', `<p>Uma tabela define-se com o seu nome e a lista de colunas, cada uma com o respetivo tipo:</p>
+    learn('CREATE TABLE', `<p>Uma tabela define-se com o seu nome e a lista de colunas. Para cada coluna indica-se o <b>tipo de dados</b>, isto é, que tipo de valor guarda: números, texto, datas…</p>
       <pre><code>CREATE TABLE cursos (
-  id_curso INT,
-  nome VARCHAR(50),
+  id_curso INT,          -- número inteiro
+  nome VARCHAR(50),      -- texto até 50 caracteres
   horas INT
-);</code></pre><p>As colunas são separadas por vírgulas e a lista fica entre parênteses. Pode escrever a instrução numa só linha ou em várias, como preferir.</p>`),
+);</code></pre><p>As colunas são separadas por vírgulas e a lista fica entre parênteses. Pode escrever a instrução numa só linha ou em várias, como preferir.</p>
+      <p>O tipo certo garante que os dados são válidos (não se guarda texto numa coluna de preços), ocupam o espaço adequado e podem ser comparados e ordenados corretamente. Antes de criar a primeira tabela, vamos conhecer os tipos mais usados.</p>`),
+    learn('Tipos numéricos', `<ul><li><b>Inteiros</b>: <code>TINYINT</code>, <code>INT</code>, <code>BIGINT</code> — idades, quantidades, identificadores.</li>
+      <li><b>Decimais exatos</b>: <code>DECIMAL(p,d)</code> — <i>p</i> algarismos no total, dos quais <i>d</i> decimais. Por exemplo, <code>DECIMAL(8,2)</code> guarda até 999999,99. Ideal para dinheiro.</li>
+      <li><b>Vírgula flutuante</b>: <code>FLOAT</code>, <code>DOUBLE</code> — valores científicos; podem ter pequenos erros de arredondamento.</li></ul>`),
+    withId('intro.3.1', quiz('Que tipo deve usar para guardar um preço como 19,99 €?', ['FLOAT', 'DECIMAL(8,2)', 'VARCHAR(10)', 'DATE'], 1, 'DECIMAL guarda valores exatos, ideal para valores monetários.')),
+    learn('Tipos de texto', `<ul><li><code>CHAR(n)</code> — texto de tamanho <b>fixo</b> (ex.: códigos postais, siglas).</li>
+      <li><code>VARCHAR(n)</code> — texto de tamanho <b>variável</b> até n caracteres (ex.: nomes, emails).</li>
+      <li><code>TEXT</code> — textos longos (ex.: descrições, comentários).</li></ul>
+      <p>Os valores de texto escrevem-se entre <b>plicas</b>: <code>'Lisboa'</code>.</p>`),
+    withId('intro.3.2', quiz('Qual é o tipo mais adequado para o nome de uma pessoa?', ['INT', 'VARCHAR(80)', 'DECIMAL(5,2)', 'BOOLEAN'], 1, 'VARCHAR guarda texto de tamanho variável.')),
+    learn('Datas e valores lógicos', `<ul><li><code>DATE</code> — data no formato <code>'AAAA-MM-DD'</code>, por exemplo <code>'2025-03-14'</code>.</li>
+      <li><code>DATETIME</code> / <code>TIMESTAMP</code> — data e hora.</li><li><code>TIME</code> — apenas a hora.</li>
+      <li><code>BOOLEAN</code> — verdadeiro/falso (internamente <code>TINYINT(1)</code>).</li></ul>`,
+      [ex('SELECT CURDATE();', 'Devolve a data atual no formato AAAA-MM-DD.')]),
+    withId('intro.3.3', quiz("Qual o formato de uma DATE no MySQL?", ['DD/MM/AAAA', 'MM-DD-AAAA', 'AAAA-MM-DD', 'DD.MM.AA'], 2, "Ex.: '2025-03-14'.")),
     ddl('Crie a tabela clientes com as colunas id_cliente (INT) e nome (VARCHAR(50)).', `CREATE TABLE clientes (
   id_cliente INT,
   nome VARCHAR(50)
@@ -500,7 +490,7 @@ CREATE TABLE transportadoras_encomendas (
   ] }],
   cheat: [
     ['CREATE DATABASE [IF NOT EXISTS] bd;', 'Criar base de dados'], ['USE bd;', 'Selecionar a base de dados ativa'], ['DROP DATABASE bd;', 'Eliminar base de dados'],
-    ['CREATE TABLE t (col TIPO [restrições], …);', 'Criar tabela'], ['id_tabela INT AUTO_INCREMENT PRIMARY KEY', 'Chave primária automática (id_ + nome da tabela)'],
+    ['CREATE TABLE t (col TIPO [restrições], …);', 'Criar tabela'], ['INT, DECIMAL(p,d)', 'Números inteiros / decimais exatos'], ['VARCHAR(n), CHAR(n), TEXT', 'Texto variável / fixo / longo'], ["DATE 'AAAA-MM-DD' · DATETIME · BOOLEAN", 'Datas e valores lógicos'], ['id_tabela INT AUTO_INCREMENT PRIMARY KEY', 'Chave primária automática (id_ + nome da tabela)'],
     ['NOT NULL · UNIQUE · DEFAULT v', 'Restrições de coluna'], ['CHAR(9) · VARCHAR(100) · DECIMAL(8,2) · DATE', 'Tipos frequentes'],
     ['id_t2 INT NOT NULL, FOREIGN KEY (id_t2) REFERENCES t2(id_t2)', 'Chave estrangeira (relação 1:N) — nunca NULL'], ['… ON UPDATE CASCADE ON DELETE RESTRICT', 'Ações aconselhadas para as chaves estrangeiras'],
     ['PRIMARY KEY (id_a, id_b)', 'Chave primária composta (tabela de ligação N:M)'],
@@ -513,6 +503,11 @@ CREATE TABLE transportadoras_encomendas (
   ],
   test: [
     quiz('Que comando seleciona a base de dados ativa?', ['SELECT DATABASE escola', 'USE escola', 'OPEN escola', 'SET escola'], 1, 'USE nome;'),
+    quiz('Qual o tipo indicado para valores monetários?', ['FLOAT', 'DOUBLE', 'DECIMAL', 'TEXT'], 2, 'DECIMAL é exato.'),
+    quiz('Qual a diferença entre CHAR e VARCHAR?', ['Nenhuma', 'CHAR tem tamanho fixo; VARCHAR é variável', 'VARCHAR só guarda números', 'CHAR só guarda uma letra'], 1, 'CHAR(n) ocupa sempre n caracteres.'),
+    quiz('Qual destas datas está no formato correto do MySQL?', ["'14/03/2025'", "'2025-03-14'", "'03-14-2025'", "'14.03.25'"], 1, 'AAAA-MM-DD.'),
+    quiz('Que tipo guarda data e hora?', ['DATE', 'TIME', 'DATETIME', 'YEAR'], 2, 'DATETIME guarda as duas; DATE só a data e TIME só a hora.'),
+    quiz('Qual o tipo mais adequado para a quantidade em stock de um produto?', ['VARCHAR(10)', 'INT', 'DECIMAL(8,2)', 'DATE'], 1, 'Um número inteiro.'),
     quiz('Qual a função de AUTO_INCREMENT?', ['Aumentar o tamanho da tabela', 'Gerar automaticamente valores sequenciais', 'Aumentar a velocidade', 'Fazer backup automático'], 1, '1, 2, 3, …'),
     quiz('Qual o tipo mais adequado para um código postal como 1000-001?', ['INT', 'CHAR(8)', 'DECIMAL(8,0)', 'DATE'], 1, 'Código de tamanho fixo com hífen: CHAR(8).'),
     quiz('Numa relação 1:N, onde se coloca a chave estrangeira?', ['Na tabela do lado "um"', 'Na tabela do lado "muitos"', 'Em ambas', 'Numa tabela de ligação'], 1, 'Ex.: id_cliente fica em encomendas.'),
@@ -1123,9 +1118,8 @@ SOURCE /caminho/escola.sql;</code></pre><p>Ficheiros comprimidos restauram-se co
 const INTROS = {
   'intro.1': 'Antes de escrever comandos, é preciso perceber o que é uma base de dados, como a informação se organiza em tabelas e qual o papel do MySQL e da linguagem SQL. Estes conceitos são a base de todo o curso.',
   'intro.2': 'Nesta lição aprende a ligar-se a um servidor MySQL e a dar os primeiros comandos: ver as bases de dados, escolher uma, listar as suas tabelas e sair. Fica também a conhecer as famílias de comandos SQL, que correspondem aos capítulos seguintes.',
-  'intro.3': 'Cada coluna de uma tabela guarda um tipo de valor: números, texto ou datas. Nesta lição conhece os tipos mais usados e aprende a escolher o adequado — uma decisão que vai tomar sempre que criar tabelas com CREATE TABLE, no capítulo 2.',
   'ddl.1': 'Uma base de dados é o "contentor" onde ficam as tabelas de um projeto. Antes de criar tabelas, aprende a criar, escolher e eliminar bases de dados.',
-  'ddl.2': 'É aqui que os tipos de dados do capítulo 1 são usados: aprende a criar tabelas com CREATE TABLE, a definir a chave primária e a acrescentar regras (restrições) que impedem dados inválidos.',
+  'ddl.2': 'Aprende a criar tabelas com CREATE TABLE e a escolher o tipo de dados de cada coluna (números, texto, datas), a definir a chave primária e a acrescentar regras (restrições) que impedem dados inválidos.',
   'ddl.3': 'As tabelas não vivem isoladas: um aluno pertence a um curso, uma encomenda pertence a um cliente. Nesta lição aprende a ler as multiplicidades de um diagrama, a ligar tabelas com chaves estrangeiras (relações 1:N, sempre NOT NULL) e as ações aconselhadas ON UPDATE CASCADE e ON DELETE RESTRICT.',
   'ddl.4': 'Algumas relações são "muitos para muitos": um aluno tem várias disciplinas e cada disciplina tem vários alunos. Aprende a representá-las com uma tabela de ligação — um padrão que vai encontrar em quase todas as bases de dados reais.',
   'ddl.opc': 'Uma chave estrangeira nunca fica a NULL. Nesta lição aprende o que fazer quando a ligação é opcional (0..1) ou de um para um: criar uma tabela nova, usar UNIQUE ou juntar as entidades numa só tabela, conforme as multiplicidades.',
@@ -1166,7 +1160,7 @@ CHAPTERS.forEach((c, ci) => {
     l.chapter = c.id;
     l.intro = INTROS[l.id] || '';
     let n = 0;
-    l.steps.forEach((s, si) => { s.idx = si; if (s.t !== 'learn') s.id = s.key ? `${l.id}.${s.key}` : `${l.id}.${++n}`; });
+    l.steps.forEach((s, si) => { s.idx = si; if (s.t !== 'learn') { if (!s.id) s.id = s.key ? `${l.id}.${s.key}` : `${l.id}.${++n}`; s.lesson = l.id; } });
     l.ex = l.steps.filter((s) => s.t !== 'learn');
   });
   c.test.forEach((q, qi) => (q.id = `${c.id}.t${qi + 1}`));
