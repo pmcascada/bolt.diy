@@ -73,4 +73,52 @@ t('script MySQL das BD de exemplo', () => {
   assert.match(s, /PRIMARY KEY \(id_encomenda, id_produto\)/);
   assert.strictEqual((s.match(/^CREATE TABLE/gm) || []).length, 4);
 });
+// Transações (simuladas no motor do browser)
+const count = (db, sql) => D.runMany(db, sql).rows[0].n;
+t('transação: ROLLBACK anula tudo o que foi feito desde START TRANSACTION', () => {
+  const db = D.create('loja');
+  D.runMany(db, "START TRANSACTION; INSERT INTO encomendas (id_cliente, data, estado) VALUES (3, '2025-06-02', 'pendente'); DELETE FROM linhas_encomenda WHERE id_encomenda = 1");
+  assert.strictEqual(count(db, 'SELECT COUNT(*) AS n FROM encomendas'), 81);
+  assert.ok(db.tx);
+  D.runMany(db, 'ROLLBACK');
+  assert.strictEqual(count(db, 'SELECT COUNT(*) AS n FROM encomendas'), 80);
+  assert.strictEqual(count(db, 'SELECT COUNT(*) AS n FROM linhas_encomenda WHERE id_encomenda = 1'), 3);
+  assert.ok(!db.tx);
+});
+t('transação: COMMIT grava; ROLLBACK sem transação não anula nada (autocommit)', () => {
+  const db = D.create('loja');
+  D.runMany(db, 'START TRANSACTION; DELETE FROM linhas_encomenda WHERE id_encomenda = 2; COMMIT; ROLLBACK');
+  assert.strictEqual(count(db, 'SELECT COUNT(*) AS n FROM linhas_encomenda WHERE id_encomenda = 2'), 0);
+  D.runMany(db, 'DELETE FROM linhas_encomenda WHERE id_encomenda = 3'); D.runMany(db, 'ROLLBACK');
+  assert.strictEqual(count(db, 'SELECT COUNT(*) AS n FROM linhas_encomenda WHERE id_encomenda = 3'), 0);
+});
+t('transação: CHECK falha a meio, a instrução é anulada e a transação continua aberta', () => {
+  const db = D.create('loja');
+  assert.throws(() => D.runMany(db, "START TRANSACTION; INSERT INTO encomendas (id_cliente, data, estado) VALUES (3, '2025-06-02', 'pendente'); UPDATE produtos SET stock = stock - 1 WHERE id_produto = 4; COMMIT"), /3819/);
+  assert.ok(db.tx, 'a transação continua aberta (o COMMIT não foi executado)');
+  assert.strictEqual(D.runMany(db, 'SELECT stock FROM produtos WHERE id_produto = 4').rows[0].stock, 0);
+  assert.strictEqual(count(db, 'SELECT COUNT(*) AS n FROM encomendas'), 81);
+  D.runMany(db, 'ROLLBACK');
+  assert.strictEqual(count(db, 'SELECT COUNT(*) AS n FROM encomendas'), 80);
+});
+t('transação: autocommit = 0, SAVEPOINT, DDL com COMMIT implícito, AUTO_INCREMENT não volta atrás', () => {
+  const db = D.create('loja');
+  D.runMany(db, 'SET autocommit = 0');
+  assert.strictEqual(D.runMany(db, 'SELECT @@autocommit').rows[0]['@@autocommit'], 0);
+  D.runMany(db, 'UPDATE produtos SET preco = 0 WHERE id_produto = 1; ROLLBACK');
+  assert.strictEqual(D.runMany(db, 'SELECT preco FROM produtos WHERE id_produto = 1').rows[0].preco, 749.9);
+  D.runMany(db, 'SET autocommit = 1; START TRANSACTION; UPDATE produtos SET stock = 1 WHERE id_produto = 17; SAVEPOINT a; UPDATE produtos SET stock = 0 WHERE id_produto = 17; ROLLBACK TO SAVEPOINT a; COMMIT');
+  assert.strictEqual(D.runMany(db, 'SELECT stock FROM produtos WHERE id_produto = 17 FOR UPDATE').rows[0].stock, 1);
+  D.runMany(db, 'START TRANSACTION; UPDATE produtos SET stock = 9 WHERE id_produto = 17; CREATE TABLE extra (a INT); ROLLBACK');
+  assert.strictEqual(D.runMany(db, 'SELECT stock FROM produtos WHERE id_produto = 17').rows[0].stock, 9);
+  D.runMany(db, "START TRANSACTION; INSERT INTO encomendas (id_cliente, data, estado) VALUES (5, '2025-06-01', 'pendente'); ROLLBACK");
+  D.runMany(db, "INSERT INTO encomendas (id_cliente, data, estado) VALUES (5, '2025-06-01', 'pendente')");
+  assert.strictEqual(D.runMany(db, 'SELECT MAX(id_encomenda) AS m FROM encomendas').rows[0].m, 82);
+});
+t('concorrência: o UPDATE com condição vende só a última unidade', () => {
+  const db = D.create('loja');
+  D.runMany(db, 'UPDATE produtos SET stock = 1 WHERE id_produto = 17');
+  const sell = () => D.runMany(db, 'UPDATE produtos SET stock = stock - 1 WHERE id_produto = 17 AND stock >= 1').affected;
+  assert.deepStrictEqual([sell(), sell()], [1, 0]);
+});
 console.log(`${n} verificações do motor e da pontuação`);

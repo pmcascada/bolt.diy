@@ -587,3 +587,21 @@ details.pj pre{max-height:360px;overflow:auto}
 .gx-story{overflow:auto}
 .gx-time.stop{color:#c084fc;animation:none}
 code,pre,kbd,samp,textarea,.mono{font-variant-ligatures:none;font-feature-settings:"liga" 0,"calt" 0}
+/* transações: aviso de transação aberta, exemplos em sessão e simulador de concorrência */
+.tx-note{display:flex;gap:8px;align-items:flex-start;margin-top:8px;padding:8px 12px;border-radius:var(--r-sm);background:var(--warn-weak);border:1px solid var(--warn);color:var(--warn);font-size:.86rem}
+.tx-note svg{flex:none;width:16px;height:16px;margin-top:2px}
+.sess-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0 4px;padding:8px 12px;border-radius:var(--r-sm);background:var(--surface-2);border:1px dashed var(--border-strong);font-size:.86rem;color:var(--text-2)}
+.sess-bar svg{width:16px;height:16px}.sess-bar .btn{margin-left:auto}
+.race{margin-top:14px;padding:14px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface)}
+.rc-grid{display:grid;grid-template-columns:28px 1fr 1fr 60px;gap:6px 10px;align-items:start}
+.rc-h{font:600 .72rem var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding-bottom:4px;border-bottom:1px solid var(--border)}
+.rc-t{font:600 .8rem var(--mono);color:var(--muted);padding-top:8px}
+.rc-cell pre{margin:0;padding:8px 10px;font-size:.78rem;white-space:pre-wrap;border-radius:var(--r-sm);background:var(--code-bg);color:var(--code-text)}
+.rc-cell.wait{display:flex;gap:6px;align-items:center;padding:8px 10px;border-radius:var(--r-sm);background:var(--warn-weak);color:var(--warn);font-size:.8rem;animation:gxpulse 1.4s infinite}
+.rc-cell.wait svg{width:15px;height:15px;flex:none}
+.rc-stock{font:700 1.1rem var(--mono);text-align:center;padding-top:6px;color:var(--text)}.rc-stock.bad{color:var(--bad)}
+.rc-note{grid-column:2 / 5;font-size:.84rem;color:var(--text-2);padding:0 2px 8px;border-bottom:1px dashed var(--border)}
+.rc-note.bad{color:var(--bad)}.rc-note.good{color:var(--ok)}
+.rc-end{display:flex;gap:8px;align-items:flex-start;margin-top:12px;padding:10px 12px;border-radius:var(--r-sm);font-weight:600;font-size:.9rem}
+.rc-end svg{width:18px;height:18px;flex:none}.rc-end.bad{background:var(--bad-weak);color:var(--bad)}.rc-end.ok{background:var(--ok-weak);color:var(--ok)}
+@media (max-width:640px){.rc-grid{grid-template-columns:22px 1fr 1fr 44px;gap:6px}.rc-cell pre{font-size:.7rem;padding:6px}}
