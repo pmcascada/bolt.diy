@@ -586,3 +586,4 @@ details.pj pre{max-height:360px;overflow:auto}
 .nx-lb .me td{background:var(--accent-soft,#F7941D22)}
 .gx-story{overflow:auto}
 .gx-time.stop{color:#c084fc;animation:none}
+code,pre,kbd,samp,textarea,.mono{font-variant-ligatures:none;font-feature-settings:"liga" 0,"calt" 0}

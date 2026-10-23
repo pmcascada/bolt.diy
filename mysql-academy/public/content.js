@@ -170,7 +170,7 @@ const CHAPTERS = [
   id_fornecedor INT AUTO_INCREMENT PRIMARY KEY,
   nome VARCHAR(80)
 );`, 'id_fornecedor INT AUTO_INCREMENT PRIMARY KEY, nome …'),
-    learn('Restrições: NOT NULL, UNIQUE, DEFAULT e CHECK', `<p>As <b>restrições</b> são regras que o MySQL verifica sempre que se guardam dados numa coluna:</p><ul><li><code>NOT NULL</code> — o valor é obrigatório;</li><li><code>UNIQUE</code> — não podem existir valores repetidos;</li><li><code>DEFAULT valor</code> — valor usado quando não é indicado nenhum;</li><li><code>CHECK (condição)</code> — o valor tem de cumprir uma condição, por exemplo <code>preco DECIMAL(8,2) CHECK (preco &gt; 0)</code>. As condições usam os operadores de comparação <code>&gt;</code>, <code>&lt;</code>, <code>&gt;=</code>, <code>&lt;=</code>, <code>=</code> e <code>&lt;&gt;</code> (diferente). O CHECK é aprofundado no capítulo 5.</li></ul>
+    learn('Restrições: NOT NULL, UNIQUE, DEFAULT e CHECK', `<p>As <b>restrições</b> são regras que o MySQL verifica sempre que se guardam dados numa coluna:</p><ul><li><code>NOT NULL</code> — o valor é obrigatório;</li><li><code>UNIQUE</code> — não podem existir valores repetidos;</li><li><code>DEFAULT valor</code> — valor usado quando não é indicado nenhum;</li><li><code>CHECK (condição)</code> — o valor tem de cumprir uma condição, por exemplo <code>preco DECIMAL(8,2) CHECK (preco &gt; 0)</code>. As condições usam os operadores de comparação <code>&gt;</code>, <code>&lt;</code>, <code>&gt;=</code>, <code>&lt;=</code>, <code>=</code> e <code>&lt;&gt;</code> (diferente). O CHECK é aprofundado na lição seguinte.</li></ul>
       <p>Escolha também o tipo certo: <code>CHAR(n)</code> para códigos de tamanho fixo (NIF, ISBN, código postal), <code>VARCHAR(n)</code> para texto variável e <code>DECIMAL(p,d)</code> para valores com casas decimais.</p>`,
       [ex("CREATE TABLE alunos (\n  id_aluno INT AUTO_INCREMENT PRIMARY KEY,\n  nome VARCHAR(80) NOT NULL,\n  email VARCHAR(100) UNIQUE,\n  idade INT DEFAULT 18\n);", 'Nome obrigatório, email sem repetidos, idade 18 por omissão.')]),
     quiz('Que restrição impede que uma coluna fique vazia?', ['UNIQUE', 'DEFAULT', 'NOT NULL', 'AUTO_INCREMENT'], 2, 'NOT NULL torna o valor obrigatório.'),
@@ -189,6 +189,69 @@ const CHAPTERS = [
   nome VARCHAR(80) NOT NULL,
   pais VARCHAR(40)
 );`, 'Procure uma vírgula em falta entre duas colunas.', { start: 'CREATE TABLE editoras (\n  id_editora INT AUTO_INCREMENT PRIMARY KEY\n  nome VARCHAR(80) NOT NULL,\n  pais VARCHAR(40)\n);' })),
+  ] },
+  { key: 'chk', title: 'Validar dados com CHECK', steps: [
+    learn('A restrição CHECK', `<p>O tipo de dados e as restrições <code>NOT NULL</code>, <code>UNIQUE</code> e <code>DEFAULT</code> já evitam muitos erros, mas não chegam: uma coluna <code>INT</code> aceita uma nota de 35 e uma coluna <code>DECIMAL</code> aceita um preço negativo. A restrição <code>CHECK</code> define uma <b>condição</b> que todos os valores têm de cumprir. Quando um valor não a cumpre, o MySQL recusa a operação e a linha <b>não é guardada</b> (ERROR 3819 — <i>Check constraint is violated</i>).</p>
+      <pre><code>CREATE TABLE produtos (
+  id_produto INT AUTO_INCREMENT PRIMARY KEY,
+  nome VARCHAR(60) NOT NULL,
+  preco DECIMAL(8,2) NOT NULL CHECK (preco &gt; 0),
+  stock INT NOT NULL DEFAULT 0 CHECK (stock &gt;= 0)
+);</code></pre>
+      <p>A condição escreve-se sempre entre parênteses e usa os operadores de comparação:</p>
+      <table><tr><th>Operador</th><th>Significa</th><th>Exemplo</th></tr>
+      <tr><td><code>=</code> · <code>&lt;&gt;</code></td><td>igual · diferente</td><td><code>CHECK (pais &lt;&gt; '')</code></td></tr>
+      <tr><td><code>&gt;</code> · <code>&gt;=</code></td><td>maior · maior ou igual</td><td><code>CHECK (idade &gt;= 16)</code></td></tr>
+      <tr><td><code>&lt;</code> · <code>&lt;=</code></td><td>menor · menor ou igual</td><td><code>CHECK (desconto &lt;= 50)</code></td></tr></table>
+      <p>Atenção à diferença entre <code>&gt;</code> e <code>&gt;=</code>: <code>preco &gt; 0</code> recusa o preço 0; <code>preco &gt;= 0</code> aceita-o. O MySQL aplica as restrições CHECK a partir da versão 8.0.16; as versões anteriores aceitavam a sintaxe mas ignoravam a regra.</p>`),
+    withId('adv.1.1', ddl('Crie a tabela artigos com id_artigo (INT, chave primária), nome (VARCHAR(60)) e preco (DECIMAL(8,2)) com uma restrição CHECK que garanta que o preço é maior que 0.', `CREATE TABLE artigos (
+  id_artigo INT PRIMARY KEY,
+  nome VARCHAR(60),
+  preco DECIMAL(8,2) CHECK (preco > 0)
+);`, 'preco DECIMAL(8,2) CHECK (preco > 0)')),
+    learn('Condições compostas: AND, OR, BETWEEN e IN', `<p>Uma condição pode juntar várias comparações:</p>
+      <ul><li><code>AND</code> — as duas condições têm de ser verdadeiras: <code>CHECK (nota &gt;= 0 AND nota &lt;= 20)</code>;</li>
+      <li><code>OR</code> — basta uma ser verdadeira: <code>CHECK (pais = 'PT' OR pais = 'ES')</code>;</li>
+      <li><code>NOT</code> — nega a condição;</li>
+      <li><code>BETWEEN a AND b</code> — entre dois valores, <b>incluindo</b> os extremos: <code>CHECK (nota BETWEEN 0 AND 20)</code> é o mesmo que <code>nota &gt;= 0 AND nota &lt;= 20</code>;</li>
+      <li><code>IN (lista)</code> — o valor tem de ser um dos da lista: <code>CHECK (estado IN ('pendente', 'paga', 'enviada'))</code>. É a forma habitual de limitar uma coluna a um conjunto fixo de valores.</li></ul>
+      <p>Se precisar de juntar AND e OR na mesma condição, use parênteses para deixar clara a ordem: <code>CHECK ((tipo = 'aluno' AND idade &gt;= 16) OR tipo = 'docente')</code>.</p>`,
+      [ex("CREATE TABLE avaliacoes (\n  id_avaliacao INT AUTO_INCREMENT PRIMARY KEY,\n  tipo VARCHAR(10) NOT NULL CHECK (tipo IN ('teste', 'trabalho', 'exame')),\n  nota INT NOT NULL CHECK (nota BETWEEN 0 AND 20),\n  peso INT NOT NULL CHECK (peso > 0 AND peso <= 100)\n);", 'Três regras: tipo de uma lista, nota de 0 a 20 e peso entre 1 e 100.')]),
+    key('c1', quiz('Qual destas restrições aceita exatamente as notas de 0 a 20 (incluindo o 0 e o 20)?', ['CHECK (nota > 0 AND nota < 20)', 'CHECK (nota BETWEEN 0 AND 20)', 'CHECK (nota IN (0, 20))', 'CHECK (nota >= 0 OR nota <= 20)'], 1, 'BETWEEN inclui os extremos. Com OR, qualquer número cumpre uma das condições; IN (0, 20) só aceita esses dois valores.')),
+    key('c2', ddl("Crie a tabela encomendas com: id_encomenda (inteiro, chave primária automática); estado (VARCHAR(20), obrigatório, por omissão 'pendente') que só pode ser 'pendente', 'paga', 'enviada' ou 'cancelada'; quantidade (inteiro, obrigatório) entre 1 e 100.", `CREATE TABLE encomendas (
+  id_encomenda INT AUTO_INCREMENT PRIMARY KEY,
+  estado VARCHAR(20) NOT NULL DEFAULT 'pendente' CHECK (estado IN ('pendente', 'paga', 'enviada', 'cancelada')),
+  quantidade INT NOT NULL CHECK (quantidade BETWEEN 1 AND 100)
+);`, "estado … CHECK (estado IN (…)) · quantidade … CHECK (quantidade BETWEEN 1 AND 100)")),
+    learn('CHECK ao nível da tabela e restrições com nome', `<p>Um CHECK escrito junto da coluna só pode usar <b>essa</b> coluna. Quando a regra compara duas colunas — por exemplo, a data de saída tem de ser posterior à de entrada — escreve-se no fim da tabela, como as chaves.</p>
+      <p>Também é boa prática dar um <b>nome</b> à restrição com <code>CONSTRAINT nome</code>. O nome aparece na mensagem de erro (fica claro que regra foi violada) e permite removê-la mais tarde. Neste curso usamos <code>chk_tabela_regra</code>:</p>
+      <pre><code>CREATE TABLE alugueres (
+  id_aluguer INT AUTO_INCREMENT PRIMARY KEY,
+  levantamento DATE NOT NULL,
+  devolucao DATE NOT NULL,
+  km INT NOT NULL,
+  CONSTRAINT chk_alugueres_datas CHECK (devolucao &gt;= levantamento),
+  CONSTRAINT chk_alugueres_km CHECK (km &gt;= 0)
+);</code></pre>
+      <p>As datas comparam-se como os números: uma data «maior» é uma data posterior.</p>`),
+    key('c3', ddl('Crie a tabela reservas com: id_reserva (inteiro, chave primária automática); entrada e saida (DATE, obrigatórias); pessoas (inteiro, obrigatório) entre 1 e 6. Acrescente a restrição chk_reservas_datas, que garante que a saída é depois da entrada (pelo menos uma noite).', `CREATE TABLE reservas (
+  id_reserva INT AUTO_INCREMENT PRIMARY KEY,
+  entrada DATE NOT NULL,
+  saida DATE NOT NULL,
+  pessoas INT NOT NULL CHECK (pessoas BETWEEN 1 AND 6),
+  CONSTRAINT chk_reservas_datas CHECK (saida > entrada)
+);`, 'CONSTRAINT chk_reservas_datas CHECK (saida > entrada) no fim da tabela')),
+    learn('CHECK e os valores NULL', `<p>Um CHECK só recusa uma linha quando a condição é <b>falsa</b>. Se a coluna estiver vazia (<code>NULL</code>), a comparação não é verdadeira nem falsa — é <i>desconhecida</i> — e a linha é <b>aceite</b>. Por isso <code>nota INT CHECK (nota BETWEEN 0 AND 20)</code> aceita uma nota em falta.</p>
+      <p>Quando o valor é obrigatório, junte <code>NOT NULL</code> ao CHECK: <code>nota INT NOT NULL CHECK (nota BETWEEN 0 AND 20)</code>.</p>
+      <p><b>Limites do CHECK:</b> a condição só pode usar colunas da própria linha. Não pode consultar outras tabelas (para isso existem as chaves estrangeiras, na lição seguinte) nem usar valores que mudam, como a data de hoje.</p>`),
+    key('c4', quiz('A tabela pautas tem a coluna nota INT CHECK (nota BETWEEN 0 AND 20), sem NOT NULL. O que acontece a uma linha sem nota (NULL)?', ['É recusada pelo CHECK', 'É aceite: com NULL a condição não é falsa', 'A nota passa a 0', 'A nota passa a 20'], 1, 'O CHECK só recusa condições falsas; para tornar a nota obrigatória acrescente NOT NULL.')),
+    withId('adv.1.2', quiz('O que acontece a um INSERT que viola uma restrição CHECK?', ['A linha é guardada com o valor corrigido para 0', 'A operação é recusada com um erro e a linha não é guardada', 'A linha é guardada mas fica marcada', 'A restrição é desativada'], 1, 'O CHECK garante que só entram dados válidos.')),
+    key('c5', quiz('Uma regra exige que data_fim nunca seja anterior a data_inicio. Como se escreve?', ['data_fim DATE CHECK (data_fim > 0)', 'No fim da tabela: CONSTRAINT chk_datas CHECK (data_fim >= data_inicio)', 'data_inicio DATE UNIQUE', 'data_fim DATE DEFAULT data_inicio'], 1, 'Uma regra que compara duas colunas escreve-se ao nível da tabela.')),
+    key('f1', ddl('Corrija o erro: o MySQL recusa a instrução abaixo. Ela devia criar a tabela produtos com o preço obrigatório e sempre maior que 0.', `CREATE TABLE produtos (
+  id_produto INT AUTO_INCREMENT PRIMARY KEY,
+  nome VARCHAR(80) NOT NULL,
+  preco DECIMAL(8,2) NOT NULL CHECK (preco > 0)
+);`, 'A condição do CHECK tem de estar entre parênteses.', { start: 'CREATE TABLE produtos (\n  id_produto INT AUTO_INCREMENT PRIMARY KEY,\n  nome VARCHAR(80) NOT NULL,\n  preco DECIMAL(8,2) NOT NULL CHECK preco > 0\n);' })),
   ] },
   { title: 'Chaves estrangeiras e relações 1:N', steps: [
     learn('Relações um-para-muitos (1:N)', `<p>Um curso tem <b>muitos</b> alunos, mas cada aluno pertence a <b>um</b> curso: é uma relação <b>1:N</b>. Representa-se colocando, na tabela do lado "muitos" (<code>alunos</code>), uma <b>chave estrangeira</b> (<code>FOREIGN KEY</code>) que referencia a chave primária da tabela do lado "um" (<code>cursos</code>).</p>
@@ -380,6 +443,11 @@ CREATE TABLE livros_autores (
 ALTER TABLE encomendas DROP FOREIGN KEY fk_encomendas_clientes;</code></pre>
       <p>Os dados que já existem têm de respeitar a nova regra; caso contrário, o MySQL recusa a alteração.</p>`),
     ddl('As tabelas cursos e alunos já existem, mas ainda não estão ligadas. Acrescente à tabela alunos a chave estrangeira fk_alunos_cursos (coluna id_curso, que referencia cursos), com as ações aconselhadas: ON UPDATE CASCADE e ON DELETE RESTRICT.', 'ALTER TABLE alunos ADD CONSTRAINT fk_alunos_cursos FOREIGN KEY (id_curso) REFERENCES cursos(id_curso) ON UPDATE CASCADE ON DELETE RESTRICT;', 'ADD CONSTRAINT fk_alunos_cursos FOREIGN KEY … ON UPDATE CASCADE ON DELETE RESTRICT', { setup: 'CREATE TABLE cursos (\n  id_curso INT AUTO_INCREMENT PRIMARY KEY,\n  nome VARCHAR(50) NOT NULL\n);\nCREATE TABLE alunos (\n  id_aluno INT AUTO_INCREMENT PRIMARY KEY,\n  nome VARCHAR(80) NOT NULL,\n  id_curso INT NOT NULL\n);' }),
+    learn('Acrescentar e remover restrições CHECK', `<p>Também se acrescenta um CHECK a uma tabela que já existe, de preferência com nome, e remove-se com <code>DROP CHECK</code>:</p>
+      <pre><code>ALTER TABLE alunos ADD CONSTRAINT chk_alunos_idade CHECK (idade &gt;= 16);
+ALTER TABLE alunos DROP CHECK chk_alunos_idade;</code></pre>
+      <p>Ao acrescentar a restrição, as linhas que já existem também têm de a cumprir; caso contrário o ALTER TABLE falha.</p>`),
+    withId('adv.1.3', ddl('Acrescente à tabela notas uma restrição chamada chk_nota que garanta que a nota está entre 0 e 20 (use BETWEEN).', 'ALTER TABLE notas ADD CONSTRAINT chk_nota CHECK (nota BETWEEN 0 AND 20);', 'ALTER TABLE notas ADD CONSTRAINT chk_nota CHECK (…)', { setup: 'CREATE TABLE notas (\n  id_aluno INT,\n  disciplina VARCHAR(50),\n  nota INT\n);' })),
     learn('Remover colunas e tabelas', `<pre><code>ALTER TABLE alunos DROP COLUMN telefone;   -- remove a coluna (e os seus dados)
 RENAME TABLE alunos TO estudantes;          -- muda o nome da tabela
 DROP TABLE IF EXISTS temporaria;            -- elimina a tabela inteira</code></pre>
@@ -491,7 +559,8 @@ CREATE TABLE transportadoras_encomendas (
   cheat: [
     ['CREATE DATABASE [IF NOT EXISTS] bd;', 'Criar base de dados'], ['USE bd;', 'Selecionar a base de dados ativa'], ['DROP DATABASE bd;', 'Eliminar base de dados'],
     ['CREATE TABLE t (col TIPO [restrições], …);', 'Criar tabela'], ['INT, DECIMAL(p,d)', 'Números inteiros / decimais exatos'], ['VARCHAR(n), CHAR(n), TEXT', 'Texto variável / fixo / longo'], ["DATE 'AAAA-MM-DD' · DATETIME · BOOLEAN", 'Datas e valores lógicos'], ['id_tabela INT AUTO_INCREMENT PRIMARY KEY', 'Chave primária automática (id_ + nome da tabela)'],
-    ['NOT NULL · UNIQUE · DEFAULT v', 'Restrições de coluna'], ['CHAR(9) · VARCHAR(100) · DECIMAL(8,2) · DATE', 'Tipos frequentes'],
+    ['NOT NULL · UNIQUE · DEFAULT v', 'Restrições de coluna'], ['col TIPO CHECK (condição)', 'Validar os valores de uma coluna'], ["CHECK (x BETWEEN 0 AND 20) · CHECK (e IN ('a', 'b'))", 'Intervalo (inclui extremos) · lista de valores'],
+    ['CONSTRAINT chk_t_regra CHECK (fim >= inicio)', 'CHECK com nome, ao nível da tabela (compara colunas)'], ['ALTER TABLE t ADD CONSTRAINT nome CHECK (…); · DROP CHECK nome;', 'Acrescentar / remover CHECK'], ['CHAR(9) · VARCHAR(100) · DECIMAL(8,2) · DATE', 'Tipos frequentes'],
     ['id_t2 INT NOT NULL, FOREIGN KEY (id_t2) REFERENCES t2(id_t2)', 'Chave estrangeira (relação 1:N) — nunca NULL'], ['… ON UPDATE CASCADE ON DELETE RESTRICT', 'Ações aconselhadas para as chaves estrangeiras'],
     ['PRIMARY KEY (id_a, id_b)', 'Chave primária composta (tabela de ligação N:M)'],
     ['0..1 — 0..*  →  tabela a_b, PK = FK do lado *', 'Relação 1:N opcional, sem nulos'], ['0..1 — 0..1  →  tabela a_b, PK + UNIQUE', 'Relação 1:1 opcional dos dois lados'],
@@ -526,6 +595,13 @@ CREATE TABLE transportadoras_encomendas (
     quiz('Que restrição deve ter uma chave estrangeira obrigatória?', ['UNIQUE', 'NOT NULL', 'DEFAULT 0', 'AUTO_INCREMENT'], 1, 'Se a relação é obrigatória, a coluna não aceita NULL.'),
     quiz('Que comando acrescenta uma coluna a uma tabela existente?', ['UPDATE TABLE … ADD', 'ALTER TABLE … ADD COLUMN', 'INSERT COLUMN', 'MODIFY TABLE'], 1, 'ALTER TABLE t ADD COLUMN c TIPO;'),
     quiz('Que tipo de dados usa normalmente uma chave estrangeira que referencia id_cliente INT?', ['VARCHAR(10)', 'INT', 'DECIMAL', 'O tipo não importa'], 1, 'Tem de ser do mesmo tipo da chave referenciada.'),
+    quiz('Para que serve a restrição CHECK?', ['Criar um índice', 'Garantir que os valores cumprem uma condição', 'Verificar a palavra-passe', 'Fazer uma cópia de segurança'], 1, 'Ex.: CHECK (preco > 0).'),
+    quiz('Qual destas definições impede notas acima de 20?', ['nota INT UNIQUE', 'nota INT DEFAULT 20', 'nota INT CHECK (nota <= 20)', 'nota INT INDEX 20'], 2, 'O CHECK valida o valor.'),
+    quiz('Porque se deve dar um nome a uma restrição (CONSTRAINT chk_…)?', ['É obrigatório', 'Para a identificar nos erros e poder removê-la', 'Para a tornar mais rápida', 'Para criar um índice'], 1, 'ALTER TABLE … DROP CHECK nome.'),
+    quiz('O que acontece ao acrescentar uma restrição CHECK que as linhas existentes não cumprem?', ['As linhas são apagadas', 'O ALTER TABLE falha', 'A restrição só se aplica a linhas novas', 'Os valores são corrigidos'], 1, 'Os dados existentes também têm de a cumprir.'),
+    quiz('A tabela stock tem a coluna qtd INT CHECK (qtd >= 0). O que acontece ao tentar guardar uma linha com qtd = -3?', ['A linha é guardada com qtd 0', 'É recusada (ERROR 3819) e a linha não é guardada', 'É guardada com um aviso', 'A restrição é ignorada'], 1, 'O CHECK recusa os valores que não cumprem a condição.'),
+    quiz("Qual destas restrições limita a coluna estado aos valores 'ativo' e 'inativo'?", ["CHECK (estado BETWEEN 'ativo' AND 'inativo')", "CHECK (estado IN ('ativo', 'inativo'))", "CHECK (estado = 'ativo' AND estado = 'inativo')", "estado DEFAULT 'ativo'"], 1, 'IN aceita apenas os valores da lista.'),
+    quiz('Uma coluna nota INT CHECK (nota BETWEEN 0 AND 20), sem NOT NULL, aceita NULL?', ['Não, o CHECK recusa', 'Sim: com NULL a condição não é falsa', 'Só se houver DEFAULT', 'Só em tabelas vazias'], 1, 'Junte NOT NULL quando o valor é obrigatório.'),
     predict('O que acontece ao executar esta instrução se a tabela clientes ainda não existir?', 'CREATE TABLE encomendas (\n  id_encomenda INT AUTO_INCREMENT PRIMARY KEY,\n  id_cliente INT NOT NULL,\n  FOREIGN KEY (id_cliente) REFERENCES clientes(id_cliente)\n);', ['A tabela é criada sem chave estrangeira', 'O MySQL recusa: a tabela referenciada tem de existir primeiro', 'A tabela clientes é criada automaticamente', 'A chave estrangeira fica desativada'], 1, 'O "pai" cria-se antes do "filho" (ERROR 1824).'),
   ],
   real: [
@@ -534,6 +610,7 @@ CREATE TABLE transportadoras_encomendas (
     'Tentar inserir uma encomenda de um cliente que não existe e ler o erro <b>1452</b> (integridade referencial).',
     'Tentar eliminar <code>clientes</code> antes de <code>encomendas</code> e ler o erro <b>3730</b>; depois eliminar pela ordem certa.',
     'Desenhar o diagrama da BD no MySQL Workbench (Database → Reverse Engineer) e verificar as relações.',
+    'Criar a tabela <code>stock</code> com <code>qtd INT NOT NULL CHECK (qtd &gt;= 0)</code>, ver a restrição com <code>SHOW CREATE TABLE stock;</code> e confirmar, mais tarde (capítulo 3), que um valor negativo dá o erro <b>3819</b>.',
   ],
   practice: [
     ddl('Já existe a tabela categorias (categorias 1..1 — 0..* artigos). Crie a tabela artigos com id_artigo (chave primária automática), nome (VARCHAR(80), obrigatório), preco (DECIMAL(8,2)) e id_categoria, ligada a categorias com as ações aconselhadas.', `CREATE TABLE artigos (
@@ -838,38 +915,12 @@ CREATE TABLE transportadoras_encomendas (
     query('Na BD loja, quantas encomendas existem em cada estado?', 'SELECT estado, COUNT(*) FROM encomendas GROUP BY estado', 'GROUP BY estado', false, { db: 'loja' }),
   ],
 },
-/* ========================= restrições, índices e vistas ========================= */
+/* ========================= índices e vistas ========================= */
 {
-  id: 'adv', icon: 'layers', title: 'Restrições, índices e vistas',
-  desc: 'CHECK para validar dados, índices para acelerar consultas e vistas (VIEW).',
+  id: 'adv', icon: 'layers', title: 'Índices e vistas',
+  desc: 'Índices para acelerar consultas e vistas (VIEW) para simplificar e proteger o acesso aos dados.',
   lessons: [
-  { title: 'Validar dados com CHECK', steps: [
-    learn('A restrição CHECK', `<p>Já conhece as restrições <code>NOT NULL</code>, <code>UNIQUE</code> e <code>DEFAULT</code>, e viu de passagem o <code>CHECK</code> no capítulo 2. Vamos agora aprofundá-lo. A restrição <code>CHECK</code> vai mais longe que as outras: define uma <b>condição</b> que todos os valores têm de cumprir. Se um INSERT ou UPDATE a violar, o MySQL recusa a operação.</p>
-      <p>Pode escrever-se junto da coluna ou no fim da definição da tabela:</p>
-      <pre><code>CREATE TABLE produtos (
-  id_produto INT PRIMARY KEY,
-  nome VARCHAR(60) NOT NULL,
-  preco DECIMAL(8,2) CHECK (preco > 0),
-  stock INT,
-  CHECK (stock >= 0)
-);</code></pre>
-      <p>O MySQL aplica as restrições CHECK a partir da versão 8.0.16.</p>`),
-    ddl('Crie a tabela artigos com id_artigo (INT, chave primária), nome (VARCHAR(60)) e preco (DECIMAL(8,2)) com uma restrição CHECK que garanta que o preço é maior que 0.', `CREATE TABLE artigos (
-  id_artigo INT PRIMARY KEY,
-  nome VARCHAR(60),
-  preco DECIMAL(8,2) CHECK (preco > 0)
-);`, 'preco DECIMAL(8,2) CHECK (preco > 0)'),
-    learn('Quando a regra é violada', `<p>Experimente: a tabela é criada, mas a inserção de um preço negativo é recusada com um erro e a linha <b>não é guardada</b>.</p>`,
-      [ex("CREATE TABLE precos (id_preco INT, valor DECIMAL(8,2) CHECK (valor > 0));", 'Cria uma tabela com uma regra de validação.'),
-       ex("INSERT INTO precos VALUES (1, -5);", 'No MySQL: ERROR 3819 — Check constraint is violated. Experimente no laboratório.')]),
-    quiz('O que acontece a um INSERT que viola uma restrição CHECK?', ['A linha é guardada com o valor corrigido para 0', 'A operação é recusada com um erro e a linha não é guardada', 'A linha é guardada mas fica marcada', 'A restrição é desativada'], 1, 'O CHECK garante que só entram dados válidos.'),
-    learn('Restrições com nome e ALTER TABLE', `<p>Dar um <b>nome</b> à restrição torna as mensagens de erro mais claras e permite removê-la mais tarde. Também é possível acrescentar uma restrição a uma tabela que já existe:</p>
-      <pre><code>ALTER TABLE alunos ADD CONSTRAINT chk_idade CHECK (idade >= 16);
-ALTER TABLE alunos DROP CHECK chk_idade;</code></pre>
-      <p>Ao acrescentar a restrição, as linhas que já existem também têm de a cumprir; caso contrário o ALTER TABLE falha.</p>`),
-    ddl('Acrescente à tabela notas uma restrição chamada chk_nota que garanta que a nota está entre 0 e 20 (use BETWEEN).', 'ALTER TABLE notas ADD CONSTRAINT chk_nota CHECK (nota BETWEEN 0 AND 20);', 'ALTER TABLE notas ADD CONSTRAINT chk_nota CHECK (…)', { setup: 'CREATE TABLE notas (\n  id_aluno INT,\n  disciplina VARCHAR(50),\n  nota INT\n);' }),
-  ] },
-  { title: 'Índices', steps: [
+  { key: '2', title: 'Índices', steps: [
     learn('Para que serve um índice', `<p>Um <b>índice</b> funciona como o índice remissivo de um livro: em vez de ler todas as páginas, salta-se diretamente para o sítio certo. Sem índice, para encontrar os alunos de Braga o MySQL tem de percorrer <b>todas</b> as linhas da tabela.</p>
       <p>Os índices aceleram as consultas que filtram (<code>WHERE</code>), juntam (<code>JOIN</code>) ou ordenam (<code>ORDER BY</code>) por essa coluna. A chave primária tem sempre um índice criado automaticamente.</p>`),
     quiz('Qual é a principal vantagem de criar um índice numa coluna?', ['Ocupa menos espaço em disco', 'Torna mais rápidas as pesquisas e junções por essa coluna', 'Impede valores repetidos em qualquer caso', 'Encripta os dados da coluna'], 1, 'O índice evita percorrer a tabela inteira.'),
@@ -892,7 +943,7 @@ EXPLAIN SELECT * FROM alunos WHERE cidade = 'Braga';   -- mostra se o índice é
       <li><b>Não vale a pena:</b> tabelas pequenas, colunas raramente pesquisadas ou com muito poucos valores diferentes (ex.: sim/não).</li></ul>`),
     quiz('Em qual destas situações um índice é MENOS útil?', ['Coluna email usada para procurar clientes numa tabela com milhões de linhas', 'Coluna usada em JOIN entre duas tabelas grandes', 'Coluna ativo (sim/não) numa tabela com 20 linhas', 'Coluna data usada em ORDER BY em relatórios frequentes'], 2, 'Tabela pequena e coluna com só dois valores: o índice não traz ganho.'),
   ] },
-  { title: 'Vistas (VIEW)', steps: [
+  { key: '3', title: 'Vistas (VIEW)', steps: [
     learn('O que é uma vista', `<p>Uma <b>vista</b> (<code>VIEW</code>) é uma consulta SELECT guardada com um nome, que se usa como se fosse uma tabela. A vista <b>não guarda dados</b>: sempre que é consultada, o MySQL executa a consulta e devolve os dados atuais.</p>
       <p>Serve para:</p><ul><li><b>simplificar</b> consultas complexas (ex.: um JOIN usado muitas vezes);</li><li><b>segurança</b>: mostrar apenas algumas colunas ou linhas a certos utilizadores;</li><li><b>estabilidade</b>: as aplicações usam a vista mesmo que as tabelas mudem.</li></ul>`),
     quiz('Uma vista guarda uma cópia dos dados?', ['Sim, é uma cópia atualizada todas as noites', 'Não, guarda a consulta; os dados vêm das tabelas quando é consultada', 'Sim, mas só das colunas indicadas', 'Só se for criada com UNIQUE'], 1, 'É uma "tabela virtual".'),
@@ -912,30 +963,28 @@ GRANT SELECT ON escola.v_alunos_cursos TO 'rececao'@'localhost';</code></pre>
     key('f1', code('Corrija o erro: esta instrução devia criar a vista v_cursos_longos com o nome dos cursos com mais de 850 horas, mas o MySQL recusa-a.', ["^create (or replace )?view v_cursos_longos as select nome from cursos where horas>850$"], 'CREATE VIEW v_cursos_longos AS SELECT nome FROM cursos WHERE horas > 850;', 'Falta uma palavra-chave entre o nome da vista e o SELECT.', { start: 'CREATE VIEW v_cursos_longos\nSELECT nome FROM cursos WHERE horas > 850;' })),
   ] }],
   cheat: [
-    ['col TIPO CHECK (condição)', 'Validar valores de uma coluna'], ['ALTER TABLE t ADD CONSTRAINT nome CHECK (…);', 'Acrescentar restrição com nome'], ['ALTER TABLE t DROP CHECK nome;', 'Remover restrição'],
     ['CREATE INDEX idx_nome ON t (col);', 'Criar índice'], ['CREATE UNIQUE INDEX idx ON t (col);', 'Índice que impede repetidos'], ['SHOW INDEX FROM t; · DROP INDEX idx ON t;', 'Listar / remover índices'], ['EXPLAIN SELECT …', 'Ver se a consulta usa índices'],
     ['CREATE VIEW v AS SELECT …;', 'Criar vista'], ['CREATE OR REPLACE VIEW v AS …;', 'Alterar vista'], ['DROP VIEW v;', 'Eliminar vista'],
   ],
   test: [
-    quiz('Para que serve a restrição CHECK?', ['Criar um índice', 'Garantir que os valores cumprem uma condição', 'Verificar a palavra-passe', 'Fazer uma cópia de segurança'], 1, 'Ex.: CHECK (preco > 0).'),
-    quiz('Qual destas definições impede notas acima de 20?', ['nota INT UNIQUE', 'nota INT DEFAULT 20', 'nota INT CHECK (nota <= 20)', 'nota INT INDEX 20'], 2, 'O CHECK valida o valor.'),
-    quiz('Porque se deve dar um nome a uma restrição (CONSTRAINT chk_…)?', ['É obrigatório', 'Para a identificar nos erros e poder removê-la', 'Para a tornar mais rápida', 'Para criar um índice'], 1, 'ALTER TABLE … DROP CHECK nome.'),
     quiz('Que tipo de consultas um índice acelera?', ['Só INSERT', 'Pesquisas com WHERE, JOIN e ORDER BY pela coluna indexada', 'Só DELETE', 'Nenhuma; serve só para documentar'], 1, 'Evita percorrer a tabela inteira.'),
     quiz('Qual é uma desvantagem dos índices?', ['Tornam os SELECT mais lentos', 'Ocupam espaço e tornam as escritas mais lentas', 'Apagam dados antigos', 'Impedem o uso de JOIN'], 1, 'Cada escrita também atualiza o índice.'),
     quiz('Que comando mostra se o MySQL vai usar um índice numa consulta?', ['SHOW TABLES', 'DESCRIBE', 'EXPLAIN', 'ANALYZE INDEX'], 2, 'EXPLAIN mostra o plano de execução.'),
     quiz('O que é uma vista (VIEW)?', ['Uma cópia de segurança', 'Uma consulta guardada que se usa como uma tabela', 'Um tipo de índice', 'Um utilizador só de leitura'], 1, 'É uma tabela virtual.'),
     quiz('Como se dá acesso a apenas algumas colunas de uma tabela a um utilizador?', ['Com um índice nessas colunas', 'Criando uma vista com essas colunas e dando GRANT SELECT sobre a vista', 'Com CHECK nas colunas', 'Não é possível'], 1, 'As vistas são úteis para a segurança.'),
     quiz('Que instrução cria um índice único na coluna email da tabela clientes?', ['CREATE INDEX UNIQUE email ON clientes', 'CREATE UNIQUE INDEX idx_clientes_email ON clientes (email)', 'ALTER clientes UNIQUE email', 'CREATE KEY email'], 1, 'CREATE UNIQUE INDEX nome ON tabela (coluna);'),
-    quiz('O que acontece ao acrescentar uma restrição CHECK que as linhas existentes não cumprem?', ['As linhas são apagadas', 'O ALTER TABLE falha', 'A restrição só se aplica a linhas novas', 'Os valores são corrigidos'], 1, 'Os dados existentes também têm de a cumprir.'),
     quiz('A chave primária precisa de um índice criado à mão?', ['Sim, sempre', 'Não, o MySQL cria-o automaticamente', 'Só em tabelas grandes', 'Só se for composta'], 1, 'A PRIMARY KEY tem sempre um índice.'),
     quiz('Como se altera a consulta de uma vista existente?', ['UPDATE VIEW', 'CREATE OR REPLACE VIEW', 'ALTER TABLE', 'MODIFY VIEW'], 1, 'Ou ALTER VIEW.'),
     quiz('Uma vista com GROUP BY permite UPDATE?', ['Sim', 'Não, é só de leitura', 'Só com CHECK', 'Só com índice'], 1, 'Vistas com agregações não são atualizáveis.'),
-    predict('O que acontece a este INSERT?', 'CREATE TABLE stock (id_stock INT, qtd INT CHECK (qtd >= 0));\nINSERT INTO stock VALUES (1, -3);', ['A linha é guardada com qtd 0', 'É recusado (ERROR 3819) e a linha não é guardada', 'É guardado com um aviso', 'A restrição é ignorada'], 1, 'O CHECK recusa os valores que não cumprem a condição.'),
     quiz('Em que coluna de uma tabela de encomendas com milhões de linhas é mais útil um índice?', ['estado (4 valores possíveis)', 'id_cliente, usada em JOIN e WHERE', 'observacoes (texto livre)', 'Nenhuma'], 1, 'Colunas de junção e pesquisa frequentes beneficiam mais.'),
+    quiz('Que comando lista os índices da tabela alunos?', ['SHOW TABLES', 'SHOW INDEX FROM alunos', 'DESCRIBE INDEX alunos', 'SELECT INDEX FROM alunos'], 1, 'SHOW INDEX FROM tabela;'),
+    quiz('O que faz CREATE INDEX idx_notas_aluno_disc ON notas (id_aluno, disciplina)?', ['Cria duas tabelas', 'Cria um índice composto, útil para pesquisar por aluno e disciplina', 'Impede notas repetidas', 'Cria uma vista'], 1, 'Um índice pode ter várias colunas.'),
+    quiz('Uma vista guarda uma cópia dos dados?', ['Sim, os dados são copiados quando a vista é criada', 'Não: guarda a consulta, que é executada sempre que a vista é usada', 'Só as vistas com JOIN', 'Só se tiver índice'], 1, 'Por isso uma vista mostra sempre os dados atuais das tabelas.'),
+    quiz('Que instrução remove o índice idx_alunos_cidade?', ['DELETE INDEX idx_alunos_cidade', 'DROP INDEX idx_alunos_cidade ON alunos', 'ALTER INDEX idx_alunos_cidade DROP', 'REMOVE INDEX alunos'], 1, 'DROP INDEX nome ON tabela;'),
     quiz('Qual destas é uma vantagem das vistas?', ['Ocupam menos espaço que as tabelas', 'Escondem a complexidade e limitam o acesso a colunas', 'Tornam os INSERT mais rápidos', 'Substituem os backups'], 1, 'Simplicidade e segurança.'),
   ],
   real: [
-    'Criar a tabela <code>stock</code> com um CHECK e provocar o erro <b>3819</b> com um valor inválido.',
+    'Criar um índice único em <code>loja.clientes(email)</code> e tentar inserir um email repetido para ver o erro <b>1062</b>.',
     'Executar <code>EXPLAIN SELECT * FROM loja.encomendas WHERE id_cliente = 5;</code> antes e depois de criar um índice em <code>id_cliente</code> e comparar a coluna <i>key</i> e o número de linhas lidas.',
     'Criar uma vista na BD loja (ex.: faturação por cliente) e consultá-la como uma tabela.',
     'Ver a definição da vista com <code>SHOW CREATE VIEW</code>.',
@@ -1120,10 +1169,11 @@ const INTROS = {
   'intro.2': 'Nesta lição aprende a ligar-se a um servidor MySQL e a dar os primeiros comandos: ver as bases de dados, escolher uma, listar as suas tabelas e sair. Fica também a conhecer as famílias de comandos SQL, que correspondem aos capítulos seguintes.',
   'ddl.1': 'Uma base de dados é o "contentor" onde ficam as tabelas de um projeto. Antes de criar tabelas, aprende a criar, escolher e eliminar bases de dados.',
   'ddl.2': 'Aprende a criar tabelas com CREATE TABLE e a escolher o tipo de dados de cada coluna (números, texto, datas), a definir a chave primária e a acrescentar regras (restrições) que impedem dados inválidos.',
+  'ddl.chk': 'Uma base de dados só é útil se os dados forem válidos. Nesta lição aprofunda a restrição CHECK: condições simples e compostas (AND, OR, BETWEEN, IN), regras que comparam duas colunas, restrições com nome e o caso dos valores NULL.',
   'ddl.3': 'As tabelas não vivem isoladas: um aluno pertence a um curso, uma encomenda pertence a um cliente. Nesta lição aprende a ler as multiplicidades de um diagrama, a ligar tabelas com chaves estrangeiras (relações 1:N, sempre NOT NULL) e as ações aconselhadas ON UPDATE CASCADE e ON DELETE RESTRICT.',
   'ddl.4': 'Algumas relações são "muitos para muitos": um aluno tem várias disciplinas e cada disciplina tem vários alunos. Aprende a representá-las com uma tabela de ligação — um padrão que vai encontrar em quase todas as bases de dados reais.',
   'ddl.opc': 'Uma chave estrangeira nunca fica a NULL. Nesta lição aprende o que fazer quando a ligação é opcional (0..1) ou de um para um: criar uma tabela nova, usar UNIQUE ou juntar as entidades numa só tabela, conforme as multiplicidades.',
-  'ddl.5': 'As necessidades mudam e as tabelas também: é preciso acrescentar colunas, corrigir tipos ou ligar tabelas já existentes. Aprende a alterar a estrutura com ALTER TABLE sem perder os dados, e a eliminar tabelas pela ordem certa.',
+  'ddl.5': 'As necessidades mudam e as tabelas também: é preciso acrescentar colunas, corrigir tipos ou ligar tabelas já existentes. Aprende a alterar a estrutura com ALTER TABLE sem perder os dados (incluindo acrescentar chaves estrangeiras e restrições CHECK), e a eliminar tabelas pela ordem certa.',
   'ddl.norm': 'Até aqui as tabelas eram indicadas no enunciado. Num projeto real é o aluno que as tem de decidir a partir de um texto. Nesta lição aprende a encontrar entidades e relações e a aplicar as formas normais para evitar dados repetidos.',
   'ddl.6': 'Desafio final do capítulo: a partir dos requisitos de uma loja online, cria sozinho as quatro tabelas, com chaves, relações e restrições. É a aplicação de tudo o que aprendeu no capítulo.',
   'dml.1': 'Com as tabelas criadas, é preciso colocar-lhes dados. Nesta lição aprende o comando INSERT, para acrescentar uma ou várias linhas a uma tabela.',
@@ -1140,7 +1190,6 @@ const INTROS = {
   'select.case': 'Aprende a criar categorias dentro de uma consulta com CASE (ex.: "caro", "barato") e a lidar com valores desconhecidos (NULL), que mudam o resultado das contas.',
   'select.join3': 'Nas bases de dados reais é comum atravessar três ou mais tabelas para obter uma resposta. Aprende também a juntar resultados de consultas diferentes com UNION.',
   'select.neg': 'Lição de aplicação: em vez de instruções passo a passo, recebe perguntas da direção da loja e tem de decidir que tabelas, filtros e agrupamentos usar. É assim que o SQL é usado no trabalho real.',
-  'adv.1': 'Uma base de dados só é útil se os dados forem válidos. Aprofunda a restrição CHECK, que impede, por exemplo, preços negativos ou notas acima de 20.',
   'adv.2': 'Com milhões de linhas, uma consulta pode demorar muito. Os índices tornam as pesquisas rápidas. Aprende a criá-los e, sobretudo, quando vale a pena fazê-lo.',
   'adv.3': 'Aprende a guardar consultas com um nome (vistas), para simplificar consultas complexas e mostrar a cada utilizador apenas os dados de que precisa — o que prepara o capítulo de segurança.',
   'sec.1': 'Uma base de dados real é usada por várias pessoas e aplicações, e nem todas devem poder fazer tudo. Começa por aprender a criar e gerir contas de utilizador.',

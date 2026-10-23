@@ -65,6 +65,19 @@ no('DROP pela ordem errada', 'DROP TABLE clientes; DROP TABLE encomendas;', drop
 const chk = { setup: 'CREATE TABLE notas (id_aluno INT, disciplina VARCHAR(50), nota INT);', solution: 'ALTER TABLE notas ADD CONSTRAINT chk_nota CHECK (nota BETWEEN 0 AND 20);' };
 ok('CHECK', 'alter table notas add constraint chk_nota check(nota between 0 and 20)', chk);
 no('CHECK diferente', 'ALTER TABLE notas ADD CHECK (nota >= 0)', chk, 'CHECK');
+// CHECK comparado pelo significado: formas equivalentes são aceites; as diferentes mostram um exemplo
+ok('CHECK equivalente: >= AND <=', 'ALTER TABLE notas ADD CHECK (nota >= 0 AND nota <= 20)', chk);
+ok('CHECK equivalente: dois CHECK', 'ALTER TABLE notas ADD CHECK (nota >= 0); ALTER TABLE notas ADD CHECK (20 >= nota);', chk);
+no('CHECK: < em vez de <=', 'ALTER TABLE notas ADD CHECK (nota >= 0 AND nota < 20)', chk, 'nota = 20');
+const ev = { solution: "CREATE TABLE eventos (id_evento INT PRIMARY KEY, tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('aula','exame','reunião')), inicio DATE NOT NULL, fim DATE NOT NULL, CHECK (fim >= inicio))" };
+ok('CHECK: IN escrito com OR e datas invertidas', "CREATE TABLE eventos (id_evento INT PRIMARY KEY, tipo VARCHAR(20) NOT NULL, inicio DATE NOT NULL, fim DATE NOT NULL, CONSTRAINT chk_tipo CHECK (tipo = 'aula' OR tipo = 'exame' OR tipo = 'reunião'), CONSTRAINT chk_datas CHECK (inicio <= fim))", ev);
+no('CHECK: falta um valor no IN', "CREATE TABLE eventos (id_evento INT PRIMARY KEY, tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('aula','exame')), inicio DATE NOT NULL, fim DATE NOT NULL, CHECK (fim >= inicio))", ev, 'reunião');
+no('CHECK: > em vez de >= entre datas', "CREATE TABLE eventos (id_evento INT PRIMARY KEY, tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('aula','exame','reunião')), inicio DATE NOT NULL, fim DATE NOT NULL, CHECK (fim > inicio))", ev, 'recusa');
+const pr = { solution: 'CREATE TABLE produtos (id_produto INT PRIMARY KEY, preco DECIMAL(8,2) NOT NULL CHECK (preco > 0))' };
+ok('CHECK: 0 < preco', 'CREATE TABLE produtos (id_produto INT PRIMARY KEY, preco DECIMAL(8,2) NOT NULL, CHECK (0 < preco))', pr);
+no('CHECK: preco >= 0 aceita o zero', 'CREATE TABLE produtos (id_produto INT PRIMARY KEY, preco DECIMAL(8,2) NOT NULL CHECK (preco >= 0))', pr, 'preco = 0');
+no('CHECK: em falta', 'CREATE TABLE produtos (id_produto INT PRIMARY KEY, preco DECIMAL(8,2) NOT NULL)', pr, 'CHECK');
+no('CHECK: não pedido', 'CREATE TABLE produtos (id_produto INT PRIMARY KEY, preco DECIMAL(8,2) NOT NULL CHECK (preco > 0), CHECK (id_produto > 0))', { solution: 'CREATE TABLE produtos (id_produto INT PRIMARY KEY, preco DECIMAL(8,2) NOT NULL)' }, 'não foi pedida');
 // modo flexível (desafio): só exige o essencial
 const loose = { loose: true, solution: 'CREATE TABLE produtos (id_produto INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(100) NOT NULL, preco DECIMAL(8,2) NOT NULL CHECK (preco > 0), stock INT DEFAULT 0);' };
 ok('flexível: tamanhos e extras diferentes', 'CREATE TABLE produtos (id_produto INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(60) NOT NULL, descricao TEXT, preco DECIMAL(10,2) NOT NULL, stock SMALLINT DEFAULT 0, CHECK (preco >= 0.01))', loose);
