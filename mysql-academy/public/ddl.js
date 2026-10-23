@@ -316,6 +316,51 @@
   const cols = (c) => `(${c.join(', ')})`;
   const mentions = (expr, col) => new RegExp(`\\b${col}\\b`).test(expr);
 
+  /* ---------- comparação das restrições CHECK pelo significado ----------
+     As condições esperada e do aluno são avaliadas (com o AlaSQL) sobre muitas linhas de teste construídas a partir
+     das constantes que aparecem nas condições. Assim aceitam-se formas equivalentes (BETWEEN ou >= … AND <=,
+     um CHECK ou dois) e, quando diferem, mostra-se um exemplo concreto. */
+  const AL = root.alasql || (typeof require !== 'undefined' ? (() => { try { return require('./vendor/alasql.min.js'); } catch { return null; } })() : null);
+  const NUMERIC = [...INT_FAMILY, 'BOOLEAN', 'DECIMAL', 'FLOAT', 'DOUBLE', 'YEAR', 'BIT'];
+  const outsideStrings = (expr, f) => expr.split(/('[^']*')/).map((part, i) => (i % 2 ? part : f(part))).join('');
+  function sampleValues(type, exprs) {
+    const code = exprs.join(' ');
+    const strs = [...code.matchAll(/'([^']*)'/g)].map((m) => m[1]);
+    const nums = [...outsideStrings(code, (x) => x).replace(/'[^']*'/g, ' ').matchAll(/-?\d+(\.\d+)?/g)].map((m) => Number(m[0]));
+    if (NUMERIC.includes(type.base)) {
+      const out = new Set([-1000, -1, 0, 1, 1000]);
+      for (const n of nums) for (const d of [-1, -0.01, 0, 0.01, 1]) out.add(Math.round((n + d) * 100) / 100);
+      return [...out].filter((v) => !INT_FAMILY.includes(type.base) || Number.isInteger(v));
+    }
+    if (['DATE', 'DATETIME', 'TIMESTAMP'].includes(type.base)) return [...new Set(['1900-01-01', '2025-01-01', '2025-06-15', '2999-12-31', ...strs.filter((x) => /^\d{4}-\d{2}-\d{2}/.test(x))])];
+    return [...new Set(['', 'a', 'zz outro', ...strs, ...strs.map((x) => x.replace(/[%_]/g, 'x'))])];
+  }
+  // Devolve null se as condições forem equivalentes, uma linha de teste em que diferem, ou undefined se não foi possível avaliar.
+  function checkDiff(tbl, eChecks, aChecks) {
+    if (!AL) return undefined;
+    const exprs = [...eChecks, ...aChecks];
+    const cols = tbl.order.filter((c) => exprs.some((e) => mentions(e, c)));
+    let rows = [{}];
+    for (const c of cols) {
+      const vals = sampleValues(tbl.cols[c].type, exprs.filter((e) => mentions(e, c)));
+      const next = []; for (const r of rows) for (const v of vals) next.push({ ...r, [c]: v });
+      rows = next;
+    }
+    if (rows.length > 6000) { const step = rows.length / 6000; rows = Array.from({ length: 6000 }, (_, i) => rows[Math.floor(i * step)]); }
+    const sql = (list) => {
+      if (!list.length) return null;
+      const b = (e) => outsideStrings(e, (x) => cols.reduce((acc, c) => acc.replace(new RegExp(`\\b${c}\\b`, 'g'), `[${c}]`), x));
+      return `SELECT (${list.map((e) => `(${b(e)})`).join(' AND ')}) AS r FROM ?`;
+    };
+    try {
+      const run = (list) => { const q = sql(list); return q ? AL(q, [rows]).map((x) => x.r === true || x.r === 1) : rows.map(() => true); };
+      const ev = run(eChecks), av = run(aChecks);
+      const k = ev.findIndex((v, i) => v !== av[i]);
+      return k < 0 ? null : { row: rows[k], exp: ev[k], act: av[k] };
+    } catch { return undefined; }
+  }
+  const rowStr = (r) => Object.entries(r).map(([c, v]) => `${c} = ${typeof v === 'string' ? `'${v}'` : v}`).join(', ');
+
   function compare(exp, act, loose) {
     const msgs = [];
     const say = (m) => msgs.push(m);
@@ -344,11 +389,16 @@
         if (g.ref === f.ref && f.explicitUpdate && g.onUpdate !== f.onUpdate) say(`Tabela ${tn}: a chave estrangeira ${cols(f.cols)} devia usar <b>ON UPDATE ${f.onUpdate}</b>${g.onUpdate !== 'RESTRICT' ? `, e não ${g.onUpdate}` : ''}.`);
       }
       if (!loose) for (const g of a.fks) if (!e.fks.some((x) => sameSet(x.cols, g.cols))) say(`Tabela ${tn}: a chave estrangeira ${cols(g.cols)} não foi pedida.`);
-      for (const k of e.checks) {
-        const ok = loose ? a.checks.some((x) => e.order.filter((c) => mentions(k.expr, c)).every((c) => mentions(x.expr, c))) : a.checks.some((x) => x.expr === k.expr);
-        if (!ok) say(`Tabela ${tn}: falta a restrição <b>CHECK (${k.expr})</b>.`);
+      const diff = !loose && e.checks.length && a.checks.length ? checkDiff(a, e.checks.map((k) => k.expr), a.checks.map((k) => k.expr)) : undefined;
+      if (diff === null) { /* condições equivalentes */ } else if (diff) {
+        say(`Tabela ${tn}: as restrições CHECK não fazem o que foi pedido. Por exemplo, com <b>${rowStr(diff.row)}</b> a sua tabela ${diff.act ? 'aceita' : 'recusa'} a linha, mas devia ${diff.exp ? 'aceitá-la' : 'recusá-la'}.`);
+      } else {
+        for (const k of e.checks) {
+          const ok = loose ? a.checks.some((x) => e.order.filter((c) => mentions(k.expr, c)).every((c) => mentions(x.expr, c))) : a.checks.some((x) => x.expr === k.expr);
+          if (!ok) say(`Tabela ${tn}: falta a restrição <b>CHECK (${k.expr})</b>.`);
+        }
+        if (!loose) for (const k of a.checks) if (!e.checks.some((x) => x.expr === k.expr)) say(`Tabela ${tn}: a restrição CHECK (${k.expr}) não foi pedida.`);
       }
-      if (!loose) for (const k of a.checks) if (!e.checks.some((x) => x.expr === k.expr)) say(`Tabela ${tn}: a restrição CHECK (${k.expr}) não foi pedida.`);
     }
     for (const tn of Object.keys(act)) if (!exp[tn]) say(`A tabela <b>${tn}</b> não devia existir no fim.`);
     return msgs;
