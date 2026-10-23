@@ -138,6 +138,18 @@
       if (error) throw error;
       return data.map((r) => ({ name: r.name, xp: r.xp, weekXp: r.week_xp || 0, turma: r.turma || '', level: r.level, pct: r.pct, streak: r.streak }));
     };
+    // Protocolo NEXUS: melhor pontuação de cada jogador (missão completa).
+    B.gameLeaderboard = async () => {
+      const { data, error } = await sb.rpc('game_leaderboard', { lim: 100 });
+      if (error) throw error;
+      return data.map((r) => ({ name: r.name, turma: r.turma || '', score: r.score, time: r.time_s, runs: r.runs }));
+    };
+    B.submitGameScore = async ({ score, time, rooms }) => {
+      if (!B.user) return null;
+      const { data, error } = await sb.rpc('submit_game_score', { s: score, secs: time, n: rooms });
+      if (error) throw error;
+      return data;
+    };
     B.students = async () => {
       const { data, error } = await sb.from('progress').select('state, updated_at, profiles(name, is_teacher, turma)');
       if (error) throw error;
@@ -175,6 +187,8 @@
     };
     B.save = async (state) => { if (B.user) await api('/api/progress', 'PUT', { state }); };
     B.leaderboard = async () => (await api('/api/leaderboard', 'GET')).map((r) => ({ name: r.name, xp: r.xp, weekXp: r.weekXp || 0, turma: r.turma || '', level: r.level, pct: r.pct, streak: r.streak }));
+    B.gameLeaderboard = async () => api('/api/game/leaderboard', 'GET');
+    B.submitGameScore = async (run) => (B.user ? (await api('/api/game/score', 'POST', run)).best : null);
     B.students = async (key) => (await api('/api/admin/students', 'GET', null, { 'x-teacher-key': key })).map((r) => ({ name: r.name, turma: r.turma || '', state: r.state || {}, updated: r.updated }));
     B.errorText = (e) => (e && e.status ? e.message : 'Servidor indisponível. Execute "npm start" para ativar as contas e a classificação.');
     return B;

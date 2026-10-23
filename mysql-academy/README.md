@@ -43,9 +43,12 @@ Duas bases de dados de exemplo correm no browser (AlaSQL): **escola** (pequena, 
 
 Jogo na primeira pessoa (só para computador), acessível no menu por baixo do Laboratório SQL. Na estação espacial Órion, tomada pela inteligência artificial NEXUS, o aluno usa SQL em terminais para abrir portas e desativar drones de segurança (sem violência: os drones são desligados com `UPDATE`).
 
-- **Parte 1 (4 salas):** criogenia (`SELECT *`), manutenção (`WHERE`), arquivo (`ORDER BY` / `LIMIT`) e laboratório (`LIKE` + `UPDATE` para desativar o drone; um `UPDATE` sem `WHERE` dispara o alarme).
-- **Pulsos EMP:** cápsulas espalhadas pelas salas; a tecla Q imobiliza os drones durante 8 segundos.
-- Cada sala dá XP (−5 por dica, 0 se vir a solução) e conquistas, e o progresso é sincronizado com a conta.
+- **Parte 1 (6 salas):** criogenia (`SELECT`), manutenção (`WHERE`), arquivo (`ORDER BY` / `LIMIT`), laboratório (`LIKE` + `UPDATE`), energia (`UPDATE` + `GROUP BY`) e hangar (`JOIN`).
+- **Zonas e narrativa:** cada sala tem duas zonas separadas por um campo de forças, com um terminal em cada uma. O terminal da entrada só vê as tabelas da zona 1; a tarefa resolvida desliga o campo de forças e dá acesso ao segundo terminal, com outras tabelas. As tarefas mudam a sala: restauram a iluminação, desativam drones, desligam lasers e abrem a porta. A história avança com mensagens da VEGA (IA aliada), da NEXUS e de registos da tripulação guardados nas próprias tabelas.
+- **Desafios diferentes em cada jogo:** os dados são gerados a partir de uma semente aleatória (códigos, técnicos, datas, drones, geradores, naves); o teste verifica 300 jogos gerados.
+- **Ameaças:** drones que patrulham e perseguem o jogador quando o veem (as caixas tapam a vista), câmaras rotativas que alertam os drones, barreiras laser intermitentes e salas às escuras. **Pulsos EMP** (tecla Q) imobilizam drones e câmaras durante 8 segundos.
+- **Tempo e pontuação:** cada sala tem um tempo-limite; quando acaba, a NEXUS ativa o bloqueio total (drones e lasers mais rápidos). Pontos: 500 por tarefa, 5 por segundo que sobra, 300 por sala perfeita; descontam dicas (−100), capturas (−150), alarmes e câmaras (−200) e códigos errados (−50). As missões completas a começar na sala 1 entram na tabela **Melhores agentes** (Supabase: `game_scores`, `submit_game_score`, `game_leaderboard`; servidor local: `/api/game/score` e `/api/game/leaderboard`).
+- Cada sala dá também XP no curso (−5 por dica, 0 se vir a solução) e conquistas, e o progresso é sincronizado com a conta.
 - Motor em Three.js (`public/game/`), com o mundo gerado em código; só é carregado quando o jogo é aberto. As salas estão em `public/game/levels.js` e são validadas por `test/game.test.js`.
 
 ## Publicar na Internet (gratuito)
