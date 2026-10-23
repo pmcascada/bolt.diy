@@ -12,10 +12,10 @@ Aplicação de **autoaprendizagem de MySQL** para desktop e telemóvel (PWA inst
 6. **Miniteste final** — em cada tentativa são sorteadas 8 perguntas de um banco de 16 e 2 exercícios práticos (SQL escrito pelo aluno). Aprovação com 70% conclui o capítulo. As respostas certas só são mostradas depois de aprovar; antes disso, o aluno vê apenas quais as perguntas que errou.
 7. **Ponte para o MySQL real** — cada capítulo tem tarefas para fazer num servidor MySQL instalado (com os erros reais a observar), os scripts `escola.sql` e `loja.sql` para descarregar, e um **projeto final** que o aluno entrega ao professor (script + resultados), com verificação automática dos requisitos.
 
-## Conteúdo (7 capítulos · 34 lições · 254 passos · 150 exercícios · 116 perguntas e 21 exercícios práticos de miniteste)
+## Conteúdo (7 capítulos · 33 lições · 253 passos · 150 exercícios · 119 perguntas e 21 exercícios práticos de miniteste)
 
 1. Introdução ao MySQL
-2. Criar bases de dados e tabelas (tipos e restrições, multiplicidades e chaves estrangeiras sempre NOT NULL — relações 1:N, N:M, opcionais (0..1) e 1:1 com tabelas próprias —, ON UPDATE CASCADE e ON DELETE RESTRICT, ALTER TABLE, **normalização: do enunciado às tabelas (1FN, 2FN, 3FN)** e um desafio final: modelar uma loja online)
+2. Criar bases de dados e tabelas (tipos de dados e restrições, multiplicidades e chaves estrangeiras sempre NOT NULL — relações 1:N, N:M, opcionais (0..1) e 1:1 com tabelas próprias —, ON UPDATE CASCADE e ON DELETE RESTRICT, ALTER TABLE, **normalização: do enunciado às tabelas (1FN, 2FN, 3FN)** e um desafio final: modelar uma loja online)
 3. Inserir, alterar e eliminar dados (INSERT, UPDATE, DELETE, TRUNCATE e manutenção de dados da BD loja)
 4. Consultas com SELECT (SELECT, WHERE, ORDER BY/LIMIT/DISTINCT, agregações e GROUP BY/HAVING, JOIN, subconsultas, **funções de texto, números e datas**, **CASE e IFNULL/COALESCE**, **JOIN de três tabelas e UNION** e **perguntas de negócio** com enunciados abertos)
 5. Restrições, índices e vistas (CHECK, CREATE INDEX, CREATE VIEW)

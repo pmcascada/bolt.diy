@@ -533,7 +533,7 @@ function renderWarm(C, L, pos) {
   const ex = warmCandidate(C, L);
   if (!ex || (pos > 0 && !(st.review[ex.id] && st.review[ex.id].due <= Date.now()))) return;
   const isDue = !!(st.review[ex.id] && st.review[ex.id].due && st.review[ex.id].due <= Date.now());
-  const from = findLesson(ex.id.split('.').slice(0, 2).join('.'));
+  const from = findLesson(ex.lesson);
   box.innerHTML = `<div class="warm card"><div class="row" style="justify-content:space-between;gap:10px"><div><div class="eyebrow" style="margin:0">${ic('repeat')}Aquecimento · opcional</div>
     <p class="small muted" style="margin:4px 0 0">${isDue ? 'Um exercício que está na hora de rever' : 'Um exercício de uma lição anterior'}${from ? ` (${esc(from.l.title)})` : ''}. Recordar o que já aprendeu ajuda a fixar a matéria${isDue ? ` e dá +${S.REVIEW_XP} XP` : ''}.</p></div>
     <span class="row" style="gap:6px"><button class="btn sm" id="warmGo">Fazer</button><button class="btn link sm" id="warmSkip">Saltar</button></span></div><div id="warmEx"></div></div>`;
@@ -982,7 +982,7 @@ function vLab() {
 /* ---------- revisão espaçada ---------- */
 let revRun = null;
 const shuffle = (a) => a.map((v) => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map((x) => x[1]);
-const exPlace = (ex) => { const f = findLesson(ex.id.split('.').slice(0, 2).join('.')); return f ? `Capítulo ${f.c.idx + 1} · ${f.l.title}` : ''; };
+const exPlace = (ex) => { const f = findLesson(ex.lesson); return f ? `Capítulo ${f.c.idx + 1} · ${f.l.title}` : ''; };
 function vRev() {
   crumbs = [['Revisão', '#/rev']];
   const items = Object.entries(st.review).filter(([id]) => S.EXS[id]);
@@ -1270,7 +1270,7 @@ function difficulty(rows) {
 function difficultyHtml(rows) {
   const stat = difficulty(rows);
   const label = (id) => { const e = logLabel({ id }); return e.text; };
-  const place = (id) => { const m = id.match(/^(\w+)\./); const c = m && CHAPTERS.find((x) => x.id === m[1]); return c ? `C${c.idx + 1}` : ''; };
+  const place = (id) => { const f = S.EXS[id] && findLesson(S.EXS[id].lesson); const m = id.match(/^(\w+)\./); const c = f ? f.c : m && CHAPTERS.find((x) => x.id === m[1]); return c ? `C${c.idx + 1}` : ''; };
   const ex = Object.entries(stat).filter(([id, x]) => S.EXS[id] && x.who.size).map(([id, x]) => ({ id, x, firstPct: x.done + x.rev ? pctOf(x.first, x.done + x.rev) : 0 }))
     .sort((a, b) => a.firstPct - b.firstPct || b.x.wrong - a.x.wrong);
   const tq = Object.entries(stat).filter(([id, x]) => /\.[tp]\d+$/.test(id) && x.wrong).sort((a, b) => b[1].wrong - a[1].wrong).slice(0, 10);
