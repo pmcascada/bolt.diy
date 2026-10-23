@@ -539,3 +539,18 @@ details.pj pre{max-height:360px;overflow:auto}
 .reset-box{margin-top:16px;padding-top:14px;border-top:1px solid var(--border)}
 .reset-box h4{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:.95rem}
 .reset-box p{margin:0 0 10px}
+/* lição por páginas */
+.lpager{display:flex;align-items:center;justify-content:flex-start;flex-wrap:wrap;gap:0;row-gap:8px;margin:2px 0 22px}
+.lpager .pg{width:32px;height:32px;border-radius:50%;border:1.5px solid var(--border-strong);background:var(--surface);color:var(--text-2);font:600 .82rem var(--font);display:grid;place-items:center;cursor:pointer;flex:none;padding:0}
+.lpager .pg svg.i{width:15px;height:15px}
+.lpager .pg.done{background:var(--ok-weak);border-color:color-mix(in srgb,var(--ok) 50%,transparent);color:var(--ok)}
+.lpager .pg.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent);box-shadow:0 0 0 3px var(--accent-weak)}
+.lpager .pg.on.done{background:var(--accent);color:var(--on-accent)}
+.lpager .pg.locked{color:var(--muted);background:var(--surface-2);cursor:default}
+.lpager .pg-line{flex:0 0 28px;height:2px;background:var(--border)}
+.pager-nav{display:flex;align-items:center;gap:12px;margin-top:22px;padding:14px 16px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface)}
+.pager-nav .pn-mid{flex:1;text-align:center;display:flex;align-items:center;justify-content:center;gap:6px}
+.pager-nav .btn[disabled]{opacity:.45;cursor:default}
+@media (max-width:600px){.pager-nav{flex-wrap:wrap}.pager-nav .pn-mid{order:-1;flex-basis:100%}.pager-nav .btn[data-next]{margin-left:auto}}
+.done-card [data-prev]{order:-1}
+@media (max-width:600px){.lesson-meta{flex-wrap:wrap}.lesson-meta .grow{flex-basis:100%}}
