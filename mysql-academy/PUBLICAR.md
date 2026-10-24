@@ -67,9 +67,11 @@ A chave pública pode ficar no site: os dados estão protegidos pelas regras de 
 
 O plano gratuito do Vercel (*Hobby*) destina-se a uso pessoal e não comercial.
 
+**Mudar o endereço:** em **Settings** → **Domains** → **Add Domain**, escreva o novo nome (ex.: `mysql-academy.vercel.app`; tem de estar livre). O site publicado usa `mysql-academy.vercel.app`; o endereço antigo `boltdiy-public.vercel.app` continua no projeto e o `middleware.js` reencaminha-o para o novo, levando consigo o progresso guardado no browser, o acesso ao site e a sessão (ver `public/mudanca.js`). Depois de mudar o endereço, atualize o Supabase (secção seguinte).
+
 ## 6. Indicar o endereço do site ao Supabase
 
-Em **Authentication** → **URL Configuration**, defina o **Site URL** com o endereço do passo 5 (ex.: `https://mysql-academy.pages.dev`) e acrescente-o também em **Redirect URLs**. É usado nos emails de recuperação da palavra-passe.
+Em **Authentication** → **URL Configuration**, defina o **Site URL** com o endereço do site (ex.: `https://mysql-academy.vercel.app`) e acrescente-o também em **Redirect URLs** (ex.: `https://mysql-academy.vercel.app/**`). É usado nos emails de recuperação da palavra-passe.
 
 ## 7. Criar a conta do gestor do site (e os professores)
 
