@@ -605,3 +605,7 @@ code,pre,kbd,samp,textarea,.mono{font-variant-ligatures:none;font-feature-settin
 .rc-end{display:flex;gap:8px;align-items:flex-start;margin-top:12px;padding:10px 12px;border-radius:var(--r-sm);font-weight:600;font-size:.9rem}
 .rc-end svg{width:18px;height:18px;flex:none}.rc-end.bad{background:var(--bad-weak);color:var(--bad)}.rc-end.ok{background:var(--ok-weak);color:var(--ok)}
 @media (max-width:640px){.rc-grid{grid-template-columns:22px 1fr 1fr 44px;gap:6px}.rc-cell pre{font-size:.7rem;padding:6px}}
+/* "Outra perspetiva": alternativas válidas que não são as adotadas nas aulas */
+.alt-view{margin:12px 0;padding:12px 14px 4px;border:1px dashed var(--border-strong);border-radius:var(--r);background:var(--surface-2)}
+.alt-tag{display:inline-block;margin-bottom:8px;padding:2px 10px;border-radius:999px;background:var(--surface);border:1px solid var(--border-strong);font:600 .74rem var(--font);letter-spacing:.02em;color:var(--muted);text-transform:uppercase}
+.alt-note{padding:10px 14px;border-left:3px solid var(--border-strong);background:var(--surface-2);border-radius:var(--r-sm);color:var(--text-2)}
