@@ -13,7 +13,8 @@
    Cada capítulo tem ainda: cheat (resumo de sintaxe), test (banco de perguntas do miniteste),
    practice (exercícios práticos sorteados no miniteste) e real (tarefas para fazer num MySQL real). */
 (function (root) {
-const learn = (title, html, examples = []) => ({ t: 'learn', title, html, examples });
+// preview: conceitos só mostrados de passagem (ex.: o SELECT no capítulo 1), que ainda não contam como ensinados.
+const learn = (title, html, examples = [], preview) => ({ t: 'learn', title, html, examples, ...(preview ? { preview } : {}) });
 const quiz = (q, opts, a, why, sql) => ({ t: 'quiz', q, opts, a, why, ...(sql ? { sql } : {}) });
 // "Qual é o resultado?": quiz que mostra uma instrução.
 const predict = (q, sql, opts, a, why) => quiz(q, opts, a, why, sql);
@@ -53,7 +54,7 @@ const CHAPTERS = [
       <li><b>Linhas</b> (ou registos) — cada elemento concreto, por exemplo um aluno;</li>
       <li><b>Chave primária</b> — a coluna que identifica cada linha de forma única, por exemplo <code>id_aluno</code>.</li></ul>
       <p>Execute o exemplo para ver a tabela <code>alunos</code> da base de dados de exemplo <b>escola</b>. A instrução <code>SELECT * FROM alunos;</code> significa simplesmente «mostra todas as colunas (<code>*</code>) da tabela alunos» — o comando <code>SELECT</code> será estudado em pormenor no capítulo 4; por agora basta observar o resultado.</p>`,
-      [ex('SELECT * FROM alunos;', 'Cada linha é um aluno; cada coluna, uma característica.', true)]),
+      [ex('SELECT * FROM alunos;', 'Cada linha é um aluno; cada coluna, uma característica.', true)], ['SELECT', 'FROM']),
     quiz('Na tabela alunos, o que representa uma linha?', ['Uma característica comum a todos os alunos', 'Um aluno concreto', 'O nome da base de dados', 'O tipo de dados de uma coluna'], 1, 'Cada linha (registo) corresponde a um elemento — neste caso, um aluno.'),
     quiz('Para que serve a chave primária?', ['Encriptar a tabela', 'Identificar cada linha de forma única', 'Ordenar os resultados', 'Guardar a palavra-passe'], 1, 'Não podem existir duas linhas com o mesmo valor de chave primária.'),
     learn('MySQL, SGBD e SQL', `<p>O <b>MySQL</b> é um <b>SGBD</b> — Sistema de Gestão de Bases de Dados — de código aberto. O SGBD trata do armazenamento, da segurança, do acesso concorrente e da recuperação dos dados.</p>
@@ -117,7 +118,7 @@ const CHAPTERS = [
     'No MySQL Workbench, abrir a ligação local e executar <code>SELECT * FROM escola.alunos;</code>.',
   ],
   practice: [
-    query('Mostre todas as colunas e linhas da tabela cursos.', 'SELECT * FROM cursos', 'SELECT * FROM …'),
+    code('Escreva o comando que mostra a estrutura da tabela cursos: as colunas e o tipo de cada uma.', ['^(describe|desc|show columns from|explain) cursos$'], 'DESCRIBE cursos;', 'DESCRIBE …'),
     code('Escreva a instrução que mostra a versão do servidor MySQL.', ['^select version\\(\\)$'], 'SELECT VERSION();', 'SELECT VERSION();'),
     code('Escreva a instrução que lista as bases de dados existentes no servidor.', ['^show (databases|schemas)$'], 'SHOW DATABASES;', 'SHOW …'),
   ],
