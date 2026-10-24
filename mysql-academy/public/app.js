@@ -79,6 +79,7 @@ function persist() {
   clearTimeout(syncTimer); syncTimer = setTimeout(push, 1500);
 }
 const sum = () => S.summarize(st);
+const shownBadges = () => BADGES.filter((b) => PROJECT_ON || b.id !== 'project');
 // Protocolo NEXUS: uma missão é melhor do que outra se chegou mais longe (salas concluídas), depois se tem mais pontos e, em empate, se foi mais rápida.
 const betterRun = (a, b) => !b || (a.rooms || 0) > (b.rooms || 0) || ((a.rooms || 0) === (b.rooms || 0) && (a.score > b.score || (a.score === b.score && (a.time || 0) < (b.time || 0))));
 
@@ -256,8 +257,11 @@ const dueReviews = () => Object.entries(st.review).filter(([id, r]) => S.EXS[id]
 
 /* ---------- estrutura (navegação, topo) ---------- */
 const view = $('#view');
+// Projeto final: escondido por agora (menu, página e conquista). Para o voltar a mostrar, basta pôr true.
+// Os projetos já entregues continuam guardados.
+const PROJECT_ON = false;
 const NAV = [
-  ['Curso', [['#/', 'home', 'Painel'], ['#/learn', 'book', 'Conteúdos'], ['#/rev', 'repeat', 'Revisão'], ['#/lab', 'terminal', 'Laboratório SQL'], ['#/jogo', 'gamepad', 'Protocolo NEXUS'], ['#/projeto', 'folder', 'Projeto final']]],
+  ['Curso', [['#/', 'home', 'Painel'], ['#/learn', 'book', 'Conteúdos'], ['#/rev', 'repeat', 'Revisão'], ['#/lab', 'terminal', 'Laboratório SQL'], ['#/jogo', 'gamepad', 'Protocolo NEXUS'], ...(PROJECT_ON ? [['#/projeto', 'folder', 'Projeto final']] : [])]],
   ['Desempenho', [['#/progress', 'chart', 'Progresso'], ['#/rank', 'trophy', 'Classificação']]],
   ['Conta', [['#/me', 'user', 'Perfil']]],
 ];
@@ -1145,7 +1149,7 @@ function vProgress() {
     <div class="card"><div class="card-h"><h3>Atividade (14 dias)</h3><span class="small muted">${total14} exercícios</span></div>
       <div class="chart">${days.map(([k]) => `<div style="height:${Math.round((100 * (byDay[k] || 0)) / mx)}%" title="${k}: ${byDay[k] || 0} exercícios"></div>`).join('')}</div>
       <div class="chart-x">${days.map(([, d], i) => `<span>${i % 2 ? '' : d.getDate()}</span>`).join('')}</div></div>
-    <div class="card"><div class="card-h"><h3>Conquistas</h3><span class="small muted">${s.badges.length} de ${BADGES.length}</span></div><div class="badges compact">${BADGES.map((b) => { const on = s.badges.includes(b.id); return `<div class="badge ${on ? '' : 'off'}" title="${esc(b.desc)}"><span class="bi">${ic(on ? b.icon : 'lock')}</span><span><b>${esc(b.name)}</b><small>${esc(b.desc)}</small></span></div>`; }).join('')}</div></div>
+    <div class="card"><div class="card-h"><h3>Conquistas</h3><span class="small muted">${s.badges.filter((id) => PROJECT_ON || id !== 'project').length} de ${shownBadges().length}</span></div><div class="badges compact">${shownBadges().map((b) => { const on = s.badges.includes(b.id); return `<div class="badge ${on ? '' : 'off'}" title="${esc(b.desc)}"><span class="bi">${ic(on ? b.icon : 'lock')}</span><span><b>${esc(b.name)}</b><small>${esc(b.desc)}</small></span></div>`; }).join('')}</div></div>
   </div>
   <div class="card" style="margin-top:16px"><div class="card-h"><h3>Histórico de tentativas</h3><span class="small muted">${st.log.length} registos</span></div>
   ${st.log.length ? `<div class="scroll" style="max-height:380px"><table class="tbl"><thead><tr><th>Data</th><th>Atividade</th><th>Descrição</th><th>Resultado</th></tr></thead><tbody>${st.log.slice().reverse().slice(0, 200).map((e) => { const x = logLabel(e); return `<tr><td class="small muted" style="white-space:nowrap">${new Date(e.at).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' })}</td><td style="font-family:var(--mono);font-size:.8rem">${esc(x.code)}</td><td class="small">${esc(x.text)}</td><td>${e.score !== undefined ? `<span class="chip ${e.ok ? 'ok' : 'bad'}">${e.score}%</span>` : e.ok ? '<span class="chip ok">Correto</span>' : '<span class="chip bad">Incorreto</span>'}</td></tr>`; }).join('')}</tbody></table></div>` : '<div class="empty">Ainda não existem tentativas registadas.</div>'}</div>`;
@@ -1355,7 +1359,7 @@ async function vProf() {
     <div class="kpi"><div class="l">${ic('users')}Alunos</div><div class="v">${n}</div><div class="s">${rows.filter((r) => r.updated > week).length} ativos nos últimos 7 dias</div></div>
     <div class="kpi"><div class="l">${ic('checkCircle')}Conclusão média</div><div class="v">${avg((r) => r.s.pct)}%</div><div class="s">do curso</div></div>
     <div class="kpi"><div class="l">${ic('clipboard')}Minitestes</div><div class="v">${rows.reduce((k, r) => k + r.s.testsPassed, 0)}</div><div class="s">aprovações no total</div></div>
-    <div class="kpi"><div class="l">${ic('zap')}XP médio</div><div class="v">${avg((r) => r.s.xp)}</div><div class="s">por aluno · ${rows.filter((r) => r.s.projectSent).length} projetos entregues</div></div></div>
+    <div class="kpi"><div class="l">${ic('zap')}XP médio</div><div class="v">${avg((r) => r.s.xp)}</div><div class="s">por aluno${PROJECT_ON ? ` · ${rows.filter((r) => r.s.projectSent).length} projetos entregues` : ''}</div></div></div>
   <div class="card" style="margin-top:16px;padding:0">${n ? `<div class="scroll"><table class="tbl prof"><thead><tr><th>Aluno</th>${turmas.length ? '<th>Turma</th>' : ''}<th>Nível</th><th class="r">XP</th><th style="width:18%">Conclusão</th>${CHAPTERS.map((c) => `<th class="c" title="${esc(c.title)}">C${c.idx + 1}</th>`).join('')}<th>Última atividade</th></tr></thead><tbody>
     ${rows.map((r, i) => `<tr class="pr" data-i="${i}"><td><span class="who"><span class="avatar">${esc(initials(r.name))}</span><b>${esc(r.name)}</b>${r.s.projectSent ? ` <span class="chip ok" title="Projeto final entregue">${ic('folder')}</span>` : ''}</span></td>${turmas.length ? `<td class="small muted">${esc(r.turma || '—')}</td>` : ''}<td>${r.s.level}</td><td class="r"><b>${r.s.xp}</b></td><td><div class="row" style="flex-wrap:nowrap">${bar(r.s.pct)}<span class="small muted num-t" style="min-width:36px">${r.s.pct}%</span></div></td>
       ${CHAPTERS.map((c) => { const p = r.s.perChapter[c.id]; return `<td class="c">${p.test.passed ? `<span class="chip ok" title="Miniteste aprovado">${p.test.best}%</span>` : p.test.attempts ? `<span class="chip bad" title="Melhor resultado no miniteste">${p.test.best}%</span>` : `<span class="small muted" title="Lições concluídas">${p.lessonsOk}/${p.lessons}</span>`}</td>`; }).join('')}
@@ -1606,7 +1610,7 @@ function route() {
   const [, a, b] = h.split('/');
   if (a !== 't') quizRun = null;
   if (a !== 'rev') revRun = null;
-  ({ '': vHome, learn: vLearn, c: () => vChapter(b), l: () => vLesson(b), m: () => vManual(b), t: () => vTest(b), rev: vRev, lab: vLab, progress: vProgress, rank: vRank, me: vMe, prof: vProf, jogo: vGame, projeto: vProject }[a || ''] || vHome)();
+  ({ '': vHome, learn: vLearn, c: () => vChapter(b), l: () => vLesson(b), m: () => vManual(b), t: () => vTest(b), rev: vRev, lab: vLab, progress: vProgress, rank: vRank, me: vMe, prof: vProf, jogo: vGame, projeto: PROJECT_ON ? vProject : vHome }[a || ''] || vHome)();
   renderChrome();
   const steps = a === 'l' && st.lessonView === 'all' ? view.querySelectorAll('.step') : [];
   if (steps.length > 1) steps[steps.length - 1].scrollIntoView({ block: 'start' }); else window.scrollTo(0, 0);
