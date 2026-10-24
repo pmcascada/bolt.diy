@@ -42,6 +42,17 @@
 (function () {
   var cfg = window.APP_CONFIG || {};
   if (!cfg.supabaseUrl) { location.replace('./'); return; } // sem Supabase (servidor local) não há palavra-passe
+  var saveTok = function (tok) {
+    document.cookie = 'mya_acesso=' + tok + '; Max-Age=' + 60 * 864e2 + '; Path=/; SameSite=Lax' + (location.protocol === 'https:' ? '; Secure' : '');
+    try { localStorage.setItem('mysql-academy.acesso', tok); } catch (e2) { /* sem storage */ }
+  };
+  // Vindo do endereço antigo (#mudanca=…): usa o acesso que lá estava guardado, uma só vez
+  // (se a palavra-passe entretanto mudou, mostra o formulário e o link mantém-se para o passo seguinte).
+  var mv = /^#mudanca=(.*)$/.exec(location.hash), tried = false;
+  if (mv) { try { tried = sessionStorage.getItem('mya-mudanca') === '1'; sessionStorage.setItem('mya-mudanca', '1'); } catch (e) { tried = true; } }
+  if (mv && !tried) {
+    try { var d = JSON.parse(decodeURIComponent(mv[1])); if (d.a && /^[0-9a-f]{64}$/.test(d.a)) { saveTok(d.a); location.replace('./' + location.hash); return; } } catch (e) { /* ignora */ }
+  }
   var f = document.getElementById('f'), pw = document.getElementById('pw'), go = document.getElementById('go'), err = document.getElementById('err');
   f.onsubmit = function (e) {
     e.preventDefault();
@@ -52,8 +63,7 @@
       body: JSON.stringify({ p: pw.value }),
     }).then(function (r) { if (!r.ok) throw new Error('rede'); return r.json(); }).then(function (tok) {
       if (!tok) { err.textContent = 'Palavra-passe incorreta.'; pw.select(); return; }
-      document.cookie = 'mya_acesso=' + tok + '; Max-Age=' + 60 * 864e2 + '; Path=/; SameSite=Lax' + (location.protocol === 'https:' ? '; Secure' : '');
-      try { localStorage.setItem('mysql-academy.acesso', tok); } catch (e2) { /* sem storage */ }
+      saveTok(tok);
       location.replace('./' + location.hash); // mantém os links de confirmação de conta e de recuperação
     }).catch(function () { err.textContent = 'Não foi possível verificar a palavra-passe. Confirme a ligação à Internet e tente novamente.'; })
       .then(function () { go.disabled = false; go.textContent = 'Entrar'; });
