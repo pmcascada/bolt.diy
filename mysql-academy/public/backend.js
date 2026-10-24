@@ -140,9 +140,9 @@
     };
     // Protocolo NEXUS: melhor pontuação de cada jogador (missão completa).
     B.gameLeaderboard = async () => {
-      const { data, error } = await sb.rpc('game_leaderboard', { lim: 100 });
+      const { data, error } = await sb.rpc('game_leaderboard2', { lim: 100 });
       if (error) throw error;
-      return data.map((r) => ({ name: r.name, turma: r.turma || '', score: r.score, time: r.time_s, runs: r.runs }));
+      return data.map((r) => ({ name: r.name, turma: r.turma || '', score: r.score, rooms: r.rooms, time: r.time_s, runs: r.runs }));
     };
     B.submitGameScore = async ({ score, time, rooms }) => {
       if (!B.user) return null;

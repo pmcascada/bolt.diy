@@ -371,6 +371,40 @@ revoke execute on function public.game_leaderboard(int) from public;
 grant execute on function public.submit_game_score(int, int, int) to authenticated;
 grant execute on function public.game_leaderboard(int) to anon, authenticated;
 
+-- ------------------------------------------------------------
+-- Versão 8: no Protocolo NEXUS a missão termina quando o tempo de uma sala chega a 0, por isso todas as
+-- missões (a começar na sala 1) contam. A melhor de cada jogador é a de maior nível atingido (salas
+-- concluídas), depois a de mais pontos e, em empate, a mais rápida. game_leaderboard2 devolve o nível.
+-- ------------------------------------------------------------
+create or replace function public.submit_game_score(s int, secs int, n int) returns int
+language plpgsql volatile security definer set search_path = public as
+'declare uid uuid := auth.uid(); b int;
+begin
+  if uid is null or s is null or s < 0 or s > 30000 or secs < 10 or secs > 86400 or n < 0 or n > 12 then return null; end if;
+  insert into public.game_scores as g (user_id, score, time_s, rooms, runs, updated_at)
+  values (uid, s, secs, n, 1, now())
+  on conflict (user_id) do update set
+    runs = g.runs + 1,
+    score = case when (excluded.rooms, excluded.score, -excluded.time_s) > (g.rooms, g.score, -g.time_s) then excluded.score else g.score end,
+    time_s = case when (excluded.rooms, excluded.score, -excluded.time_s) > (g.rooms, g.score, -g.time_s) then excluded.time_s else g.time_s end,
+    updated_at = case when (excluded.rooms, excluded.score, -excluded.time_s) > (g.rooms, g.score, -g.time_s) then now() else g.updated_at end,
+    rooms = case when (excluded.rooms, excluded.score, -excluded.time_s) > (g.rooms, g.score, -g.time_s) then excluded.rooms else g.rooms end
+  returning g.score into b;
+  return b;
+end';
+
+create or replace function public.game_leaderboard2(lim int default 50)
+returns table (name text, turma text, score int, rooms int, time_s int, runs int, updated_at timestamptz)
+language sql stable security definer set search_path = public as
+'select p.name, p.turma, g.score, g.rooms, g.time_s, g.runs, g.updated_at
+   from public.game_scores g join public.profiles p on p.id = g.user_id
+  where g.score > 0 or g.rooms > 0
+  order by g.rooms desc, g.score desc, g.time_s asc, g.updated_at asc
+  limit least(greatest(coalesce(lim, 50), 1), 300)';
+
+revoke execute on function public.game_leaderboard2(int) from public;
+grant execute on function public.game_leaderboard2(int) to anon, authenticated;
+
 -- ============================================================
 -- Gestor do site: executar uma única vez, com o email da conta do gestor. A partir daí,
 -- o gestor atribui o perfil de professor a outras contas na Área do professor.

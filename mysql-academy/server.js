@@ -110,9 +110,9 @@ async function api(req, res, url) {
     return send(res, 200, rows);
   }
   if (req.method === 'GET' && url.pathname === '/api/game/leaderboard') {
-    const rows = Object.values(users).filter((u) => u.game && u.game.score > 0)
-      .map((u) => ({ name: u.name, turma: u.turma || '', score: u.game.score, time: u.game.time, runs: u.game.runs, at: u.game.at }))
-      .sort((a, b) => b.score - a.score || a.time - b.time || a.at - b.at).slice(0, 100);
+    const rows = Object.values(users).filter((u) => u.game && (u.game.score > 0 || u.game.rooms > 0))
+      .map((u) => ({ name: u.name, turma: u.turma || '', score: u.game.score, rooms: u.game.rooms || 0, time: u.game.time, runs: u.game.runs, at: u.game.at }))
+      .sort((a, b) => b.rooms - a.rooms || b.score - a.score || a.time - b.time || a.at - b.at).slice(0, 100);
     return send(res, 200, rows);
   }
   if (req.method === 'GET' && url.pathname === '/api/admin/students') {
@@ -152,12 +152,14 @@ async function api(req, res, url) {
     return send(res, 200, { state: u.state, me: publicRow(u) });
   }
   if (req.method === 'POST' && url.pathname === '/api/game/score') {
-    // Protocolo NEXUS: guarda a melhor pontuação (em empate, o menor tempo) e conta as missões.
+    // Protocolo NEXUS: guarda a melhor missão — maior nível atingido (salas concluídas), depois mais pontos e,
+    // em empate, menos tempo — e conta as missões jogadas.
     const b = await body(req);
-    const score = int(b.score, -1, 30001), time = int(b.time, 0, 86401), rooms = int(b.rooms, 0, 13);
-    if (score < 0 || score > 30000 || time < 60 || time > 86400 || rooms < 1 || rooms > 12) return send(res, 400, { error: 'Pontuação inválida.' });
-    const g = u.game || { score: 0, time: 0, runs: 0, at: 0 };
-    if (score > g.score || (score === g.score && time < g.time)) Object.assign(g, { score, time, rooms, at: Date.now() });
+    const score = int(b.score, -1, 30001), time = int(b.time, 0, 86401), rooms = int(b.rooms, -1, 13);
+    if (score < 0 || score > 30000 || time < 10 || time > 86400 || rooms < 0 || rooms > 12) return send(res, 400, { error: 'Pontuação inválida.' });
+    const g = u.game || { score: 0, time: 0, rooms: 0, runs: 0, at: 0 };
+    const better = !g.runs || rooms > (g.rooms || 0) || (rooms === (g.rooms || 0) && (score > g.score || (score === g.score && time < g.time)));
+    if (better) Object.assign(g, { score, time, rooms, at: Date.now() });
     g.runs++; u.game = g; save();
     return send(res, 200, { best: g.score });
   }

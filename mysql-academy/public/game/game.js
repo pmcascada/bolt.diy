@@ -12,7 +12,7 @@ import { OutputPass } from '../vendor/three/postprocessing/OutputPass.js';
 const ROOM_W = 22, ROOM_D = 24, ROOM_H = 5.5, CORR_L = 7, CORR_W = 3.2, SPACING = ROOM_D + CORR_L;
 const BAR = 2; // o campo de forças fica 2 m à frente do centro da sala (do lado da entrada)
 const EYE = 1.65, RADIUS = 0.35, WALK = 3.8, RUN = 6.6, EMP_TIME = 8;
-const TIME_BONUS = 45, CLOCK_STOP = 25; // cápsulas de tempo: +45 s; cápsula de relógio parado: 25 s sem contar
+const TIME_BONUS = 45, CLOCK_STOP = 25, ALERT = 30; // ALERT: nos últimos 30 s entra o bloqueio total; a 0 s a missão termina // cápsulas de tempo: +45 s; cápsula de relógio parado: 25 s sem contar
 const VIEW = 7.5, FOV = 0.62, CATCH = 1.25, PATROL = 2.2, CHASE = 3.6, GRACE = 2.5;
 const CAM_RANGE = 11, CAM_FOV = 0.28;
 const PALETTE = [0x22d3ee, 0xf59e0b, 0xa78bfa, 0x34d399, 0xfacc15, 0x818cf8];
@@ -21,6 +21,7 @@ const PALETTE = [0x22d3ee, 0xf59e0b, 0xa78bfa, 0x34d399, 0xfacc15, 0x818cf8];
  * Arranca o jogo dentro de `container`.
  * opts: { levels (GAME.generate), story, startRoom, doneRooms, ranked, best, seed, quality, sensitivity, sound,
  *         ui: { esc, table, sqlError }, roomScore, onRoomDone(id, info), onRunEnd(run) → Promise<string>,
+ *         loadBoard() → Promise<[{name, turma, score, rooms, time, runs}]>, me (nome do jogador),
  *         onSettings(s), onRestart(), onExit() }
  */
 export function startGame(container, opts) {
@@ -69,7 +70,7 @@ export function startGame(container, opts) {
       <div class="gx-obj"><div class="gx-room"></div><div class="gx-skill"></div><div class="gx-tasks"></div><div class="gx-objtext"></div></div>
       <div class="gx-clock"><div class="gx-time">--:--</div><div class="gx-pts"><span>${opts.ranked ? 'PONTOS' : 'PONTOS · TREINO'}</span><b>0</b></div></div>
       <div class="gx-top"><span class="gx-progress"></span><span class="gx-emp" title="Pulsos EMP: imobilizam drones e câmaras durante ${EMP_TIME} s"><span class="gx-key">Q</span> EMP <b>0</b><i></i></span><span class="gx-key">Esc</span> menu</div>
-      <div class="gx-alert" hidden>⚠ BLOQUEIO TOTAL — drones e lasers acelerados</div>
+      <div class="gx-alert" hidden>⚠ BLOQUEIO TOTAL — a sala fecha quando o tempo acabar</div>
       <div class="gx-cross"></div>
       <div class="gx-prompt" hidden></div>
       <div class="gx-lock" hidden>Clique no ecrã para controlar a câmara com o rato</div>
@@ -80,6 +81,7 @@ export function startGame(container, opts) {
     <div class="gx-panel" data-p="terminal" hidden></div>
     <div class="gx-panel" data-p="keypad" hidden></div>
     <div class="gx-panel gx-menu" data-p="menu" hidden></div>
+    <div class="gx-panel gx-menu" data-p="board" hidden></div>
     <div class="gx-panel gx-story" data-p="story" hidden></div>`;
   const $ = (s) => container.querySelector(s);
   const canvas = $('.gx-canvas');
@@ -550,7 +552,7 @@ export function startGame(container, opts) {
     const i = state.room, r = rec[i];
     const t = $('.gx-time');
     t.textContent = rooms[i].door.open && !r.started ? '--:--' : mmss(r.left);
-    t.classList.toggle('warn', r.started && !r.done && r.left <= 30 && !r.lockdown);
+    t.classList.toggle('warn', r.started && !r.done && r.left <= 60 && !r.lockdown);
     t.classList.toggle('lock', r.lockdown && !r.done);
     $('.gx-pts b').textContent = totalScore();
     $('.gx-alert').hidden = !(r.lockdown && !r.done);
@@ -672,12 +674,12 @@ export function startGame(container, opts) {
   }
   function completeRoom(i) {
     const r = rec[i]; if (r.done) return;
-    r.done = true; const s = scoreOf(i); r.score = s.total;
+    r.done = true; r.lockdown = false; const s = scoreOf(i); r.score = s.total;
     const lv = levels[i];
     const pop = $('.gx-pop');
     pop.innerHTML = `<h3>Sala ${i + 1} concluída</h3>
       <div><span>Tarefas (${r.tasks}/${lv.tasks.length})</span><b>+${s.tasks}</b></div>
-      <div><span>${r.lockdown ? 'Tempo esgotado' : `Tempo restante (${mmss(r.left)})`}</span><b>+${s.time}</b></div>
+      <div><span>Tempo restante (${mmss(r.left)})</span><b>+${s.time}</b></div>
       ${s.perfect ? `<div><span>Sala perfeita</span><b>+${s.perfect}</b></div>` : ''}
       ${s.pen ? `<div class="pen"><span>Dicas, capturas, alarmes e erros</span><b>−${s.pen}</b></div>` : ''}
       <div class="tot"><span>Pontos da sala</span><b>${s.total}</b></div>`;
@@ -694,6 +696,7 @@ export function startGame(container, opts) {
       <p class="gx-ctl">O tempo da sala está parado. ${opts.ranked ? `Pontuação atual: <b>${totalScore()}</b>.` : 'Modo treino: comece na sala 1 para entrar na tabela de melhores jogadores.'}</p>
       <button data-a="resume" class="gx-go">Continuar</button>
       <button data-a="restart">Voltar ao início da zona</button>
+      ${opts.loadBoard ? '<button data-a="board">🏆 Pontuações máximas</button>' : ''}
       <label>Qualidade gráfica <select data-a="q"><option value="high">Alta (efeitos de luz)</option><option value="low">Baixa (computadores mais lentos)</option></select></label>
       <label>Sensibilidade do rato <input type="range" min="0.3" max="2" step="0.1" data-a="sens"></label>
       <label class="gx-chk"><input type="checkbox" data-a="snd"> Som</label>
@@ -708,6 +711,25 @@ export function startGame(container, opts) {
     p.querySelector('[data-a="sens"]').oninput = (e) => { sensitivity = Number(e.target.value); settings(); };
     p.querySelector('[data-a="snd"]').onchange = (e) => { sfx.on = e.target.checked; settings(); };
     p.querySelector('[data-a="exit"]').onclick = () => opts.onExit && opts.onExit();
+    const bb = p.querySelector('[data-a="board"]'); if (bb) bb.onclick = boardPanel;
+  }
+  /* ---------- pontuações máximas (melhor missão de cada jogador: nível atingido e pontos) ---------- */
+  function boardHtml(rows) {
+    if (!rows) return '<p class="gx-ctl">A carregar…</p>';
+    if (!rows.length) return '<p class="gx-ctl">Ainda não há pontuações. Seja o primeiro!</p>';
+    const me = String(opts.me || '').toLowerCase(), N = levels.length;
+    return `<table class="gx-res gx-board"><thead><tr><th>#</th><th>Agente</th><th>Nível atingido</th><th>Pontos</th><th>Tempo</th></tr></thead><tbody>${rows.slice(0, 10).map((r, k) => `<tr class="${r.name.toLowerCase() === me ? 'me' : ''}"><td>${k + 1}</td><td>${esc(r.name)}</td><td>${r.rooms >= N ? `✔ Missão completa` : `Sala ${r.rooms + 1} <small>(${r.rooms}/${N})</small>`}</td><td><b>${r.score}</b></td><td>${mmss(r.time)}</td></tr>`).join('')}</tbody></table>`;
+  }
+  function fillBoard(el) {
+    el.innerHTML = boardHtml(null);
+    Promise.resolve(opts.loadBoard()).then((rows) => (el.innerHTML = boardHtml(rows || []))).catch(() => (el.innerHTML = '<p class="gx-ctl">Tabela indisponível (sem ligação ou sem conta).</p>'));
+  }
+  function boardPanel() {
+    const p = $('[data-p="board"]');
+    p.innerHTML = `<div class="gx-menu-box gx-board-box"><h2>🏆 Pontuações máximas</h2><p class="gx-ctl">Melhor missão de cada jogador: primeiro o nível atingido, depois os pontos.</p><div class="gx-bt"></div><button data-a="back" class="gx-go">Voltar</button></div>`;
+    showPanel('board'); state.mode = 'menu';
+    fillBoard(p.querySelector('.gx-bt'));
+    p.querySelector('[data-a="back"]').onclick = menu;
   }
 
   const CONTROLS = '<div class="gx-ctl"><b>Controlos</b>: W A S D — mover · rato — olhar · Shift — correr · E — usar terminais e painéis · Q — pulso EMP (imobiliza drones e câmaras) · Esc — pausa</div>';
@@ -783,7 +805,7 @@ export function startGame(container, opts) {
         else if (!live) log('Cápsula de tempo recolhida, mas o relógio desta sala já parou.', 'SISTEMA');
         else if (k.kind === 'time') {
           rk.left += TIME_BONUS; sfx.unlock(); flash('rgba(34,197,94,.3)');
-          if (rk.lockdown) { rk.lockdown = false; log(`+${TIME_BONUS} segundos! O bloqueio total foi cancelado.`, 'VEGA', 'vega'); }
+          if (rk.lockdown && rk.left > ALERT) { rk.lockdown = false; log(`+${TIME_BONUS} segundos! O bloqueio total foi suspenso.`, 'VEGA', 'vega'); }
           else log(`+${TIME_BONUS} segundos no relógio da sala.`, 'SISTEMA', 'ok');
           updateClock();
         } else { state.clockStop = Math.max(state.now, state.clockStop) + CLOCK_STOP; sfx.emp(); flash('rgba(168,85,247,.3)'); log(`Relógio parado durante ${CLOCK_STOP} segundos.`, 'SISTEMA', 'ok'); updateClock(); }
@@ -806,11 +828,13 @@ export function startGame(container, opts) {
     if (r.started && !r.done && !stopped && ['play', 'terminal', 'keypad'].includes(state.mode)) {
       const before = r.left; r.left = Math.max(0, r.left - dt); r.used += dt;
       if (r.left <= 30 && Math.ceil(r.left) !== Math.ceil(before) && r.left > 0) sfx.tick(r.left <= 10);
-      if (r.left === 0 && !r.lockdown) {
+      if (r.left <= ALERT && !r.lockdown && r.left > 0) {
         r.lockdown = true; sfx.alarm(); lastSiren = t; flash('rgba(239,68,68,.5)');
-        log('Tempo esgotado. Protocolo de bloqueio total ativado: drones e lasers acelerados.', 'NEXUS', 'nexus');
+        log(`Restam ${ALERT} segundos. Bloqueio total: drones e lasers acelerados. Quando o tempo acabar, a sala fecha e a missão termina.`, 'NEXUS', 'nexus');
       }
+      if (r.left > ALERT && r.lockdown) r.lockdown = false; // ganhou tempo com uma cápsula
       if (Math.ceil(r.left) !== Math.ceil(before) || r.lockdown) updateClock();
+      if (r.left === 0 && !state.safe) { gameOver(i); return; }
     }
     const lock = r.lockdown && !r.done;
     if (lock && state.mode === 'play' && t - lastSiren > 4) { lastSiren = t; sfx.alarm(); }
@@ -912,28 +936,41 @@ export function startGame(container, opts) {
     if (composer) composer.render(); else renderer.render(scene, camera);
   }
 
-  function finish() {
+  // Fim da missão: completa (chegou à saída) ou falhada (o tempo de uma sala chegou a 0).
+  function endRun(failedRoom) {
     state.finished = true;
-    const played = rec.map((r, i) => ({ r, i })).filter(({ i }) => i >= start);
+    const played = rec.map((r, i) => ({ r, i })).filter(({ i }) => i >= start && (rec[i].started || rec[i].done));
     const score = totalScore(), time = Math.round(played.reduce((s, { r }) => s + r.used, 0));
-    const complete = played.every(({ r }) => r.done);
-    const ranked = !!opts.ranked && start === 0 && complete;
-    const rows = played.map(({ r, i }) => `<tr><td>${i + 1}. ${esc(levels[i].name)}</td><td>${r.tasks}/${levels[i].tasks.length}</td><td>${r.lockdown ? 'esgotado' : mmss(r.used)}</td><td>${r.caught + r.alarms + r.hints + r.wrong || '—'}</td><td><b>${r.score}</b></td></tr>`).join('');
+    const rooms = rec.filter((r, i) => i >= start && r.done).length, complete = failedRoom === undefined;
+    const ranked = !!opts.ranked && start === 0;
+    const rows = played.map(({ r, i }) => `<tr${i === failedRoom ? ' class="bad"' : ''}><td>${i + 1}. ${esc(levels[i].name)}</td><td>${r.tasks}/${levels[i].tasks.length}</td><td>${i === failedRoom ? 'esgotado' : mmss(r.used)}</td><td>${r.caught + r.alarms + r.hints + r.wrong || '—'}</td><td><b>${r.done ? r.score : scoreOf(i).tasks - scoreOf(i).pen > 0 ? scoreOf(i).tasks - scoreOf(i).pen : 0}</b></td></tr>`).join('');
+    const N = levels.length, level = complete ? 'Missão completa' : `Sala ${failedRoom + 1} de ${N} (${rooms} concluída${rooms === 1 ? '' : 's'})`;
     const extra = `<table class="gx-res"><thead><tr><th>Sala</th><th>Tarefas</th><th>Tempo</th><th>Penalizações</th><th>Pontos</th></tr></thead><tbody>${rows}</tbody>
-      <tfoot><tr><td>Total</td><td></td><td>${mmss(time)}</td><td></td><td><b>${score}</b></td></tr></tfoot></table>
-      <p class="gx-rank">${ranked ? (opts.best && opts.best >= score ? `O seu recorde continua a ser ${opts.best} pontos.` : '🏆 Novo recorde pessoal!') : 'Modo treino: comece a missão na sala 1 para entrar na tabela de melhores jogadores.'}</p>
+      <tfoot><tr><td>Total · ${esc(level)}</td><td></td><td>${mmss(time)}</td><td></td><td><b>${score}</b></td></tr></tfoot></table>
+      <p class="gx-rank">${ranked ? 'A registar a pontuação…' : 'Modo treino: comece a missão na sala 1 para entrar na tabela de pontuações máximas.'}</p>
+      ${opts.loadBoard ? '<h3 class="gx-bh">🏆 Pontuações máximas</h3><div class="gx-bt"></div>' : ''}
       <button class="gx-go" data-a="again" style="margin-right:8px">Jogar de novo (novos códigos)</button>`;
-    storyScreen(story.end, `Missão concluída · ${score} pontos`, 'Ver a tabela de melhores jogadores', () => opts.onExit && opts.onExit(), extra);
+    const lines = complete ? story.end : [`A NEXUS fechou a sala ${failedRoom + 1} — ${levels[failedRoom].name}. O bloqueio total tornou-se definitivo.`, `Chegou à sala ${failedRoom + 1} de ${N} e concluiu ${rooms} sala${rooms === 1 ? '' : 's'}. Os pontos que já ganhou contam para a tabela.`];
+    storyScreen(lines, complete ? `Missão concluída · ${score} pontos` : `Tempo esgotado · ${score} pontos`, 'Sair do jogo', () => opts.onExit && opts.onExit(), extra);
     const p = $('[data-p="story"]');
     p.querySelector('[data-a="again"]').onclick = () => opts.onRestart && opts.onRestart();
-    sfx.ok();
-    if (opts.onRunEnd) Promise.resolve(opts.onRunEnd({ score, time, rooms: played.length, ranked })).then((msg) => { if (msg) p.querySelector('.gx-rank').textContent = msg; }).catch(() => {});
+    const bt = p.querySelector('.gx-bt');
+    if (complete) sfx.ok(); else { sfx.caught(); setTimeout(() => sfx.alarm(), 400); }
+    const done = opts.onRunEnd ? Promise.resolve(opts.onRunEnd({ score, time, rooms, complete, ranked })).then((msg) => { if (msg) p.querySelector('.gx-rank').textContent = msg; }).catch(() => {}) : Promise.resolve();
+    if (bt) done.then(() => fillBoard(bt));
+  }
+  function finish() { endRun(); }
+  function gameOver(i) {
+    if (state.finished) return;
+    flash('rgba(239,68,68,.7)'); log('Tempo esgotado. A NEXUS selou a sala.', 'NEXUS', 'nexus');
+    if (document.pointerLockElement === canvas) document.exitPointerLock();
+    endRun(i);
   }
 
   /* ---------- arranque ---------- */
   setupQuality(); updateHud(); updateClock(); updateEmp();
   raf = requestAnimationFrame(frame);
-  const rules = `<p class="gx-rules">⏱ Cada sala tem um tempo-limite: quanto mais depressa, mais pontos. Cada tarefa vale ${500} pontos; dicas, capturas, alarmes e códigos errados descontam. Os códigos mudam em cada jogo.</p><p class="gx-rules">Cápsulas: <span style="color:#4ade80">⧗ verde</span> +${TIME_BONUS} s (e cancela o bloqueio total) · <span style="color:#c084fc">◆ roxa</span> para o relógio ${CLOCK_STOP} s · <span style="color:#38bdf8">◆ azul</span> pulso EMP.</p>${CONTROLS}`;
+  const rules = `<p class="gx-rules">⏱ Cada sala tem um tempo-limite: quanto mais depressa, mais pontos. <b>Se o tempo de uma sala chegar a 0, a missão termina</b> — nos últimos ${ALERT} s a NEXUS ativa o bloqueio total. Cada tarefa vale ${500} pontos; dicas, capturas, alarmes e códigos errados descontam. Os códigos mudam em cada jogo.</p><p class="gx-rules">Cápsulas: <span style="color:#4ade80">⧗ verde</span> +${TIME_BONUS} s · <span style="color:#c084fc">◆ roxa</span> para o relógio ${CLOCK_STOP} s · <span style="color:#38bdf8">◆ azul</span> pulso EMP.</p>${CONTROLS}`;
   if (start === 0) storyScreen(story.intro, story.title, opts.ranked ? 'Iniciar missão' : 'Iniciar treino', () => play(), rules);
   else storyScreen([`Regressa à sala ${start + 1}: ${levels[start].name}.`, 'Modo treino: a pontuação só conta para a tabela de melhores jogadores quando a missão começa na sala 1.'], story.title, 'Continuar missão', () => play(), rules);
 
@@ -941,7 +978,7 @@ export function startGame(container, opts) {
     // Diagnóstico (só usado nos testes automáticos, com ?nxdebug no endereço).
     debug: {
       teleport(i, x, dz, yawDeg = 0) { yaw.position.set(x, EYE, rooms[i].cz - dz); yaw.rotation.y = (yawDeg * Math.PI) / 180; pitch.rotation.x = 0; },
-      levels, safe(v = true) { state.safe = v; },
+      levels, menu: () => menu(), safe(v = true) { state.safe = v; },
       setTime(i, s) { rec[i].left = s; },
       solve(i) { const t = currentTask(i); if (t) completeTask(i, t); },
       info: () => ({
