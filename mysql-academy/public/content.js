@@ -58,7 +58,9 @@ const CHAPTERS = [
     quiz('Na tabela alunos, o que representa uma linha?', ['Uma característica comum a todos os alunos', 'Um aluno concreto', 'O nome da base de dados', 'O tipo de dados de uma coluna'], 1, 'Cada linha (registo) corresponde a um elemento — neste caso, um aluno.'),
     quiz('Para que serve a chave primária?', ['Encriptar a tabela', 'Identificar cada linha de forma única', 'Ordenar os resultados', 'Guardar a palavra-passe'], 1, 'Não podem existir duas linhas com o mesmo valor de chave primária.'),
     learn('MySQL, SGBD e SQL', `<p>O <b>MySQL</b> é um <b>SGBD</b> — Sistema de Gestão de Bases de Dados — de código aberto. O SGBD trata do armazenamento, da segurança, do acesso concorrente e da recuperação dos dados.</p>
+      <p>Há outros SGBD <b>relacionais</b> (que organizam os dados em tabelas relacionadas e usam SQL): <b>PostgreSQL</b>, <b>MariaDB</b> (derivado do MySQL), <b>Oracle Database</b>, <b>Microsoft SQL Server</b> e <b>SQLite</b>. Uma <b>folha de cálculo</b>, como o Microsoft Excel, também mostra dados em tabelas, mas <b>não é um SGBD</b>: não garante a integridade dos dados (chaves, restrições), não controla o acesso de vários utilizadores ao mesmo tempo nem usa SQL.</p>
       <p>Funciona em modelo <b>cliente/servidor</b>: o <b>servidor</b> guarda os dados; os <b>clientes</b> (terminal <code>mysql</code>, MySQL Workbench, aplicações) enviam pedidos escritos em <b>SQL</b> — <i>Structured Query Language</i> — e recebem as respostas.</p>`),
+    key('s1', quiz('Qual destes é um SGBD relacional?', ['Microsoft Excel', 'PostgreSQL', 'Microsoft Word', 'Google Chrome'], 1, 'PostgreSQL, MariaDB, Oracle e SQL Server são SGBD relacionais, como o MySQL. Uma folha de cálculo não é um SGBD.')),
     quiz('O que significa SQL?', ['Simple Query Link', 'Structured Query Language', 'System Quality Logic', 'Secure Question List'], 1, 'SQL é a linguagem usada para comunicar com bases de dados relacionais.'),
     quiz('No modelo cliente/servidor do MySQL, quem guarda os dados?', ['O cliente', 'O servidor', 'O browser', 'O sistema de ficheiros do aluno'], 1, 'O servidor guarda e gere os dados; os clientes apenas enviam pedidos.'),
   ] },
@@ -1258,7 +1260,9 @@ SOURCE /caminho/escola.sql;</code></pre><p>Ficheiros comprimidos restauram-se co
       'Faz-se a cópia, cria-se uma BD vazia de teste, restaura-se lá o ficheiro e confirma-se que os dados estão completos.')),
   ] },
   { title: 'Estratégias de backup', steps: [
-    learn('Backups físicos', `<p>Em bases de dados grandes, copiar os ficheiros de dados é muito mais rápido do que gerar e reproduzir SQL. Ferramentas como <b>Percona XtraBackup</b> ou <b>MySQL Enterprise Backup</b> fazem cópias físicas consistentes sem parar o servidor.</p>`),
+    learn('Backups lógicos e backups físicos', `<p>O <code>mysqldump</code> faz um <b>backup lógico</b>: gera um ficheiro com as instruções SQL (<code>CREATE TABLE</code>, <code>INSERT</code>…) que recriam a base de dados. É legível, portável (pode até ser usado noutro servidor ou versão) e ideal para bases de dados pequenas e médias. Mas, numa base de dados grande — centenas de GB —, gerar o ficheiro e, sobretudo, reproduzir todas as instruções no restauro <b>pode demorar muitas horas</b>.</p>
+      <p>Um <b>backup físico</b> copia diretamente os ficheiros de dados do servidor, o que é muito mais rápido a copiar e a restaurar. Ferramentas como <b>Percona XtraBackup</b> ou <b>MySQL Enterprise Backup</b> fazem cópias físicas consistentes sem parar o servidor.</p>`),
+    key('l1', quiz('O que contém o ficheiro gerado por um backup lógico (mysqldump)?', ['Uma cópia dos ficheiros de dados do servidor', 'As instruções SQL que recriam as tabelas e os dados', 'Apenas a estrutura das tabelas', 'O binary log'], 1, 'Por isso é legível e portável, mas lento de reproduzir em bases de dados grandes.')),
     quiz('Qual a principal vantagem de um backup físico em bases de dados grandes?', ['Ficheiro legível', 'Rapidez de cópia e de restauro', 'Funciona noutros SGBD', 'Não ocupa espaço'], 1, 'Copia diretamente os ficheiros de dados.'),
     learn('Binary log e recuperação num ponto no tempo', `<p>O <b>binary log</b> regista todas as alterações feitas aos dados. Depois de restaurar o último backup completo, podem reaplicar-se as alterações do binlog até um instante exato — por exemplo, até um minuto antes de um <code>DROP TABLE</code> acidental. Chama-se <b>PITR</b> (<i>Point-In-Time Recovery</i>).</p>`),
     quiz('Para que servem os binary logs na recuperação?', ['Acelerar consultas', 'Recuperar a BD até um ponto exato no tempo após restaurar um backup', 'Guardar palavras-passe', 'Criar utilizadores'], 1, 'Reaplicam as alterações posteriores ao backup.'),
@@ -1341,7 +1345,7 @@ const INTROS = {
   'sec.3': 'Dar permissões a cada utilizador, um a um, torna-se difícil de gerir. Os roles agrupam permissões e atribuem-se de uma vez. A lição termina com as boas práticas de segurança.',
   'backup.1': 'Avarias, erros humanos e ataques acontecem. Esta lição explica porque se fazem cópias de segurança e como se fazem com o mysqldump.',
   'backup.2': 'Uma cópia de segurança só vale se for possível recuperá-la. Aprende a restaurar uma base de dados a partir de um ficheiro e a testar os backups.',
-  'backup.3': 'Para terminar, uma visão de conjunto: backups físicos, recuperação até um instante exato e a regra 3-2-1, para planear uma estratégia de backup completa.',
+  'backup.3': 'Para terminar, uma visão de conjunto: backups lógicos e físicos, recuperação até um instante exato e a regra 3-2-1, para planear uma estratégia de backup completa.',
 };
 
 /* IDs estáveis e estrutura derivada: capítulo.lição.exercício */
