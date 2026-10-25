@@ -33,11 +33,18 @@
       const { data, error } = await sb.from('profiles').select('name, is_teacher, is_admin, turma').eq('id', session.user.id).single();
       if (error) throw error;
       B.user = { id: session.user.id, email: session.user.email, name: data.name, teacher: !!data.is_teacher, admin: !!data.is_admin, turma: data.turma || '' };
+      try { localStorage.setItem(USER_KEY, JSON.stringify(B.user)); } catch { /* sem storage */ }
       return B.user;
     }
+    // Último perfil carregado: permite continuar a estudar sem ligação (a app só abre com sessão iniciada).
+    const USER_KEY = 'mysql-academy.user';
     B.init = async () => {
       const { data } = await sb.auth.getSession();
-      try { return await loadUser(data.session); } catch { return null; }
+      try { return await loadUser(data.session); } catch {
+        if (!data.session) return null;
+        try { const c = JSON.parse(localStorage.getItem(USER_KEY) || 'null'); if (c && c.id === data.session.user.id) return (B.user = c); } catch { /* ignorar */ }
+        return null;
+      }
     };
     B.register = async ({ name, email, password, turma }) => {
       const { data: free, error: e1 } = await sb.rpc('name_available', { n: name });
@@ -53,7 +60,7 @@
       if (error) throw error;
       return loadUser(data.session);
     };
-    B.logout = async () => { await sb.auth.signOut({ scope: 'local' }); B.user = null; };
+    B.logout = async () => { await sb.auth.signOut({ scope: 'local' }); B.user = null; try { localStorage.removeItem(USER_KEY); } catch { /* ignorar */ } };
     B.resetPassword = async (email) => { const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: here() }); if (error) throw error; };
     B.updatePassword = async (password) => { const { error } = await sb.auth.updateUser({ password }); if (error) throw error; B.recovery = false; };
     B.load = async () => {
@@ -150,7 +157,7 @@
       if (error) throw error;
       return data;
     };
-    // Quiz ao vivo: o professor cria e controla a sessão; os alunos entram com um nome (sem conta) e respondem.
+    // Quiz ao vivo: o professor cria e controla a sessão; os alunos entram com a sua conta e respondem.
     const rpc = async (f, args) => { const { data, error } = await sb.rpc(f, args); if (error) throw error; return data; };
     B.liveCreate = async ({ chapter, title, questions, secs }) => {
       const code = await rpc('live_create', { ch: chapter, ti: title, qs: questions, s: secs });
@@ -158,7 +165,7 @@
       return code;
     };
     B.liveControl = (code, act) => rpc('live_control', { c: code, act });
-    B.liveJoin = (code, name) => rpc('live_join', { c: code, n: name });
+    B.liveJoin = (code) => rpc('live_join2', { c: code }); // entra com a conta (o nome é o do perfil)
     B.liveAnswer = (code, token, choice) => rpc('live_answer', { c: code, t: token, ch: choice });
     B.livePoll = (code, token) => rpc('live_poll', { c: code, t: token || null });
     B.students = async () => {
@@ -209,7 +216,7 @@
       return j.code;
     };
     B.liveControl = async (code, act) => (await api('/api/live/control', 'POST', { code, act }, { 'x-live-host': hostKey(code) })).ok;
-    B.liveJoin = async (code, name) => (await api('/api/live/join', 'POST', { code, name })).token;
+    B.liveJoin = async (code) => (await api('/api/live/join', 'POST', { code })).token;
     B.liveAnswer = async (code, token, choice) => (await api('/api/live/answer', 'POST', { code, token, choice })).ok;
     B.livePoll = async (code, token) => {
       try { return await api(`/api/live/poll?code=${encodeURIComponent(code)}&token=${encodeURIComponent(token || '')}`, 'GET', null, { 'x-live-host': hostKey(code) }); }

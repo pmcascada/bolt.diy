@@ -703,3 +703,7 @@ button.lv-opt{cursor:pointer}button.lv-opt:active{transform:scale(.97)}
   .lv-chart{gap:8px}.lv-col{width:56px}
   .lv-qbox{padding-right:80px}
 }
+
+/* sem sessão iniciada: só a página de entrada (sem menu nem pontuação) */
+body.gated #nav,body.gated #mini,body.gated #tabbar,body.gated #topr .pill{display:none}
+.gate-info h3{display:flex;align-items:center;gap:8px}

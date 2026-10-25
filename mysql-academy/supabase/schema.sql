@@ -563,6 +563,66 @@ grant execute on function public.live_join(text, text) to anon, authenticated;
 grant execute on function public.live_answer(text, uuid, int) to anon, authenticated;
 grant execute on function public.live_poll(text, uuid) to anon, authenticated;
 
+-- ------------------------------------------------------------
+-- Versão 10: só utilizadores registados (com sessão iniciada) acedem aos dados da app.
+-- As classificações e o quiz ao vivo deixam de estar disponíveis para visitantes anónimos;
+-- no quiz ao vivo, cada aluno entra com a sua conta (o nome é o do perfil).
+-- ------------------------------------------------------------
+alter table public.live_players add column if not exists user_id uuid references auth.users (id) on delete cascade;
+create unique index if not exists live_players_user on public.live_players (code, user_id);
+
+-- Entrar no quiz com a conta: devolve o token do aluno (o mesmo, se voltar a entrar noutro dispositivo).
+create or replace function public.live_join2(c text) returns uuid
+language plpgsql volatile security definer set search_path = public as
+'declare t uuid; nm text;
+begin
+  if auth.uid() is null or not exists (select 1 from public.live_sessions where code = c and state <> ''end'') then return null; end if;
+  select token into t from public.live_players where code = c and user_id = auth.uid();
+  if found then return t; end if;
+  if (select count(*) from public.live_players where code = c) >= 200 then return null; end if;
+  select name into nm from public.profiles where id = auth.uid();
+  if nm is null then return null; end if;
+  insert into public.live_players (code, name, user_id) values (c, left(nm, 24), auth.uid()) on conflict do nothing returning token into t;
+  return t;
+end';
+
+-- A resposta só conta para o token do próprio utilizador.
+create or replace function public.live_answer(c text, t uuid, ch int) returns boolean
+language plpgsql volatile security definer set search_path = public as
+'declare r public.live_sessions; el double precision; q jsonb; p int;
+begin
+  select * into r from public.live_sessions where code = c;
+  if not found or r.state <> ''question'' then return false; end if;
+  if not exists (select 1 from public.live_players where code = c and token = t and user_id = auth.uid()) then return false; end if;
+  el := extract(epoch from now() - r.q_started_at);
+  if el > r.secs + 1.5 then return false; end if;
+  q := r.questions -> r.qindex;
+  if ch < 0 or ch >= jsonb_array_length(q -> ''opts'') then return false; end if;
+  p := case when ch = (q ->> ''a'')::int then greatest(500, round(1000 * (1 - least(el, r.secs) / r.secs / 2)))::int else 0 end;
+  insert into public.live_answers (code, token, qindex, choice, ms, points) values (c, t, r.qindex, ch, (el * 1000)::int, p)
+  on conflict do nothing;
+  if found then update public.live_players set score = score + p where code = c and token = t; end if;
+  return true;
+end';
+
+revoke execute on function public.live_join(text, text) from public, anon, authenticated;
+revoke execute on function public.live_join2(text) from public, anon;
+grant execute on function public.live_join2(text) to authenticated;
+revoke execute on function public.live_answer(text, uuid, int) from public, anon;
+revoke execute on function public.live_poll(text, uuid) from public, anon;
+revoke execute on function public.leaderboard2(int) from public, anon;
+revoke execute on function public.game_leaderboard2(int) from public, anon;
+grant execute on function public.leaderboard2(int) to authenticated;
+grant execute on function public.game_leaderboard2(int) to authenticated;
+do 'begin
+  if to_regprocedure(''public.game_leaderboard(int)'') is not null then
+    execute ''revoke execute on function public.game_leaderboard(int) from public, anon'';
+  end if;
+  if to_regprocedure(''public.leaderboard(int)'') is not null then
+    execute ''revoke execute on function public.leaderboard(int) from public, anon'';
+  end if;
+end';
+
 -- ============================================================
 -- Gestor do site: executar uma única vez, com o email da conta do gestor. A partir daí,
 -- o gestor atribui o perfil de professor a outras contas na Área do professor.
