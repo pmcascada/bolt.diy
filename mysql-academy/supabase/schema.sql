@@ -405,6 +405,164 @@ language sql stable security definer set search_path = public as
 revoke execute on function public.game_leaderboard2(int) from public;
 grant execute on function public.game_leaderboard2(int) to anon, authenticated;
 
+-- ------------------------------------------------------------
+-- Versão 9: quiz ao vivo (estilo Kahoot). O professor cria uma sessão com as perguntas de um capítulo;
+-- os alunos entram com o código (sem conta, só com um nome) e respondem no telemóvel ou no computador.
+-- Tudo passa por funções (security definer): a resposta certa só é enviada aos alunos depois de revelada.
+-- ------------------------------------------------------------
+create table if not exists public.live_sessions (
+  code         text primary key,
+  host         uuid not null references auth.users (id) on delete cascade,
+  chapter      text not null,
+  title        text,
+  questions    jsonb not null,
+  secs         int not null default 20 check (secs between 5 and 120),
+  state        text not null default 'lobby' check (state in ('lobby', 'question', 'reveal', 'end')),
+  qindex       int not null default -1,
+  q_started_at timestamptz,
+  created_at   timestamptz not null default now()
+);
+create table if not exists public.live_players (
+  code      text not null references public.live_sessions (code) on delete cascade,
+  token     uuid not null default gen_random_uuid(),
+  name      text not null,
+  score     int not null default 0,
+  joined_at timestamptz not null default now(),
+  primary key (code, token),
+  unique (code, name)
+);
+create table if not exists public.live_answers (
+  code   text not null,
+  token  uuid not null,
+  qindex int not null,
+  choice int not null,
+  ms     int not null,
+  points int not null,
+  primary key (code, token, qindex),
+  foreign key (code, token) references public.live_players (code, token) on delete cascade
+);
+alter table public.live_sessions enable row level security;
+alter table public.live_players enable row level security;
+alter table public.live_answers enable row level security;
+revoke all on public.live_sessions, public.live_players, public.live_answers from anon, authenticated;
+
+-- O professor cria a sessão; devolve o código de 6 algarismos.
+create or replace function public.live_create(ch text, ti text, qs jsonb, s int) returns text
+language plpgsql volatile security definer set search_path = public as
+'declare c text;
+begin
+  if not public.is_teacher() or jsonb_typeof(qs) <> ''array'' or jsonb_array_length(qs) < 1 or jsonb_array_length(qs) > 40 then return null; end if;
+  loop
+    c := lpad((floor(random() * 900000) + 100000)::int::text, 6, ''0'');
+    exit when not exists (select 1 from public.live_sessions where code = c);
+  end loop;
+  insert into public.live_sessions (code, host, chapter, title, questions, secs)
+  values (c, auth.uid(), left(ch, 20), left(ti, 120), qs, greatest(5, least(coalesce(s, 20), 120)));
+  return c;
+end';
+
+-- Comandos do professor: start/next (pergunta seguinte ou fim), reveal (mostra a resposta), end.
+create or replace function public.live_control(c text, act text) returns boolean
+language plpgsql volatile security definer set search_path = public as
+'declare r public.live_sessions;
+begin
+  select * into r from public.live_sessions where code = c and host = auth.uid();
+  if not found then return false; end if;
+  if act in (''start'', ''next'') and r.state in (''lobby'', ''reveal'') then
+    if r.qindex + 1 >= jsonb_array_length(r.questions) then
+      update public.live_sessions set state = ''end'' where code = c;
+    else
+      update public.live_sessions set state = ''question'', qindex = r.qindex + 1, q_started_at = now() where code = c;
+    end if;
+  elsif act = ''reveal'' and r.state = ''question'' then
+    update public.live_sessions set state = ''reveal'' where code = c;
+  elsif act = ''end'' then
+    update public.live_sessions set state = ''end'' where code = c;
+  else
+    return false;
+  end if;
+  return true;
+end';
+
+-- Um aluno entra com um nome (único na sessão); devolve o seu token secreto.
+create or replace function public.live_join(c text, n text) returns uuid
+language plpgsql volatile security definer set search_path = public as
+'declare t uuid; nm text := left(regexp_replace(trim(coalesce(n, '''')), ''\s+'', '' '', ''g''), 20);
+begin
+  if length(nm) < 1 or not exists (select 1 from public.live_sessions where code = c and state <> ''end'') then return null; end if;
+  if (select count(*) from public.live_players where code = c) >= 200 then return null; end if;
+  insert into public.live_players (code, name) values (c, nm) on conflict do nothing returning token into t;
+  return t;
+end';
+
+-- Resposta de um aluno: só conta dentro do tempo; até 1000 pontos, mais quanto mais rápida (mínimo 500 se certa).
+create or replace function public.live_answer(c text, t uuid, ch int) returns boolean
+language plpgsql volatile security definer set search_path = public as
+'declare r public.live_sessions; el double precision; q jsonb; p int;
+begin
+  select * into r from public.live_sessions where code = c;
+  if not found or r.state <> ''question'' then return false; end if;
+  if not exists (select 1 from public.live_players where code = c and token = t) then return false; end if;
+  el := extract(epoch from now() - r.q_started_at);
+  if el > r.secs + 1.5 then return false; end if;
+  q := r.questions -> r.qindex;
+  if ch < 0 or ch >= jsonb_array_length(q -> ''opts'') then return false; end if;
+  p := case when ch = (q ->> ''a'')::int then greatest(500, round(1000 * (1 - least(el, r.secs) / r.secs / 2)))::int else 0 end;
+  insert into public.live_answers (code, token, qindex, choice, ms, points) values (c, t, r.qindex, ch, (el * 1000)::int, p)
+  on conflict do nothing;
+  if found then update public.live_players set score = score + p where code = c and token = t; end if;
+  return true;
+end';
+
+-- Estado da sessão para os alunos (token) e para o professor (anfitrião): pergunta, tempo, respostas, classificação.
+create or replace function public.live_poll(c text, t uuid default null) returns jsonb
+language plpgsql stable security definer set search_path = public as
+'declare r public.live_sessions; q jsonb; host boolean; res jsonb; me jsonb := null; n int; ans int; lft double precision;
+begin
+  select * into r from public.live_sessions where code = c;
+  if not found then return null; end if;
+  host := coalesce(r.host = auth.uid(), false);
+  select count(*) into n from public.live_players where code = c;
+  res := jsonb_build_object(''state'', r.state, ''qindex'', r.qindex, ''total'', jsonb_array_length(r.questions), ''secs'', r.secs,
+    ''title'', r.title, ''chapter'', r.chapter, ''players'', n, ''host'', host);
+  if r.state in (''question'', ''reveal'') then
+    q := r.questions -> r.qindex;
+    lft := greatest(0, r.secs - extract(epoch from now() - r.q_started_at));
+    select count(*) into ans from public.live_answers where code = c and qindex = r.qindex;
+    res := res || jsonb_build_object(''left'', lft, ''answered'', ans,
+      ''question'', jsonb_build_object(''q'', q -> ''q'', ''sql'', q -> ''sql'', ''opts'', q -> ''opts''));
+    if r.state = ''reveal'' then
+      res := res || jsonb_build_object(''a'', q -> ''a'', ''why'', q -> ''why'', ''counts'',
+        (select jsonb_agg((select count(*) from public.live_answers x where x.code = c and x.qindex = r.qindex and x.choice = i) order by i)
+           from generate_series(0, jsonb_array_length(q -> ''opts'') - 1) i));
+    end if;
+  end if;
+  if r.state in (''reveal'', ''end'') or host then
+    res := res || jsonb_build_object(''top'', coalesce((select jsonb_agg(jsonb_build_object(''name'', name, ''score'', score) order by score desc, joined_at)
+      from (select name, score, joined_at from public.live_players where code = c order by score desc, joined_at limit case when host then 200 else 10 end) z), ''[]''::jsonb));
+  end if;
+  if t is not null then
+    select jsonb_build_object(''name'', p.name, ''score'', p.score,
+      ''rank'', (select count(*) + 1 from public.live_players o where o.code = c and o.score > p.score),
+      ''answered'', exists (select 1 from public.live_answers a where a.code = c and a.token = t and a.qindex = r.qindex),
+      ''last'', case when r.state = ''reveal'' then (select jsonb_build_object(''choice'', a.choice, ''points'', a.points) from public.live_answers a where a.code = c and a.token = t and a.qindex = r.qindex) end)
+      into me from public.live_players p where p.code = c and p.token = t;
+    res := res || jsonb_build_object(''me'', me);
+  end if;
+  return res;
+end';
+
+revoke execute on function public.live_create(text, text, jsonb, int) from public, anon;
+revoke execute on function public.live_control(text, text) from public, anon;
+revoke execute on function public.live_join(text, text) from public;
+revoke execute on function public.live_answer(text, uuid, int) from public;
+revoke execute on function public.live_poll(text, uuid) from public;
+grant execute on function public.live_create(text, text, jsonb, int) to authenticated;
+grant execute on function public.live_control(text, text) to authenticated;
+grant execute on function public.live_join(text, text) to anon, authenticated;
+grant execute on function public.live_answer(text, uuid, int) to anon, authenticated;
+grant execute on function public.live_poll(text, uuid) to anon, authenticated;
+
 -- ============================================================
 -- Gestor do site: executar uma única vez, com o email da conta do gestor. A partir daí,
 -- o gestor atribui o perfil de professor a outras contas na Área do professor.
