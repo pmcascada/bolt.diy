@@ -1182,8 +1182,8 @@ async function vRank() {
   } catch (e) { $('#rk').outerHTML = alertBox('bad', 'alert', `Não foi possível obter a classificação. ${esc(BK.errorText(e))} O seu progresso continua guardado neste dispositivo.`); }
 }
 
-function vMe() {
-  crumbs = [['Perfil', '#/me']];
+function vMe(gate = false) {
+  crumbs = [[gate ? 'Entrar' : 'Perfil', '#/me']];
   const s = sum(), sbMode = BK.kind === 'supabase', u = BK.user;
   const prefs = `<div class="card"><h3>Preferências e dados</h3><p class="small muted">Nível ${s.level} · ${s.xp} XP · ${s.exDone} exercícios resolvidos.</p>
     <div class="row"><button class="btn sec-b" id="theme">${ic('moon')}Alternar tema</button>${u ? '' : `<button class="btn danger" id="reset">${ic('trash')}Apagar progresso local</button>`}</div>
@@ -1211,7 +1211,11 @@ function vMe() {
     <label class="field">Turma (opcional, só ao criar perfil)<input class="txt" id="tu" maxlength="30"></label>
     <div class="row"><button class="btn" type="button" id="reg">Criar perfil</button><button class="btn sec-b" type="submit">Iniciar sessão</button></div><div id="msg"></div></form>`;
   }
-  view.innerHTML = `<div class="page-h"><div><div class="eyebrow">Conta</div><h1>Perfil</h1></div></div><div class="two"><div class="card">${acct}</div>${prefs}</div>`;
+  const welcome = `<div class="card gate-info"><h3>${ic('lock')}Acesso para utilizadores registados</h3><p class="small muted">Os conteúdos, o laboratório SQL, o Protocolo NEXUS, as classificações e o quiz ao vivo só estão disponíveis com sessão iniciada.</p>
+    <ul class="small" style="padding-left:18px;margin:0;line-height:1.8"><li>${sbMode ? 'Crie uma conta com o seu email' : 'Crie um perfil com um nome e um PIN'} — leva menos de um minuto.</li><li>O progresso fica guardado na conta e pode continuar em qualquer dispositivo.</li><li>Se entrou por um link ou QR code de um quiz, segue para lá logo a seguir.</li></ul></div>`;
+  view.innerHTML = gate
+    ? `<div class="page-h"><div><div class="eyebrow">MySQL Academy</div><h1>Entrar</h1><p>Inicie sessão ou crie uma conta para continuar.</p></div></div><div class="two"><div class="card">${acct}</div>${welcome}</div>`
+    : `<div class="page-h"><div><div class="eyebrow">Conta</div><h1>Perfil</h1></div></div><div class="two"><div class="card">${acct}</div>${prefs}</div>`;
   const msg = (kind, icon, html) => { $('#msg').innerHTML = alertBox(kind, icon, html); };
   const entered = async (user) => { meTab = 'in'; st.name = user.name; persist(); await push(); toast('Sessão iniciada'); route(); };
   const busyT = async (fn) => { try { await fn(); } catch (e) { toast(BK.errorText(e), 'alert'); } };
@@ -1226,7 +1230,7 @@ function vMe() {
       Object.assign(st, { name: '', ...EMPTY() }); persist(); route();
     };
   } else if (sbMode) {
-    view.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { meTab = b.dataset.tab; vMe(); }));
+    view.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { meTab = b.dataset.tab; vMe(gate); }));
     $('#authf').onsubmit = (e) => {
       e.preventDefault();
       const email = $('#em').value.trim(), password = $('#pw').value;
@@ -1255,7 +1259,7 @@ function vMe() {
     $('#authf').onsubmit = (e) => { e.preventDefault(); go('in'); };
     $('#reg').onclick = () => go('reg');
   }
-  $('#theme').onclick = () => $('#themeBtn').click();
+  if ($('#theme')) $('#theme').onclick = () => $('#themeBtn').click();
   if ($('#reset')) $('#reset').onclick = () => { if (confirm('Apagar todo o progresso guardado neste dispositivo?')) { Object.assign(st, EMPTY()); persist(); route(); } };
 }
 let meTab = 'in';
@@ -1601,7 +1605,7 @@ function closeGame() {
 
 /* ---------- quiz ao vivo (estilo Kahoot) ----------
    O professor escolhe o capítulo e inicia; o ecrã projetado mostra o código, o QR code e as perguntas.
-   Os alunos entram no telemóvel ou no computador (link, QR code ou código) só com um nome e respondem.
+   Os alunos entram no telemóvel ou no computador (link, QR code ou código) com a sua conta e respondem.
    Sem websockets: cada ecrã pergunta o estado ao servidor uma vez por segundo. */
 const LIVE_KEY = 'mya-live', LIVE_HOST = 'mya-live-host';
 const LIVE_SHAPES = [['▲', 'lv-r'], ['◆', 'lv-b'], ['●', 'lv-y'], ['■', 'lv-g'], ['★', 'lv-p'], ['⬢', 'lv-o']];
@@ -1645,7 +1649,7 @@ function vLive() {
   <div class="lv-home">
     <section class="card"><h3>${ic('play')}Entrar num quiz</h3><p class="small muted">Introduza o código que aparece no ecrã do professor (ou leia o QR code com a câmara do telemóvel).</p>
       <form id="lvJoin"><label class="field">Código<input class="txt lv-code-in num-t" id="lvC" inputmode="numeric" autocomplete="off" maxlength="7" placeholder="000 000" value="${me ? liveFmtCode(me.code) : ''}"></label>
-      <label class="field">Nome a mostrar<input class="txt" id="lvN" maxlength="20" value="${esc((me && me.name) || (BK.user && BK.user.name) || st.name || '')}"></label>
+      <p class="small muted">Entra como <b>${esc(BK.user.name)}</b> — é este o nome que aparece na classificação.</p>
       <div id="lvJMsg"></div><button class="btn" type="submit">Entrar ${ic('chevR')}</button></form></section>
     ${canHost ? `<section class="card"><h3>${ic('users')}Iniciar um quiz (professor)</h3>
       ${hosted ? `<p class="small">Quiz em curso: <a href="#/aovivo/host/${hosted.code}"><b class="num-t">${liveFmtCode(hosted.code)}</b> · ${esc(hosted.title || '')}</a></p>` : ''}
@@ -1656,11 +1660,11 @@ function vLive() {
         ${needKey ? `<label class="field">Chave de professor<input class="txt" id="lvK" type="password"></label>` : ''}
         <div id="lvNMsg"></div><button class="btn" type="submit">${ic('zap')}Criar quiz</button></form>
       <p class="small muted" style="margin-bottom:0">As perguntas são sorteadas do banco dos minitestes do capítulo e as opções baralhadas. Depois de criar, projete o ecrã: os alunos entram pelo link, pelo QR code ou com o código.</p></section>`
-    : `<section class="card"><h3>${ic('info')}Como funciona</h3><ol class="small" style="padding-left:18px;margin:0;line-height:1.7"><li>O professor inicia o quiz e projeta o código e o QR code.</li><li>Entra com o código e um nome (não precisa de conta).</li><li>Cada pergunta tem tempo limitado: responda nos botões coloridos.</li><li>Resposta certa vale entre 500 e 1000 pontos — mais quanto mais rápida.</li><li>No fim aparece o pódio.</li></ol></section>`}
+    : `<section class="card"><h3>${ic('info')}Como funciona</h3><ol class="small" style="padding-left:18px;margin:0;line-height:1.7"><li>O professor inicia o quiz e projeta o código e o QR code.</li><li>Entra com o código (ou pelo link/QR code); o nome é o da sua conta.</li><li>Cada pergunta tem tempo limitado: responda nos botões coloridos.</li><li>Resposta certa vale entre 500 e 1000 pontos — mais quanto mais rápida.</li><li>No fim aparece o pódio.</li></ol></section>`}
   </div>`;
   const cIn = $('#lvC');
   cIn.oninput = () => { const c = liveCode(cIn.value); cIn.value = c.length > 3 ? liveFmtCode(c) : c; };
-  $('#lvJoin').onsubmit = async (e) => { e.preventDefault(); liveJoin(liveCode(cIn.value), $('#lvN').value, $('#lvJMsg')); };
+  $('#lvJoin').onsubmit = async (e) => { e.preventDefault(); liveJoin(liveCode(cIn.value), $('#lvJMsg')); };
   if ($('#lvNew')) $('#lvNew').onsubmit = async (e) => {
     e.preventDefault();
     const btn = e.submitter || $('#lvNew button'); btn.disabled = true;
@@ -1683,18 +1687,17 @@ function vLive() {
   };
 }
 
-async function liveJoin(code, name, msg) {
-  name = String(name || '').trim().replace(/\s+/g, ' ').slice(0, 20);
+// Entra no quiz com a conta (o nome é o do perfil); voltar a entrar devolve o mesmo lugar.
+async function liveJoin(code, msg) {
   const say = (t) => { msg.innerHTML = alertBox('bad', 'alert', t); };
   if (code.length !== 6) return say('O código tem 6 algarismos.');
-  if (!name) return say('Indique o nome que vai aparecer na classificação.');
   try {
     const d = await BK.livePoll(code);
     if (!d) return say(`Não existe nenhum quiz com o código ${liveFmtCode(code)}. Confirme o código no ecrã do professor.`);
     if (d.state === 'end') return say('Este quiz já terminou.');
-    const token = await BK.liveJoin(code, name);
-    if (!token) return say(`Já há alguém com o nome “${esc(name)}” neste quiz. Escolha outro nome.`);
-    liveSet(LIVE_KEY, { code, token, name });
+    const token = await BK.liveJoin(code);
+    if (!token) return say('Não foi possível entrar neste quiz (pode estar cheio ou já ter terminado).');
+    liveSet(LIVE_KEY, { code, token, name: BK.user.name, user: BK.user.name });
     if (location.hash === '#/q/' + code) vLivePlay(code); else location.hash = '#/q/' + code;
   } catch (e) { say(esc(BK.errorText(e))); }
 }
@@ -1704,11 +1707,11 @@ function vLivePlay(code) {
   crumbs = [['Quiz ao vivo', '#/aovivo']];
   code = liveCode(code);
   const me = liveGet(LIVE_KEY);
-  if (!me || me.code !== code) {
-    view.innerHTML = `<div class="lv-play"><div class="card lv-join"><div class="eyebrow">Quiz ao vivo</div><h2>Entrar no quiz <span class="num-t">${liveFmtCode(code)}</span></h2>
-      <form id="lvJ2"><label class="field">O seu nome<input class="txt" id="lvN2" maxlength="20" autocomplete="nickname" value="${esc((BK.user && BK.user.name) || st.name || '')}"></label><div id="lvJMsg2"></div><button class="btn lv-big-btn" type="submit">Entrar ${ic('chevR')}</button></form></div></div>`;
-    const n = $('#lvN2'); if (!n.value) n.focus();
-    $('#lvJ2').onsubmit = (e) => { e.preventDefault(); liveJoin(code, n.value, $('#lvJMsg2')); };
+  if (!me || me.code !== code || me.user !== BK.user.name) {
+    // chegou pelo link ou QR code: entra logo com a sua conta
+    view.innerHTML = `<div class="lv-play"><div class="card lv-join"><div class="eyebrow">Quiz ao vivo</div><h2>A entrar no quiz <span class="num-t">${liveFmtCode(code)}</span>…</h2>
+      <p class="muted">Como <b>${esc(BK.user.name)}</b></p><div id="lvJMsg2"></div><a class="btn sec-b" href="#/aovivo">Introduzir outro código</a></div></div>`;
+    liveJoin(code, $('#lvJMsg2'));
     return;
   }
   view.innerHTML = '<div class="lv-play" id="lvP"><div class="card"><div class="empty">A ligar ao quiz…</div></div></div><p class="small muted lv-net" id="lvNet" hidden>Ligação instável — a tentar de novo…</p>';
@@ -1839,6 +1842,7 @@ function applyTheme() {
 }
 
 /* ---------- router ---------- */
+let authReady = false;
 function route() {
   if (gameCtl) closeGame();
   liveStop();
@@ -1846,6 +1850,10 @@ function route() {
   const dr = $('#drawer'); dr.hidden = true; dr.innerHTML = '';
   const h = location.hash || '#/';
   const [, a, b] = h.split('/');
+  // A app só abre com sessão iniciada: sem sessão, mostra a entrada (e depois volta à página pedida).
+  document.body.classList.toggle('gated', !BK.user);
+  if (!authReady) { view.innerHTML = '<div class="card"><div class="empty">A carregar…</div></div>'; renderChrome(); return; }
+  if (!BK.user) { vMe(true); renderChrome(); window.scrollTo(0, 0); return; }
   if (a !== 't') quizRun = null;
   if (a !== 'rev') revRun = null;
   ({ '': vHome, learn: vLearn, c: () => vChapter(b), l: () => vLesson(b), m: () => vManual(b), t: () => vTest(b), rev: vRev, lab: vLab, progress: vProgress, rank: vRank, me: vMe, prof: vProf, jogo: vGame, aovivo: () => (b === 'host' ? vLiveHost(h.split('/')[3] || '') : vLive()), q: () => vLivePlay(b || ''), projeto: PROJECT_ON ? vProject : vHome }[a || ''] || vHome)();
@@ -1868,12 +1876,14 @@ const settingsReady = loadSettings();
 BK.init().then(async (u) => {
   if (BK.recovery) askNewPassword();
   const changed = await settingsReady;
-  if (!u) { if (changed) route(); else renderChrome(); return; }
+  authReady = true;
+  route();
+  if (!u) return;
   st.name = u.name;
   await push();
   loadAdminPending();
   const a = (location.hash.split('/')[1] || '');
   if (changed || ['', 'learn', 'c', 'progress', 'rank', 'me', 'prof', 'projeto', 'aovivo'].includes(a)) route(); else renderChrome();
-}).catch(() => renderChrome());
+}).catch(() => { authReady = true; route(); });
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();

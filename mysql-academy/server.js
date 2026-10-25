@@ -104,9 +104,8 @@ const publicRow = (u) => {
 };
 
 /* Quiz ao vivo (estilo Kahoot), em memória: o professor cria a sessão (chave de professor) e recebe uma chave
-   de anfitrião; os alunos entram só com um nome. Mesmas regras das funções live_* do Supabase. */
+   de anfitrião; os alunos entram com a sua conta. Mesmas regras das funções live_* do Supabase. */
 const LIVE = new Map();
-const liveName = (n) => str(n, 60).trim().replace(/\s+/g, ' ').slice(0, 20);
 function livePoll(s, token, host) {
   const now = Date.now(), players = [...s.players.values()];
   const res = { state: s.state, qindex: s.qindex, total: s.questions.length, secs: s.secs, title: s.title, chapter: s.chapter, players: players.length, host };
@@ -142,6 +141,9 @@ async function live(req, res, url) {
     return send(res, 200, { code: c, host: hostKey });
   }
   if (!s) return send(res, 404, { error: 'Sessão não encontrada.' });
+  // só utilizadores com sessão iniciada participam (o professor anfitrião usa a sua chave de anfitrião)
+  const u = authed(req);
+  if (!u && !(isHost && op !== 'join' && op !== 'answer')) return send(res, 401, { error: 'Inicie sessão para participar no quiz.' });
   if (op === 'poll') return send(res, 200, livePoll(s, str(url.searchParams.get('token'), 64), isHost));
   if (op === 'control' && req.method === 'POST') {
     if (!isHost) return send(res, 403, { error: 'Só o professor que criou a sessão a pode controlar.' });
@@ -154,14 +156,16 @@ async function live(req, res, url) {
     return send(res, 200, { ok });
   }
   if (op === 'join' && req.method === 'POST') {
-    const name = liveName(b.name);
-    if (!name || s.state === 'end' || s.players.size >= 200 || [...s.players.values()].some((p) => p.name === name)) return send(res, 200, { token: null });
+    const again = [...s.players.entries()].find(([, p]) => p.user === key(u.name));
+    if (again) return send(res, 200, { token: again[0] }); // volta a entrar (ex.: outro dispositivo)
+    if (s.state === 'end' || s.players.size >= 200) return send(res, 200, { token: null });
     const token = crypto.randomUUID();
-    s.players.set(token, { name, score: 0, joined: Date.now(), answers: {} });
+    s.players.set(token, { name: u.name, user: key(u.name), score: 0, joined: Date.now(), answers: {} });
     return send(res, 200, { token });
   }
   if (op === 'answer' && req.method === 'POST') {
     const p = s.players.get(str(b.token, 64)), q = s.questions[s.qindex];
+    if (p && p.user !== key(u.name)) return send(res, 200, { ok: false });
     const el = (Date.now() - s.started) / 1000, ch = int(b.choice, -1, 99);
     if (!p || s.state !== 'question' || el > s.secs + 1.5 || ch < 0 || ch >= q.opts.length) return send(res, 200, { ok: false });
     if (!p.answers[s.qindex]) {
@@ -176,16 +180,6 @@ async function live(req, res, url) {
 async function api(req, res, url) {
   const ip = req.socket.remoteAddress;
   if (url.pathname.startsWith('/api/live/')) return live(req, res, url);
-  if (req.method === 'GET' && url.pathname === '/api/leaderboard') {
-    const rows = Object.values(users).map(publicRow).sort((a, b) => b.xp - a.xp || a.updated - b.updated).slice(0, 100);
-    return send(res, 200, rows);
-  }
-  if (req.method === 'GET' && url.pathname === '/api/game/leaderboard') {
-    const rows = Object.values(users).filter((u) => u.game && (u.game.score > 0 || u.game.rooms > 0))
-      .map((u) => ({ name: u.name, turma: u.turma || '', score: u.game.score, rooms: u.game.rooms || 0, time: u.game.time, runs: u.game.runs, at: u.game.at }))
-      .sort((a, b) => b.rooms - a.rooms || b.score - a.score || a.time - b.time || a.at - b.at).slice(0, 100);
-    return send(res, 200, rows);
-  }
   if (req.method === 'GET' && url.pathname === '/api/admin/students') {
     if (!TEACHER_KEY || req.headers['x-teacher-key'] !== TEACHER_KEY) return send(res, 403, { error: 'Chave de professor inválida.' });
     return send(res, 200, Object.values(users).map((u) => ({ ...publicRow(u), created: u.created, chapters: SCORE.summarize(u.state).perChapter, log: u.state.log.slice(-100), state: u.state })));
@@ -212,6 +206,17 @@ async function api(req, res, url) {
   }
   const u = authed(req);
   if (!u) return send(res, 401, { error: 'Sessão inválida.' });
+  // classificações: só para utilizadores registados
+  if (req.method === 'GET' && url.pathname === '/api/leaderboard') {
+    const rows = Object.values(users).map(publicRow).sort((a, b) => b.xp - a.xp || a.updated - b.updated).slice(0, 100);
+    return send(res, 200, rows);
+  }
+  if (req.method === 'GET' && url.pathname === '/api/game/leaderboard') {
+    const rows = Object.values(users).filter((u) => u.game && (u.game.score > 0 || u.game.rooms > 0))
+      .map((u) => ({ name: u.name, turma: u.turma || '', score: u.game.score, rooms: u.game.rooms || 0, time: u.game.time, runs: u.game.runs, at: u.game.at }))
+      .sort((a, b) => b.rooms - a.rooms || b.score - a.score || a.time - b.time || a.at - b.at).slice(0, 100);
+    return send(res, 200, rows);
+  }
   if (req.method === 'GET' && url.pathname === '/api/progress') return send(res, 200, { state: u.state });
   if (req.method === 'PUT' && url.pathname === '/api/turma') {
     u.turma = cleanTurma((await body(req)).turma); save();
