@@ -53,6 +53,15 @@ Jogo na primeira pessoa (só para computador), acessível no menu por baixo do L
 - Cada sala dá também XP no curso (−5 por dica, 0 se vir a solução) e conquistas, e o progresso é sincronizado com a conta.
 - Motor em Three.js (`public/game/`), com o mundo gerado em código; só é carregado quando o jogo é aberto. As salas estão em `public/game/levels.js` e são validadas por `test/game.test.js`.
 
+## Quiz ao vivo (estilo Kahoot)
+
+Área **Quiz ao vivo** no menu (e botão no Painel) para usar em aula:
+
+- **Professor:** escolhe o capítulo (ou todos), o número de perguntas (5–20) e o tempo por pergunta (10–60 s) e cria o quiz. As perguntas são sorteadas do banco dos minitestes e as opções baralhadas. O ecrã para projetar mostra o código de 6 algarismos, o **QR code** e o link (`…/#/q/CÓDIGO`) e os nomes de quem entra; depois mostra cada pergunta com contagem decrescente e o número de respostas. Quando o tempo acaba (ou todos respondem) aparece o gráfico das respostas, a resposta certa com a explicação e a classificação; no fim, o pódio. Tem botão de ecrã inteiro.
+- **Alunos:** entram no telemóvel ou no computador pelo link, pelo QR code ou com o código, só com um nome (não precisam de conta), e respondem em botões coloridos (▲ ◆ ● ■). Recebem logo se acertaram, os pontos e a posição.
+- **Pontos:** resposta certa vale entre 500 e 1000 pontos — mais quanto mais rápida; errada ou sem resposta, 0. O tempo é medido no servidor.
+- A resposta certa só é enviada aos alunos depois de revelada. Supabase: tabelas `live_sessions`, `live_players`, `live_answers` (sem acesso direto) e funções `live_create`/`live_control` (só professores), `live_join`, `live_answer` e `live_poll`. Servidor local: `/api/live/*`, em memória (criar o quiz pede a `TEACHER_KEY`).
+
 ## Publicar na Internet (gratuito)
 
 Siga o guia **[PUBLICAR.md](PUBLICAR.md)**: o site fica no Vercel ou no Cloudflare Pages e as contas, o progresso e a classificação no Supabase (plano gratuito). Basta executar `supabase/schema.sql` no Supabase e preencher `public/config.js`. Quem já tinha executado a versão anterior do `schema.sql` deve executá-lo de novo: acrescenta as turmas e o XP semanal sem perder dados.
@@ -86,7 +95,8 @@ public/            a aplicação (HTML/CSS/JS puro, sem build)
   game/levels.js   história e salas do Protocolo NEXUS (bases de dados, objetivos, regras das portas)
   game/game.js     motor 3D do jogo (Three.js)
   ddl.js           verificador de CREATE/ALTER/DROP TABLE (compara a estrutura obtida com a esperada; os CHECK são comparados pelo significado)
-  app.js           interface e lógica
+  app.js           interface e lógica (inclui o quiz ao vivo)
+  vendor/qrcode.js gerador de QR codes (qrcode-generator, MIT), carregado só no ecrã do quiz ao vivo
   sw.js            service worker (offline)
 ```
 

@@ -103,8 +103,79 @@ const publicRow = (u) => {
   return { name: u.name, turma: u.turma || '', xp: s.xp, weekXp: s.weekXp, level: s.level, title: s.title, pct: s.pct, exDone: s.exDone, streak: s.streak, badges: s.badges.length, updated: u.updated };
 };
 
+/* Quiz ao vivo (estilo Kahoot), em memória: o professor cria a sessão (chave de professor) e recebe uma chave
+   de anfitrião; os alunos entram só com um nome. Mesmas regras das funções live_* do Supabase. */
+const LIVE = new Map();
+const liveName = (n) => str(n, 60).trim().replace(/\s+/g, ' ').slice(0, 20);
+function livePoll(s, token, host) {
+  const now = Date.now(), players = [...s.players.values()];
+  const res = { state: s.state, qindex: s.qindex, total: s.questions.length, secs: s.secs, title: s.title, chapter: s.chapter, players: players.length, host };
+  const ranked = players.slice().sort((a, b) => b.score - a.score || a.joined - b.joined);
+  if (s.state === 'question' || s.state === 'reveal') {
+    const q = s.questions[s.qindex], ans = players.filter((p) => p.answers[s.qindex]);
+    Object.assign(res, { left: Math.max(0, s.secs - (now - s.started) / 1000), answered: ans.length, question: { q: q.q, sql: q.sql || null, opts: q.opts } });
+    if (s.state === 'reveal') Object.assign(res, { a: q.a, why: q.why || null, counts: q.opts.map((_, i) => ans.filter((p) => p.answers[s.qindex].choice === i).length) });
+  }
+  if (s.state === 'reveal' || s.state === 'end' || host) res.top = ranked.slice(0, host ? 200 : 10).map((p) => ({ name: p.name, score: p.score }));
+  if (token) {
+    const p = s.players.get(token);
+    res.me = p ? { name: p.name, score: p.score, rank: players.filter((o) => o.score > p.score).length + 1, answered: !!p.answers[s.qindex],
+      last: s.state === 'reveal' && p.answers[s.qindex] ? { choice: p.answers[s.qindex].choice, points: p.answers[s.qindex].points } : null } : null;
+  }
+  return res;
+}
+async function live(req, res, url) {
+  const op = url.pathname.slice('/api/live/'.length);
+  const b = req.method === 'POST' ? await body(req) : {};
+  const code = str(b.code || url.searchParams.get('code'), 6);
+  const s = LIVE.get(code);
+  const isHost = !!(s && req.headers['x-live-host'] && req.headers['x-live-host'] === s.hostKey);
+  if (op === 'create' && req.method === 'POST') {
+    if (!TEACHER_KEY || req.headers['x-teacher-key'] !== TEACHER_KEY) return send(res, 403, { error: 'Chave de professor inválida.' });
+    const qs = Array.isArray(b.questions) ? b.questions.slice(0, 40).map((q) => ({ q: str(q.q, 2000), sql: q.sql ? str(q.sql, 2000) : null,
+      opts: (Array.isArray(q.opts) ? q.opts : []).slice(0, 6).map((o) => str(o, 500)), a: int(q.a, 0, 5), why: q.why ? str(q.why, 2000) : null })).filter((q) => q.opts.length >= 2 && q.a < q.opts.length) : [];
+    if (!qs.length) return send(res, 400, { error: 'Sem perguntas.' });
+    let c; do c = String(100000 + crypto.randomInt(900000)); while (LIVE.has(c));
+    const hostKey = crypto.randomBytes(18).toString('hex');
+    LIVE.set(c, { code: c, hostKey, chapter: str(b.chapter, 20), title: str(b.title, 120), questions: qs, secs: int(b.secs || 20, 5, 120), state: 'lobby', qindex: -1, started: 0, players: new Map(), created: Date.now() });
+    for (const [k, v] of LIVE) if (Date.now() - v.created > 12 * 3600e3) LIVE.delete(k); // limpa sessões antigas
+    return send(res, 200, { code: c, host: hostKey });
+  }
+  if (!s) return send(res, 404, { error: 'Sessão não encontrada.' });
+  if (op === 'poll') return send(res, 200, livePoll(s, str(url.searchParams.get('token'), 64), isHost));
+  if (op === 'control' && req.method === 'POST') {
+    if (!isHost) return send(res, 403, { error: 'Só o professor que criou a sessão a pode controlar.' });
+    let ok = true;
+    if ((b.act === 'start' || b.act === 'next') && (s.state === 'lobby' || s.state === 'reveal')) {
+      if (s.qindex + 1 >= s.questions.length) s.state = 'end'; else Object.assign(s, { state: 'question', qindex: s.qindex + 1, started: Date.now() });
+    } else if (b.act === 'reveal' && s.state === 'question') s.state = 'reveal';
+    else if (b.act === 'end') s.state = 'end';
+    else ok = false;
+    return send(res, 200, { ok });
+  }
+  if (op === 'join' && req.method === 'POST') {
+    const name = liveName(b.name);
+    if (!name || s.state === 'end' || s.players.size >= 200 || [...s.players.values()].some((p) => p.name === name)) return send(res, 200, { token: null });
+    const token = crypto.randomUUID();
+    s.players.set(token, { name, score: 0, joined: Date.now(), answers: {} });
+    return send(res, 200, { token });
+  }
+  if (op === 'answer' && req.method === 'POST') {
+    const p = s.players.get(str(b.token, 64)), q = s.questions[s.qindex];
+    const el = (Date.now() - s.started) / 1000, ch = int(b.choice, -1, 99);
+    if (!p || s.state !== 'question' || el > s.secs + 1.5 || ch < 0 || ch >= q.opts.length) return send(res, 200, { ok: false });
+    if (!p.answers[s.qindex]) {
+      const points = ch === q.a ? Math.max(500, Math.round(1000 * (1 - Math.min(el, s.secs) / s.secs / 2))) : 0;
+      p.answers[s.qindex] = { choice: ch, points }; p.score += points;
+    }
+    return send(res, 200, { ok: true });
+  }
+  send(res, 404, { error: 'Não encontrado.' });
+}
+
 async function api(req, res, url) {
   const ip = req.socket.remoteAddress;
+  if (url.pathname.startsWith('/api/live/')) return live(req, res, url);
   if (req.method === 'GET' && url.pathname === '/api/leaderboard') {
     const rows = Object.values(users).map(publicRow).sort((a, b) => b.xp - a.xp || a.updated - b.updated).slice(0, 100);
     return send(res, 200, rows);

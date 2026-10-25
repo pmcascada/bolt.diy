@@ -150,6 +150,17 @@
       if (error) throw error;
       return data;
     };
+    // Quiz ao vivo: o professor cria e controla a sessão; os alunos entram com um nome (sem conta) e respondem.
+    const rpc = async (f, args) => { const { data, error } = await sb.rpc(f, args); if (error) throw error; return data; };
+    B.liveCreate = async ({ chapter, title, questions, secs }) => {
+      const code = await rpc('live_create', { ch: chapter, ti: title, qs: questions, s: secs });
+      if (!code) throw new Error('Só os professores podem iniciar um quiz ao vivo.');
+      return code;
+    };
+    B.liveControl = (code, act) => rpc('live_control', { c: code, act });
+    B.liveJoin = (code, name) => rpc('live_join', { c: code, n: name });
+    B.liveAnswer = (code, token, choice) => rpc('live_answer', { c: code, t: token, ch: choice });
+    B.livePoll = (code, token) => rpc('live_poll', { c: code, t: token || null });
     B.students = async () => {
       const { data, error } = await sb.from('progress').select('state, updated_at, profiles(name, is_teacher, turma)');
       if (error) throw error;
@@ -189,6 +200,21 @@
     B.leaderboard = async () => (await api('/api/leaderboard', 'GET')).map((r) => ({ name: r.name, xp: r.xp, weekXp: r.weekXp || 0, turma: r.turma || '', level: r.level, pct: r.pct, streak: r.streak }));
     B.gameLeaderboard = async () => api('/api/game/leaderboard', 'GET');
     B.submitGameScore = async (run) => (B.user ? (await api('/api/game/score', 'POST', run)).best : null);
+    // Quiz ao vivo: a chave de anfitrião (devolvida ao criar) fica só nesta aba do professor.
+    const HOSTS = 'mya.liveHost';
+    const hostKey = (code) => { try { return (JSON.parse(sessionStorage.getItem(HOSTS) || '{}'))[code] || ''; } catch { return ''; } };
+    B.liveCreate = async (spec, key) => {
+      const j = await api('/api/live/create', 'POST', spec, { 'x-teacher-key': key });
+      try { const m = JSON.parse(sessionStorage.getItem(HOSTS) || '{}'); m[j.code] = j.host; sessionStorage.setItem(HOSTS, JSON.stringify(m)); } catch { /* sem storage */ }
+      return j.code;
+    };
+    B.liveControl = async (code, act) => (await api('/api/live/control', 'POST', { code, act }, { 'x-live-host': hostKey(code) })).ok;
+    B.liveJoin = async (code, name) => (await api('/api/live/join', 'POST', { code, name })).token;
+    B.liveAnswer = async (code, token, choice) => (await api('/api/live/answer', 'POST', { code, token, choice })).ok;
+    B.livePoll = async (code, token) => {
+      try { return await api(`/api/live/poll?code=${encodeURIComponent(code)}&token=${encodeURIComponent(token || '')}`, 'GET', null, { 'x-live-host': hostKey(code) }); }
+      catch (e) { if (e.status === 404) return null; throw e; }
+    };
     B.students = async (key) => (await api('/api/admin/students', 'GET', null, { 'x-teacher-key': key })).map((r) => ({ name: r.name, turma: r.turma || '', state: r.state || {}, updated: r.updated }));
     B.errorText = (e) => (e && e.status ? e.message : 'Servidor indisponível. Execute "npm start" para ativar as contas e a classificação.');
     return B;

@@ -27,6 +27,7 @@ const P = {
   play: 'M7 4.5v15l12-7.5z',
   clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M12 7v5l3 2',
   copy: 'M9 9h11v11H9z M5 15H4V4h11v1',
+  live: 'M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z M16.2 7.8a6 6 0 0 1 0 8.4 M7.8 16.2a6 6 0 0 1 0-8.4 M19.1 4.9a10 10 0 0 1 0 14.2 M4.9 19.1a10 10 0 0 1 0-14.2',
   eye: 'M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
   download: 'M12 3v12 M7 10l5 5 5-5 M5 21h14',
   refresh: 'M21 12a9 9 0 1 1-3-6.7L21 8 M21 3v5h-5',
@@ -261,7 +262,7 @@ const view = $('#view');
 // Os projetos já entregues continuam guardados.
 const PROJECT_ON = false;
 const NAV = [
-  ['Curso', [['#/', 'home', 'Painel'], ['#/learn', 'book', 'Conteúdos'], ['#/rev', 'repeat', 'Revisão'], ['#/lab', 'terminal', 'Laboratório SQL'], ['#/jogo', 'gamepad', 'Protocolo NEXUS'], ...(PROJECT_ON ? [['#/projeto', 'folder', 'Projeto final']] : [])]],
+  ['Curso', [['#/', 'home', 'Painel'], ['#/learn', 'book', 'Conteúdos'], ['#/rev', 'repeat', 'Revisão'], ['#/lab', 'terminal', 'Laboratório SQL'], ['#/jogo', 'gamepad', 'Protocolo NEXUS'], ['#/aovivo', 'live', 'Quiz ao vivo'], ...(PROJECT_ON ? [['#/projeto', 'folder', 'Projeto final']] : [])]],
   ['Desempenho', [['#/progress', 'chart', 'Progresso'], ['#/rank', 'trophy', 'Classificação']]],
   ['Conta', [['#/me', 'user', 'Perfil']]],
 ];
@@ -271,6 +272,7 @@ function isOn(h) {
   const r = location.hash || '#/';
   if (h === '#/') return r === '#/' || r === '#';
   if (h === '#/learn') return /^#\/(learn|c|l|m|t)\b/.test(r);
+  if (h === '#/aovivo') return /^#\/(aovivo|q)\b/.test(r);
   return r.startsWith(h);
 }
 function renderChrome() {
@@ -306,7 +308,7 @@ function vHome() {
   }
   view.innerHTML = `
   <div class="page-h"><div><h1>${greet}${st.name ? ', ' + esc(st.name.split(' ')[0]) : ''}</h1><p>${s.exDone ? `Concluiu ${s.chaptersDone.length} de ${CHAPTERS.length} capítulos e resolveu ${s.exDone} exercícios.` : 'Bem-vindo ao curso de MySQL. A matéria é apresentada passo a passo: leia, pratique e avance.'}</p></div>
-  ${BK.user ? '' : `<a class="btn sec-b" href="#/me">${ic('user')}${BK.kind === 'supabase' ? 'Entrar / criar conta' : 'Criar perfil'}</a>`}</div>
+  <div class="row"><a class="btn sec-b" href="#/aovivo">${ic('live')}Quiz ao vivo</a>${BK.user ? '' : `<a class="btn sec-b" href="#/me">${ic('user')}${BK.kind === 'supabase' ? 'Entrar / criar conta' : 'Criar perfil'}</a>`}</div></div>
   <div class="dash">
     <section class="card resume">${resume}</section>
     <section class="card lvl">
@@ -1597,6 +1599,241 @@ function closeGame() {
   if ((location.hash || '').startsWith('#/jogo')) route();
 }
 
+/* ---------- quiz ao vivo (estilo Kahoot) ----------
+   O professor escolhe o capítulo e inicia; o ecrã projetado mostra o código, o QR code e as perguntas.
+   Os alunos entram no telemóvel ou no computador (link, QR code ou código) só com um nome e respondem.
+   Sem websockets: cada ecrã pergunta o estado ao servidor uma vez por segundo. */
+const LIVE_KEY = 'mya-live', LIVE_HOST = 'mya-live-host';
+const LIVE_SHAPES = [['▲', 'lv-r'], ['◆', 'lv-b'], ['●', 'lv-y'], ['■', 'lv-g'], ['★', 'lv-p'], ['⬢', 'lv-o']];
+let liveTimer = null;
+const liveStop = () => { if (liveTimer) clearInterval(liveTimer); liveTimer = null; };
+const liveGet = (k) => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch { return null; } };
+const liveSet = (k, v) => { try { if (v) localStorage.setItem(k, JSON.stringify(v)); else localStorage.removeItem(k); } catch { /* sem storage */ } };
+const liveLink = (code) => `${location.origin}${location.pathname.replace(/index\.html$/, '')}#/q/${code}`;
+const liveCode = (s) => String(s || '').replace(/\D/g, '').slice(0, 6);
+const liveFmtCode = (c) => c.slice(0, 3) + ' ' + c.slice(3);
+const liveCanHost = () => (BK.kind === 'supabase' ? staff() : true); // no servidor local pede-se a chave de professor
+function liveLoadQr() {
+  if (window.qrcode) return Promise.resolve();
+  return new Promise((ok, no) => { const s = document.createElement('script'); s.src = 'vendor/qrcode.js'; s.onload = ok; s.onerror = no; document.head.append(s); });
+}
+function livePoller(code, token, onState) {
+  liveStop();
+  let busy = false;
+  const tick = async () => {
+    if (busy) return; busy = true;
+    try { onState(await BK.livePoll(code, token)); } catch { const n = $('#lvNet'); if (n) n.hidden = false; } finally { busy = false; }
+  };
+  tick(); liveTimer = setInterval(tick, 1000);
+}
+function liveOpts(q, d, mine) {
+  return `<div class="lv-opts">${q.opts.map((o, i) => {
+    const [sh, cl] = LIVE_SHAPES[i];
+    const cls = d.state === 'reveal' ? (i === d.a ? 'ok' : 'off') : '';
+    return `<div class="lv-opt ${cl} ${cls} ${mine === i ? 'mine' : ''}"><span class="lv-sh">${sh}</span><span class="lv-ot">${esc(o)}</span>${d.counts ? `<span class="lv-n num-t">${d.counts[i]}</span>` : ''}${d.state === 'reveal' && i === d.a ? ic('check') : ''}</div>`;
+  }).join('')}</div>`;
+}
+const liveRank = (top, n = 5) => `<ol class="lv-rank">${top.slice(0, n).map((p, i) => `<li><span class="lv-pos">${i + 1}</span><b>${esc(p.name)}</b><span class="num-t">${p.score}</span></li>`).join('')}</ol>`;
+
+function vLive() {
+  crumbs = [['Quiz ao vivo', '#/aovivo']];
+  const me = liveGet(LIVE_KEY), hosted = liveGet(LIVE_HOST);
+  const canHost = liveCanHost();
+  const needKey = BK.kind === 'server' && !sessionStorage.getItem('mya.teacherKey');
+  const chs = CHAPTERS.filter((c) => (c.test || []).length);
+  view.innerHTML = `<div class="page-h"><div><div class="eyebrow">Em aula</div><h1>Quiz ao vivo</h1><p>Perguntas de escolha múltipla em tempo real, iniciadas pelo professor. Os alunos respondem no telemóvel ou no computador: quanto mais rápida a resposta certa, mais pontos.</p></div></div>
+  <div class="lv-home">
+    <section class="card"><h3>${ic('play')}Entrar num quiz</h3><p class="small muted">Introduza o código que aparece no ecrã do professor (ou leia o QR code com a câmara do telemóvel).</p>
+      <form id="lvJoin"><label class="field">Código<input class="txt lv-code-in num-t" id="lvC" inputmode="numeric" autocomplete="off" maxlength="7" placeholder="000 000" value="${me ? liveFmtCode(me.code) : ''}"></label>
+      <label class="field">Nome a mostrar<input class="txt" id="lvN" maxlength="20" value="${esc((me && me.name) || (BK.user && BK.user.name) || st.name || '')}"></label>
+      <div id="lvJMsg"></div><button class="btn" type="submit">Entrar ${ic('chevR')}</button></form></section>
+    ${canHost ? `<section class="card"><h3>${ic('users')}Iniciar um quiz (professor)</h3>
+      ${hosted ? `<p class="small">Quiz em curso: <a href="#/aovivo/host/${hosted.code}"><b class="num-t">${liveFmtCode(hosted.code)}</b> · ${esc(hosted.title || '')}</a></p>` : ''}
+      <form id="lvNew">
+        <label class="field">Capítulo<select class="txt" id="lvCh">${chs.map((c) => `<option value="${c.id}">${c.idx + 1}. ${esc(c.title)} (${c.test.length} perguntas)</option>`).join('')}<option value="*">Todos os capítulos (revisão geral)</option></select></label>
+        <div class="row" style="gap:12px"><label class="field" style="flex:1">Perguntas<select class="txt" id="lvQn">${[5, 10, 15, 20].map((n) => `<option ${n === 10 ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+        <label class="field" style="flex:1">Tempo por pergunta<select class="txt" id="lvS">${[10, 20, 30, 45, 60].map((n) => `<option value="${n}" ${n === 20 ? 'selected' : ''}>${n} segundos</option>`).join('')}</select></label></div>
+        ${needKey ? `<label class="field">Chave de professor<input class="txt" id="lvK" type="password"></label>` : ''}
+        <div id="lvNMsg"></div><button class="btn" type="submit">${ic('zap')}Criar quiz</button></form>
+      <p class="small muted" style="margin-bottom:0">As perguntas são sorteadas do banco dos minitestes do capítulo e as opções baralhadas. Depois de criar, projete o ecrã: os alunos entram pelo link, pelo QR code ou com o código.</p></section>`
+    : `<section class="card"><h3>${ic('info')}Como funciona</h3><ol class="small" style="padding-left:18px;margin:0;line-height:1.7"><li>O professor inicia o quiz e projeta o código e o QR code.</li><li>Entra com o código e um nome (não precisa de conta).</li><li>Cada pergunta tem tempo limitado: responda nos botões coloridos.</li><li>Resposta certa vale entre 500 e 1000 pontos — mais quanto mais rápida.</li><li>No fim aparece o pódio.</li></ol></section>`}
+  </div>`;
+  const cIn = $('#lvC');
+  cIn.oninput = () => { const c = liveCode(cIn.value); cIn.value = c.length > 3 ? liveFmtCode(c) : c; };
+  $('#lvJoin').onsubmit = async (e) => { e.preventDefault(); liveJoin(liveCode(cIn.value), $('#lvN').value, $('#lvJMsg')); };
+  if ($('#lvNew')) $('#lvNew').onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = e.submitter || $('#lvNew button'); btn.disabled = true;
+    const ch = $('#lvCh').value, n = +$('#lvQn').value, secs = +$('#lvS').value;
+    const pool = ch === '*' ? chs.flatMap((c) => c.test) : CHAPTERS.find((c) => c.id === ch).test;
+    const questions = shuffle(pool).slice(0, n).map((q) => {
+      const order = shuffle(q.opts.map((o, k) => k));
+      return { q: q.q, sql: q.sql || null, opts: order.map((k) => q.opts[k]), a: order.indexOf(q.a), why: q.why || null };
+    });
+    const title = ch === '*' ? 'Todos os capítulos' : CHAPTERS.find((c) => c.id === ch).title;
+    if ($('#lvK')) sessionStorage.setItem('mya.teacherKey', $('#lvK').value);
+    try {
+      const code = await BK.liveCreate({ chapter: ch === '*' ? 'todos' : ch, title, questions, secs }, sessionStorage.getItem('mya.teacherKey'));
+      liveSet(LIVE_HOST, { code, title });
+      location.hash = '#/aovivo/host/' + code;
+    } catch (err) {
+      if (BK.kind === 'server') sessionStorage.removeItem('mya.teacherKey');
+      $('#lvNMsg').innerHTML = alertBox('bad', 'alert', esc(BK.errorText(err))); btn.disabled = false;
+    }
+  };
+}
+
+async function liveJoin(code, name, msg) {
+  name = String(name || '').trim().replace(/\s+/g, ' ').slice(0, 20);
+  const say = (t) => { msg.innerHTML = alertBox('bad', 'alert', t); };
+  if (code.length !== 6) return say('O código tem 6 algarismos.');
+  if (!name) return say('Indique o nome que vai aparecer na classificação.');
+  try {
+    const d = await BK.livePoll(code);
+    if (!d) return say(`Não existe nenhum quiz com o código ${liveFmtCode(code)}. Confirme o código no ecrã do professor.`);
+    if (d.state === 'end') return say('Este quiz já terminou.');
+    const token = await BK.liveJoin(code, name);
+    if (!token) return say(`Já há alguém com o nome “${esc(name)}” neste quiz. Escolha outro nome.`);
+    liveSet(LIVE_KEY, { code, token, name });
+    if (location.hash === '#/q/' + code) vLivePlay(code); else location.hash = '#/q/' + code;
+  } catch (e) { say(esc(BK.errorText(e))); }
+}
+
+/* Ecrã do aluno */
+function vLivePlay(code) {
+  crumbs = [['Quiz ao vivo', '#/aovivo']];
+  code = liveCode(code);
+  const me = liveGet(LIVE_KEY);
+  if (!me || me.code !== code) {
+    view.innerHTML = `<div class="lv-play"><div class="card lv-join"><div class="eyebrow">Quiz ao vivo</div><h2>Entrar no quiz <span class="num-t">${liveFmtCode(code)}</span></h2>
+      <form id="lvJ2"><label class="field">O seu nome<input class="txt" id="lvN2" maxlength="20" autocomplete="nickname" value="${esc((BK.user && BK.user.name) || st.name || '')}"></label><div id="lvJMsg2"></div><button class="btn lv-big-btn" type="submit">Entrar ${ic('chevR')}</button></form></div></div>`;
+    const n = $('#lvN2'); if (!n.value) n.focus();
+    $('#lvJ2').onsubmit = (e) => { e.preventDefault(); liveJoin(code, n.value, $('#lvJMsg2')); };
+    return;
+  }
+  view.innerHTML = '<div class="lv-play" id="lvP"><div class="card"><div class="empty">A ligar ao quiz…</div></div></div><p class="small muted lv-net" id="lvNet" hidden>Ligação instável — a tentar de novo…</p>';
+  let key = '', picked = null;
+  livePoller(code, me.token, (d) => {
+    const box = $('#lvP'); if (!box) return liveStop();
+    $('#lvNet').hidden = true;
+    if (!d || !d.me) { // sessão apagada ou token desconhecido
+      liveStop(); liveSet(LIVE_KEY, null);
+      box.innerHTML = `<div class="card"><h2>Quiz não encontrado</h2><p class="muted">Este quiz já não existe. Peça o código novo ao professor.</p><a class="btn" href="#/aovivo">Introduzir código</a></div>`; return;
+    }
+    const k = `${d.state}:${d.qindex}:${d.me.answered}`;
+    const head = `<div class="lv-bar"><span><b>${esc(d.me.name)}</b></span><span class="num-t">${d.state === 'lobby' || d.state === 'end' ? '' : `Pergunta ${d.qindex + 1}/${d.total}`}</span><span class="lv-sc num-t">${ic('zap')}${d.me.score}</span></div>`;
+    if (k === key) { const t = $('#lvT'); if (t && d.left !== undefined) t.textContent = Math.ceil(d.left); return; }
+    key = k;
+    if (d.state === 'lobby') {
+      box.innerHTML = head + `<div class="card lv-wait"><div class="lv-pulse">${ic('check')}</div><h2>Está dentro!</h2><p class="muted">Veja o seu nome no ecrã do professor. O quiz começa daqui a pouco.</p><p class="small muted">${esc(d.title || '')} · ${d.total} perguntas · ${d.players} ${d.players === 1 ? 'participante' : 'participantes'}</p></div>`;
+    } else if (d.state === 'question' && !d.me.answered) {
+      picked = null;
+      box.innerHTML = head + `<div class="lv-q card"><div class="lv-timer"><span id="lvT" class="num-t">${Math.ceil(d.left)}</span></div><h2>${esc(d.question.q)}</h2>${d.question.sql ? `<div class="code q-code"><pre><code class="hl">${hl(d.question.sql)}</code></pre></div>` : ''}</div>
+        <div class="lv-btns">${d.question.opts.map((o, i) => `<button class="lv-opt ${LIVE_SHAPES[i][1]}" data-i="${i}"><span class="lv-sh">${LIVE_SHAPES[i][0]}</span><span class="lv-ot">${esc(o)}</span></button>`).join('')}</div>`;
+      box.querySelectorAll('.lv-btns button').forEach((b) => (b.onclick = async () => {
+        if (picked !== null) return;
+        picked = +b.dataset.i;
+        box.querySelectorAll('.lv-btns button').forEach((x) => { x.disabled = true; x.classList.toggle('mine', x === b); x.classList.toggle('off', x !== b); });
+        try { const ok = await BK.liveAnswer(code, me.token, picked); if (!ok) toast('O tempo acabou — a resposta não contou', 'clock'); } catch (e) { picked = null; toast(BK.errorText(e), 'alert'); box.querySelectorAll('.lv-btns button').forEach((x) => { x.disabled = false; x.classList.remove('off', 'mine'); }); }
+      }));
+    } else if (d.state === 'question') {
+      box.innerHTML = head + `<div class="card lv-wait"><div class="lv-pulse">${ic('clock')}</div><h2>Resposta enviada</h2><p class="muted">Aguarde pelo fim do tempo…</p><p class="lv-timer-s num-t"><span id="lvT">${Math.ceil(d.left)}</span> s</p></div>`;
+    } else if (d.state === 'reveal') {
+      const L = d.me.last, ok = L && L.choice === d.a;
+      box.innerHTML = head + `<div class="card lv-fb ${ok ? 'ok' : 'bad'}"><div class="lv-pulse">${ic(ok ? 'check' : L ? 'x' : 'clock')}</div><h2>${ok ? 'Certo!' : L ? 'Errado' : 'Sem resposta'}</h2>
+        ${ok ? `<p class="lv-pts num-t">+${L.points}</p>` : ''}<p>Resposta certa: <b>${LIVE_SHAPES[d.a][0]} ${esc(d.question.opts[d.a])}</b></p>${d.why ? `<p class="small muted">${esc(d.why)}</p>` : ''}
+        <p class="lv-place">Está em <b class="num-t">${d.me.rank}.º</b> lugar com <b class="num-t">${d.me.score}</b> pontos</p></div>`;
+    } else {
+      liveStop();
+      const r = d.me.rank;
+      box.innerHTML = head + `<div class="card lv-fb ${r <= 3 ? 'ok' : ''}"><div class="lv-medal">${r <= 3 ? ['🥇', '🥈', '🥉'][r - 1] : '🏁'}</div><h2>${r <= 3 ? 'No pódio!' : 'Quiz terminado'}</h2><p class="lv-place">Ficou em <b class="num-t">${r}.º</b> lugar entre ${d.players} com <b class="num-t">${d.me.score}</b> pontos.</p>${liveRank(d.top || [], 5)}
+        <div class="row" style="justify-content:center"><a class="btn sec-b" href="#/aovivo" id="lvOut">Sair</a>${visibleCh().find((c) => c.id === d.chapter) ? `<a class="btn" href="#/m/${d.chapter}">${ic('book')}Rever o capítulo</a>` : ''}</div></div>`;
+      $('#lvOut').onclick = () => liveSet(LIVE_KEY, null);
+    }
+  });
+}
+
+/* Ecrã do professor (para projetar) */
+// Acrescenta só os nomes novos (os que já lá estavam não voltam a animar).
+function liveNames(top) {
+  const box = $('#lvNames'); if (!box) return;
+  const names = (top || []).map((p) => p.name).sort((a, b) => a.localeCompare(b));
+  if (!names.length) { box.innerHTML = '<span class="muted">À espera dos alunos…</span>'; return; }
+  const have = new Set([...box.querySelectorAll('.lv-name')].map((e) => e.textContent));
+  if (!have.size) box.innerHTML = '';
+  for (const n of names) if (!have.has(n)) { const e = document.createElement('span'); e.className = 'lv-name'; e.textContent = n; box.append(e); }
+}
+function vLiveHost(code) {
+  crumbs = [['Quiz ao vivo', '#/aovivo'], ['Sessão ' + liveFmtCode(code), '#/aovivo/host/' + code]];
+  view.innerHTML = `<div class="lv-stage" id="lvS"><div class="card"><div class="empty">A carregar…</div></div></div><p class="small muted lv-net" id="lvNet" hidden>Ligação instável — a tentar de novo…</p>`;
+  let key = '', acting = false;
+  const act = async (a) => {
+    if (acting) return; acting = true;
+    try { await BK.liveControl(code, a); } catch (e) { toast(BK.errorText(e), 'alert'); } finally { acting = false; }
+  };
+  const tools = () => `<div class="lv-tools"><span class="chip">${ic('users')}<span id="lvPl" class="num-t"></span></span><button class="btn sec-b sm" id="lvFull">${ic('move')}Ecrã inteiro</button><button class="btn link sm" id="lvEnd">Terminar quiz</button></div>`;
+  const wire = () => {
+    $('#lvFull').onclick = () => { const s = $('#lvS'); if (document.fullscreenElement) document.exitFullscreen(); else if (s.requestFullscreen) s.requestFullscreen().catch(() => {}); };
+    $('#lvEnd').onclick = () => { if (confirm('Terminar o quiz agora e mostrar o pódio?')) act('end'); };
+    const go = $('#lvGo'); if (go) go.onclick = () => act(go.dataset.act);
+  };
+  livePoller(code, null, async (d) => {
+    const box = $('#lvS'); if (!box) return liveStop();
+    $('#lvNet').hidden = true;
+    if (!d || !d.host) {
+      liveStop();
+      box.innerHTML = `<div class="card locked-card"><span class="side-i">${ic('lock')}</span><div><h2>Sessão indisponível</h2><p class="muted">${d ? 'Só o professor que criou este quiz o pode controlar (neste browser e com a mesma conta).' : 'Este quiz não existe ou já foi apagado.'}</p><a class="btn" href="#/aovivo">Criar outro quiz</a></div></div>`;
+      return;
+    }
+    const pl = () => { const e = $('#lvPl'); if (e) e.textContent = `${d.players} ${d.players === 1 ? 'aluno' : 'alunos'}`; };
+    const k = `${d.state}:${d.qindex}`;
+    if (k === key) {
+      pl();
+      if (d.state === 'lobby') liveNames(d.top);
+      if (d.state === 'question') {
+        $('#lvT').textContent = Math.ceil(d.left); $('#lvA').textContent = `${d.answered} / ${d.players}`;
+        // revela sozinho quando o tempo acaba ou quando todos responderam
+        if (d.left <= 0 || (d.players > 0 && d.answered >= d.players)) act('reveal');
+      }
+      return;
+    }
+    key = k;
+    if (d.state === 'lobby') {
+      const link = liveLink(code);
+      box.innerHTML = tools() + `<div class="lv-lobby"><div class="lv-join-info"><p class="lv-step">Entre em <b>${esc(link.replace(/^https?:\/\//, '').replace(/#.*/, ''))}</b> → <b>Quiz ao vivo</b>, ou leia o QR code</p>
+          <div class="lv-code num-t">${liveFmtCode(code)}</div><p class="small muted"><a href="${esc(link)}" target="_blank" rel="noopener">${esc(link)}</a> <button class="btn link sm" id="lvCopy">${ic('copy')}Copiar link</button></p>
+          <h2>${esc(d.title || '')}</h2><p class="muted">${d.total} perguntas · ${d.secs} s por pergunta</p></div>
+        <div class="lv-qr" id="lvQr"></div></div>
+        <div class="lv-names" id="lvNames"><span class="muted">À espera dos alunos…</span></div>
+        <div class="lv-next"><button class="btn lv-big-btn" id="lvGo" data-act="start">${ic('play')}Começar</button></div>`;
+      $('#lvCopy').onclick = () => { navigator.clipboard && navigator.clipboard.writeText(link).then(() => toast('Link copiado')); };
+      liveLoadQr().then(() => { const q = qrcode(0, 'M'); q.addData(link); q.make(); const el = $('#lvQr'); if (el) el.innerHTML = q.createSvgTag({ cellSize: 8, margin: 2, scalable: true, alt: 'QR code do quiz' }); }).catch(() => {});
+      liveNames(d.top);
+    } else if (d.state === 'question') {
+      box.innerHTML = tools() + `<div class="lv-qhead"><span class="chip acc">Pergunta ${d.qindex + 1} de ${d.total}</span><span class="chip">Respostas: <b id="lvA" class="num-t">${d.answered} / ${d.players}</b></span></div>
+        <div class="lv-qbox"><div class="lv-timer"><span id="lvT" class="num-t">${Math.ceil(d.left)}</span></div><h1>${esc(d.question.q)}</h1>${d.question.sql ? `<div class="code q-code"><pre><code class="hl">${hl(d.question.sql)}</code></pre></div>` : ''}</div>
+        ${liveOpts(d.question, d)}<div class="lv-next"><button class="btn sec-b" id="lvGo" data-act="reveal">Mostrar resposta ${ic('chevR')}</button></div>`;
+    } else if (d.state === 'reveal') {
+      const last = d.qindex + 1 >= d.total, max = Math.max(1, ...d.counts);
+      const ok = d.counts[d.a], tot = d.counts.reduce((x, y) => x + y, 0);
+      box.innerHTML = tools() + `<div class="lv-qhead"><span class="chip acc">Pergunta ${d.qindex + 1} de ${d.total}</span><span class="chip ok">${ok} de ${tot} ${tot === 1 ? 'acertou' : 'acertaram'}</span></div>
+        <div class="lv-qbox"><h1>${esc(d.question.q)}</h1>${d.question.sql ? `<div class="code q-code"><pre><code class="hl">${hl(d.question.sql)}</code></pre></div>` : ''}</div>
+        <div class="lv-chart">${d.counts.map((n, i) => `<div class="lv-col ${LIVE_SHAPES[i][1]} ${i === d.a ? 'ok' : 'off'}"><span class="num-t">${n}</span><i style="height:${Math.round((n / max) * 100)}%"></i><b>${LIVE_SHAPES[i][0]}${i === d.a ? ' ✓' : ''}</b></div>`).join('')}</div>
+        ${liveOpts(d.question, d)}${d.why ? `<div class="lv-why">${ic('info')}<span>${esc(d.why)}</span></div>` : ''}
+        <div class="lv-split"><div><h3>${ic('trophy')}Classificação</h3>${liveRank(d.top || [], 5)}</div>
+        <div class="lv-next"><button class="btn lv-big-btn" id="lvGo" data-act="next">${last ? `${ic('award')}Ver pódio` : `Pergunta seguinte ${ic('chevR')}`}</button></div></div>`;
+    } else {
+      liveStop(); liveSet(LIVE_HOST, null);
+      const t = d.top || [], pod = [t[1], t[0], t[2]];
+      box.innerHTML = `<div class="lv-end"><div class="eyebrow">${esc(d.title || '')}</div><h1>Pódio</h1>
+        <div class="lv-podium">${pod.map((p, j) => (p ? `<div class="lv-pd lv-pd${[2, 1, 3][j]}"><span class="lv-medal">${['🥈', '🥇', '🥉'][j]}</span><b>${esc(p.name)}</b><span class="num-t">${p.score} pts</span><i>${[2, 1, 3][j]}</i></div>` : '<div></div>')).join('')}</div>
+        ${t.length > 3 ? `<details class="lv-all"><summary>Classificação completa (${t.length})</summary>${liveRank(t, 200)}</details>` : ''}
+        <div class="row" style="justify-content:center;margin-top:18px"><a class="btn" href="#/aovivo">${ic('zap')}Novo quiz</a></div></div>`;
+    }
+    pl(); if ($('#lvFull')) wire();
+  });
+}
+
 function applyTheme() {
   if (st.theme) document.documentElement.dataset.theme = st.theme; else delete document.documentElement.dataset.theme;
 }
@@ -1604,13 +1841,14 @@ function applyTheme() {
 /* ---------- router ---------- */
 function route() {
   if (gameCtl) closeGame();
+  liveStop();
   $('#modal').hidden = true;
   const dr = $('#drawer'); dr.hidden = true; dr.innerHTML = '';
   const h = location.hash || '#/';
   const [, a, b] = h.split('/');
   if (a !== 't') quizRun = null;
   if (a !== 'rev') revRun = null;
-  ({ '': vHome, learn: vLearn, c: () => vChapter(b), l: () => vLesson(b), m: () => vManual(b), t: () => vTest(b), rev: vRev, lab: vLab, progress: vProgress, rank: vRank, me: vMe, prof: vProf, jogo: vGame, projeto: PROJECT_ON ? vProject : vHome }[a || ''] || vHome)();
+  ({ '': vHome, learn: vLearn, c: () => vChapter(b), l: () => vLesson(b), m: () => vManual(b), t: () => vTest(b), rev: vRev, lab: vLab, progress: vProgress, rank: vRank, me: vMe, prof: vProf, jogo: vGame, aovivo: () => (b === 'host' ? vLiveHost(h.split('/')[3] || '') : vLive()), q: () => vLivePlay(b || ''), projeto: PROJECT_ON ? vProject : vHome }[a || ''] || vHome)();
   renderChrome();
   const steps = a === 'l' && st.lessonView === 'all' ? view.querySelectorAll('.step') : [];
   if (steps.length > 1) steps[steps.length - 1].scrollIntoView({ block: 'start' }); else window.scrollTo(0, 0);
@@ -1635,7 +1873,7 @@ BK.init().then(async (u) => {
   await push();
   loadAdminPending();
   const a = (location.hash.split('/')[1] || '');
-  if (changed || ['', 'learn', 'c', 'progress', 'rank', 'me', 'prof', 'projeto'].includes(a)) route(); else renderChrome();
+  if (changed || ['', 'learn', 'c', 'progress', 'rank', 'me', 'prof', 'projeto', 'aovivo'].includes(a)) route(); else renderChrome();
 }).catch(() => renderChrome());
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
