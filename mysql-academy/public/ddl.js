@@ -133,7 +133,7 @@
         else if (accept('character', 'set') || accept('charset')) p++;
         else if (accept('constraint')) { if (!isKw(peek(), 'check')) name('da restrição'); }
         else if (accept('check')) out.checks.push(parenExpr());
-        else if (isKw(t, 'references')) out.fk = refClause();
+        else if (isKw(t, 'references')) fail(`A chave estrangeira não se escreve na declaração da coluna ${col.name}: até ao MySQL 8.4 o REFERENCES junto da coluna é aceite mas ignorado (a ligação não é criada). Deixe a coluna só com o tipo (ex.: ${col.name} INT NOT NULL) e declare no fim da tabela: FOREIGN KEY (${col.name}) REFERENCES tabela(coluna) ON UPDATE CASCADE ON DELETE RESTRICT.`);
         else fail(`Não percebi "${t.v}" na definição da coluna ${col.name}${t.t === 'id' ? ' — falta uma vírgula a separar as colunas?' : '.'}`);
       }
       return out;
@@ -385,6 +385,7 @@
         const g = a.fks.find((x) => sameSet(x.cols, f.cols));
         if (!g) { say(`Tabela ${tn}: falta a chave estrangeira <b>${cols(f.cols)} → ${f.ref}${cols(f.refCols)}</b>.`); continue; }
         if (g.ref !== f.ref || !sameSet(g.refCols, f.refCols)) say(`Tabela ${tn}: a chave estrangeira ${cols(f.cols)} devia referenciar ${f.ref}${cols(f.refCols)}.`);
+        else if (f.explicitDelete && g.onDelete === f.onDelete && !g.explicitDelete) say(`Tabela ${tn}: escreva explicitamente <b>ON DELETE ${f.onDelete}</b> na chave estrangeira ${cols(f.cols)} (nas aulas, as ações ON UPDATE e ON DELETE indicam-se sempre).`);
         else if (f.explicitDelete && g.onDelete !== f.onDelete) say(`Tabela ${tn}: a chave estrangeira ${cols(f.cols)} devia usar <b>ON DELETE ${f.onDelete}</b>${g.onDelete !== 'RESTRICT' ? `, e não ${g.onDelete}` : ''}.`);
         if (g.ref === f.ref && f.explicitUpdate && g.onUpdate !== f.onUpdate) say(`Tabela ${tn}: a chave estrangeira ${cols(f.cols)} devia usar <b>ON UPDATE ${f.onUpdate}</b>${g.onUpdate !== 'RESTRICT' ? `, e não ${g.onUpdate}` : ''}.`);
       }
@@ -425,7 +426,7 @@
         extra: [
           ...(t.pk && t.pk.length > 1 ? [`PRIMARY KEY ${cols(t.pk)}`] : []),
           ...t.uniques.filter((u) => u.length > 1).map((u) => `UNIQUE ${cols(u)}`),
-          ...t.fks.map((f) => `FOREIGN KEY ${cols(f.cols)} REFERENCES ${f.ref}${cols(f.refCols)}${f.onDelete !== 'RESTRICT' ? ` ON DELETE ${f.onDelete}` : ''}${f.onUpdate !== 'RESTRICT' ? ` ON UPDATE ${f.onUpdate}` : ''}`),
+          ...t.fks.map((f) => `FOREIGN KEY ${cols(f.cols)} REFERENCES ${f.ref}${cols(f.refCols)} ON UPDATE ${f.onUpdate} ON DELETE ${f.onDelete}`),
           ...t.checks.map((k) => `CHECK (${k.expr})`),
         ],
       };
