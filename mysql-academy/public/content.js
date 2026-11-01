@@ -142,6 +142,17 @@ const CHAPTERS = [
     learn('DROP DATABASE', `<p>Para eliminar uma base de dados <b>e todo o seu conteúdo</b>:</p><pre><code>DROP DATABASE IF EXISTS loja;</code></pre>
       <p class="warn"><b>Atenção:</b> o DROP é irreversível. Faça sempre uma cópia de segurança antes.</p>`),
     quiz('O que faz DROP DATABASE escola?', ['Esconde a base de dados', 'Elimina a base de dados e todo o seu conteúdo', 'Faz uma cópia', 'Renomeia a base de dados'], 1, 'DROP é irreversível.'),
+    learn('Motores de armazenamento: InnoDB', `<p>O MySQL guarda e gere os dados de cada tabela através de um <b>motor de armazenamento</b> (<i>storage engine</i>). É o motor que decide, por exemplo, se a tabela suporta transações e chaves estrangeiras.</p>
+      <table><tr><th>Motor</th><th>Características</th></tr>
+      <tr><td><code>InnoDB</code></td><td>Suporta <b>transações</b> (COMMIT/ROLLBACK), <b>chaves estrangeiras</b> e bloqueio por linha, e recupera os dados após uma falha. É o motor <b>por omissão</b> desde o MySQL 5.5.</td></tr>
+      <tr><td><code>MyISAM</code></td><td>Motor antigo: <b>sem</b> transações e <b>sem</b> chaves estrangeiras (as <code>FOREIGN KEY</code> são aceites mas ignoradas).</td></tr>
+      <tr><td><code>MEMORY</code></td><td>Dados só em memória: perdem-se quando o servidor reinicia. Útil para tabelas temporárias.</td></tr></table>
+      <p><code>SHOW ENGINES;</code> lista os motores disponíveis no servidor; o motor por omissão tem <code>DEFAULT</code> na coluna <code>Support</code>.</p>
+      <p><code>SET default_storage_engine = InnoDB;</code> define o InnoDB como motor por omissão para as tabelas criadas a seguir, na sessão atual. Também se pode indicar o motor de uma tabela no fim do <code>CREATE TABLE</code>, com <code>ENGINE = InnoDB</code> — vai aprender a criar tabelas na próxima lição.</p>
+      <p><b>Nas aulas usa-se sempre o InnoDB</b>, porque as chaves estrangeiras e as transações que vai aprender só funcionam com ele.</p>`,
+      [ex('SHOW ENGINES;', 'Lista os motores de armazenamento disponíveis no servidor.'), ex('SET default_storage_engine = InnoDB;\nSELECT @@default_storage_engine;', 'Define o InnoDB como motor por omissão (suporta transações e chaves estrangeiras) e confirma.')]),
+    key('eng1', quiz('Porque é que nas aulas as tabelas usam o motor InnoDB?', ['Porque é o único motor do MySQL', 'Porque suporta transações e chaves estrangeiras', 'Porque guarda os dados só em memória', 'Porque não precisa de chave primária'], 1, 'O MyISAM, por exemplo, não suporta transações e ignora as chaves estrangeiras.')),
+    key('eng2', quiz('Que comando mostra os motores de armazenamento disponíveis no servidor?', ['SHOW DATABASES;', 'SHOW ENGINES;', 'SHOW TABLES;', 'SELECT ENGINE;'], 1, 'Na coluna Support, o motor por omissão aparece como DEFAULT.')),
   ] },
   { title: 'Criar tabelas', steps: [
     learn('CREATE TABLE', `<p>Uma tabela define-se com o seu nome e a lista de colunas. Para cada coluna indica-se o <b>tipo de dados</b>, isto é, que tipo de valor guarda: números, texto, datas…</p>
@@ -613,6 +624,7 @@ CREATE TABLE transportadoras_encomendas (
   ] }],
   cheat: [
     ['CREATE DATABASE [IF NOT EXISTS] bd;', 'Criar base de dados'], ['USE bd;', 'Selecionar a base de dados ativa'], ['DROP DATABASE bd;', 'Eliminar base de dados'],
+    ['SHOW ENGINES; · SET default_storage_engine = InnoDB;', 'Ver os motores de armazenamento · usar o InnoDB por omissão (transações e chaves estrangeiras)'],
     ['CREATE TABLE t (col TIPO [restrições], …);', 'Criar tabela'], ['INT, DECIMAL(p,d)', 'Números inteiros / decimais exatos'], ['VARCHAR(n), CHAR(n), TEXT', 'Texto variável / fixo / longo'], ["DATE 'AAAA-MM-DD' · DATETIME · BOOLEAN", 'Datas e valores lógicos'], ['id_tabela INT AUTO_INCREMENT PRIMARY KEY', 'Chave primária automática (id_ + nome da tabela)'],
     ['NOT NULL · UNIQUE · DEFAULT v', 'Restrições de coluna'], ['col TIPO CHECK (condição)', 'Validar os valores de uma coluna'], ["CHECK (x BETWEEN 0 AND 20) · CHECK (e IN ('a', 'b'))", 'Intervalo (inclui extremos) · lista de valores'],
     ['CONSTRAINT chk_t_regra CHECK (fim >= inicio)', 'CHECK com nome, ao nível da tabela (compara colunas)'], ['ALTER TABLE t ADD CONSTRAINT nome CHECK (…); · DROP CHECK nome;', 'Acrescentar / remover CHECK'], ['CHAR(9) · VARCHAR(100) · DECIMAL(8,2) · DATE', 'Tipos frequentes'],

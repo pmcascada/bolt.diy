@@ -223,6 +223,17 @@
       // Como no InnoDB, o contador AUTO_INCREMENT não volta atrás: os números usados na transação anulada ficam por usar.
     }
   }
+  const ENGINES = [
+    ['InnoDB', 'YES', 'Supports transactions, row-level locking, and foreign keys', 'YES'],
+    ['MyISAM', 'YES', 'MyISAM storage engine', 'NO'],
+    ['MEMORY', 'YES', 'Hash based, stored in memory, useful for temporary tables', 'NO'],
+    ['CSV', 'YES', 'CSV storage engine', 'NO'],
+    ['ARCHIVE', 'YES', 'Archive storage engine', 'NO'],
+    ['BLACKHOLE', 'YES', '/dev/null storage engine (anything you write to it disappears)', 'NO'],
+    ['MRG_MYISAM', 'YES', 'Collection of identical MyISAM tables', 'NO'],
+    ['PERFORMANCE_SCHEMA', 'YES', 'Performance Schema', 'NO'],
+    ['FEDERATED', 'NO', 'Federated MySQL storage engine', null],
+  ];
   const txOpen = (db) => !!db.tx;
   function control(db, s) {
     const c = s.replace(/\s+/g, ' ').trim();
@@ -256,6 +267,18 @@
       return { msg: on ? 'autocommit ligado: cada instrução é gravada logo que termina.' : 'autocommit desligado: as alterações só ficam gravadas com COMMIT (ou anuladas com ROLLBACK).' };
     }
     if (/^select @@(session\.)?autocommit$/i.test(c)) return { rows: [{ '@@autocommit': db.autocommit === false ? 0 : 1 }] };
+    // Motores de armazenamento: como no MySQL 8 (no simulador, as tabelas comportam-se sempre como InnoDB).
+    if (/^show (storage )?engines$/i.test(c)) {
+      const def = (db.engine || 'InnoDB').toUpperCase();
+      return { rows: ENGINES.map(([e, sup, com, tr]) => ({ Engine: e, Support: sup === 'YES' && e.toUpperCase() === def ? 'DEFAULT' : sup, Comment: com, Transactions: tr, XA: tr, Savepoints: tr })) };
+    }
+    if ((m = /^set (?:@@(?:session\.|global\.)?|session |global )?default_storage_engine ?= ?'?(\w+)'?$/i.exec(c))) {
+      const e = ENGINES.find(([n, sup]) => n.toUpperCase() === m[1].toUpperCase() && sup === 'YES');
+      if (!e) throw new Error(`ERROR 1286 (42000): Unknown storage engine '${m[1]}'`);
+      db.engine = e[0];
+      return { msg: `Motor por omissão: ${e[0]}. As tabelas criadas a seguir usam este motor.` };
+    }
+    if (/^select @@(session\.)?default_storage_engine$/i.test(c)) return { rows: [{ '@@default_storage_engine': db.engine || 'InnoDB' }] };
     if (/^set (session |global )?transaction isolation level /i.test(c) || /^lock tables? /i.test(c) || /^unlock tables?$/i.test(c)) return { msg: 'Instrução aceite (no simulador há um só utilizador, por isso não tem efeito).' };
     return null;
   }
