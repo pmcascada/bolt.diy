@@ -707,3 +707,8 @@ button.lv-opt{cursor:pointer}button.lv-opt:active{transform:scale(.97)}
 /* sem sessão iniciada: só a página de entrada (sem menu nem pontuação) */
 body.gated #nav,body.gated #mini,body.gated #tabbar,body.gated #topr .pill{display:none}
 .gate-info h3{display:flex;align-items:center;gap:8px}
+
+/* modo Revisão (repetir lição/capítulo sem pontos) */
+.rv-sum{display:grid;gap:10px;margin-top:18px;position:sticky;bottom:12px;z-index:5;box-shadow:0 6px 18px rgba(15,23,42,.12)}
+.rv-sum.end{border-color:var(--ok)}
+.rv-lesson .task{margin-bottom:14px}

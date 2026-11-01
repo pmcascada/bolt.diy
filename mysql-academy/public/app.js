@@ -271,7 +271,7 @@ let crumbs = [];
 function isOn(h) {
   const r = location.hash || '#/';
   if (h === '#/') return r === '#/' || r === '#';
-  if (h === '#/learn') return /^#\/(learn|c|l|m|t)\b/.test(r);
+  if (h === '#/learn') return /^#\/(learn|c|l|m|t|rl|rc)\b/.test(r);
   if (h === '#/aovivo') return /^#\/(aovivo|q)\b/.test(r);
   return r.startsWith(h);
 }
@@ -364,6 +364,7 @@ function vChapter(id) {
       ${p.test.attempts ? `<p class="small">Melhor resultado: <b>${p.test.best}%</b> · ${p.test.attempts} ${p.test.attempts === 1 ? 'tentativa' : 'tentativas'} ${p.test.passed ? '<span class="chip ok">Aprovado</span>' : ''}</p>` : ''}
       ${p.unlocked ? `<a class="btn" href="#/t/${c.id}">${p.test.attempts ? 'Repetir miniteste' : 'Iniciar miniteste'}</a>` : `<span class="chip">${ic('lock')}Disponível após concluir as ${c.lessons.length} lições</span>`}</div></div>
   </div>
+  ${p.unlocked ? `<div class="card side-card" style="margin-top:16px"><span class="side-i">${ic('repeat')}</span><div><h3>Rever o capítulo</h3><p class="small muted">Volte a fazer todos os exercícios do capítulo em <b>modo Revisão</b>: pode repeti-los as vezes que quiser, mas não contam para a pontuação. Cada lição concluída também pode ser revista sozinha.</p><a class="btn sec-b" href="#/rc/${c.id}">${ic('repeat')}Rever o capítulo</a></div></div>` : ''}
   ${c.real ? `<div class="card real-card" style="margin-top:16px"><div class="card-h"><h3>${ic('cpu')}Prática no MySQL real</h3><span class="small muted">${p.real}/${p.realTot} feitas</span></div>
     <p class="small muted" style="margin-top:0">O simulador serve para aprender; o objetivo é usar um servidor MySQL a sério. Faça estas tarefas no seu computador (MySQL Community Server + Workbench) e marque-as à medida que as concluir.</p>
     <ul class="real">${c.real.map((t, k) => `<li><label><input type="checkbox" data-r="${k}" ${(st.real[c.id] || []).includes(k) ? 'checked' : ''}><span>${t}</span></label></li>`).join('')}</ul>
@@ -396,7 +397,7 @@ function stepHtml(L, k) {
   return `<section class="step learn" data-k="${k}"><div class="step-l">${ic('book')}Conceito ${nConcept}</div><h2>${esc(s.title)}</h2>${s.html}${sess}${s.examples.map((e, j) => codeBlock(e, `<button class="btn" data-copy="${j}" aria-label="Copiar">${ic('copy')}<span class="lbl">Copiar</span></button>${e.run ? `<a class="btn" href="#/lab" data-lab="${j}" aria-label="Abrir no laboratório">${ic('terminal')}<span class="lbl">Laboratório</span></a><button class="btn run" data-run="${j}">${ic('play')}Executar</button>` : ''}`)).join('')}</section>`;
 }
 // Liga os botões dos exemplos e cria os exercícios dos passos mostrados.
-function bindSteps(L, onPass) {
+function bindSteps(L, onPass, optOf) {
   view.querySelectorAll('.step.learn').forEach((box) => {
     const s = L.steps[+box.dataset.k];
     box.querySelectorAll('[data-copy]').forEach((b) => (b.onclick = () => { navigator.clipboard?.writeText(s.examples[+b.dataset.copy].sql); toast('Copiado para a área de transferência', 'copy'); }));
@@ -411,12 +412,12 @@ function bindSteps(L, onPass) {
   });
   view.querySelectorAll('.step.practice').forEach((box) => {
     const s = L.steps[+box.dataset.k];
-    box.append(taskEl(s, +box.dataset.n - 1, onPass));
+    box.append(taskEl(s, +box.dataset.n - 1, onPass, optOf ? optOf(s, +box.dataset.n - 1) : undefined));
   });
 }
 const lessonHead = (C, L, idx, label, pct, done, paged) => `<div class="lesson-head"><div class="eyebrow">Capítulo ${C.idx + 1} · Lição ${idx + 1} de ${C.lessons.length}</div><h1>${esc(L.title)}</h1>
   <div class="row lesson-meta"><div class="grow"><div class="row small" style="justify-content:space-between;margin-bottom:6px"><span class="muted">${label}</span><span class="muted num-t">${pct}%</span></div>${bar(pct, done ? 'ok' : '')}</div>
-  <button class="btn sec-b sm" id="openManual">${ic('book')}Manual</button><button class="btn link sm" id="lessonMode" title="Alternar a forma de apresentar a lição">${ic(paged ? 'list' : 'layers')}${paged ? 'Ver a lição inteira' : 'Ver por páginas'}</button></div></div>`;
+  ${done ? `<a class="btn sec-b sm" href="#/rl/${L.id}" title="Repetir os exercícios sem contar para a pontuação">${ic('repeat')}Rever a lição</a>` : ''}<button class="btn sec-b sm" id="openManual">${ic('book')}Manual</button><button class="btn link sm" id="lessonMode" title="Alternar a forma de apresentar a lição">${ic(paged ? 'list' : 'layers')}${paged ? 'Ver a lição inteira' : 'Ver por páginas'}</button></div></div>`;
 
 function vLesson(id) {
   const f = findLesson(id); if (!f) return vHome();
@@ -527,7 +528,58 @@ function doneCardHtml(C, L, idx, paged) {
   const next = C.lessons[idx + 1], p = sum().perChapter[C.id];
   return `<div class="card done-card"><span class="side-i ok">${ic('checkCircle')}</span><div><h2>Lição concluída</h2>
     <p class="muted">${next ? `Pode avançar para a lição seguinte: <b>${esc(next.title)}</b>.` : p.test.passed ? 'Este capítulo já está concluído. Pode repetir o miniteste para melhorar o resultado.' : `Concluiu todas as lições deste capítulo. Faça agora o miniteste final (mínimo ${PASS_MARK}%) para o dar como concluído.`}</p>
-    <div class="row">${paged ? `<button class="btn sec-b" data-prev>${ic('chevL')}Anterior</button>` : ''}${next ? `<a class="btn" href="#/l/${next.id}">Lição seguinte ${ic('chevR')}</a>` : `<a class="btn" href="#/t/${C.id}">${ic('clipboard')}${p.test.passed ? 'Repetir miniteste' : 'Fazer o miniteste'}</a>`}<a class="btn sec-b" href="#/m/${C.id}">${ic('book')}Rever no manual</a></div></div></div>`;
+    <div class="row">${paged ? `<button class="btn sec-b" data-prev>${ic('chevL')}Anterior</button>` : ''}<a class="btn sec-b" href="#/rl/${L.id}">${ic('repeat')}Rever a lição</a>${next ? `<a class="btn" href="#/l/${next.id}">Lição seguinte ${ic('chevR')}</a>` : `<a class="btn" href="#/t/${C.id}">${ic('clipboard')}${p.test.passed ? 'Repetir miniteste' : 'Fazer o miniteste'}</a>`}<a class="btn sec-b" href="#/m/${C.id}">${ic('book')}Rever no manual</a></div></div></div>`;
+}
+
+/* ---------- modo Revisão: repetir uma lição ou um capítulo já concluídos, sem pontos ----------
+   Os exercícios reabrem em modo revisão (taskEl com review): não mudam a pontuação, a classificação,
+   as tentativas, as dicas nem o histórico que o professor vê. */
+const reviewBanner = (what) => alertBox('info', 'repeat', `<b>Modo Revisão</b> — está a rever ${what}. Pode repetir os exercícios as vezes que quiser, mas <b>não contam para a pontuação</b> nem para a classificação; o resultado da primeira vez mantém-se.`);
+function reviewTracker(total) {
+  const t = { total, done: 0, ok: 0 };
+  t.paint = () => {
+    const box = $('#rvSum'); if (!box) return;
+    box.innerHTML = `<div class="card rv-sum ${t.done === total ? 'end' : ''}"><div><b>${t.done === total ? 'Revisão terminada' : 'Progresso da revisão'}</b><p class="small muted" style="margin:4px 0 0">Respondeu a ${t.done} de ${total} · <b>${t.ok}</b> ${t.ok === 1 ? 'certo' : 'certos'} à primeira. Não conta para a pontuação.</p></div>${bar(pctOf(t.done, total), t.done === total ? 'ok' : '')}</div>`;
+  };
+  t.opt = (ex, i, label) => ({ review: true, label, onResult: (ok) => { t.done++; if (ok) t.ok++; t.paint(); } });
+  return t;
+}
+function vReviewLesson(id) {
+  const f = findLesson(id); if (!f) return vHome();
+  const { c: C, l: L, i: idx } = f;
+  if (hiddenPage(C)) return;
+  if (!lessonDone(L)) { location.replace('#/l/' + L.id); return; }
+  crumbs = [['Conteúdos', '#/learn'], [`Capítulo ${C.idx + 1}`, '#/c/' + C.id], [`Lição ${idx + 1}`, '#/l/' + L.id], ['Revisão', '#/rl/' + L.id]];
+  const tr = reviewTracker(L.ex.length);
+  view.innerHTML = `<div class="lesson-wrap"><article class="prose">
+    <div class="lesson-head"><div class="eyebrow">${ic('repeat')}Modo Revisão · Capítulo ${C.idx + 1} · Lição ${idx + 1}</div><h1>${esc(L.title)}</h1></div>
+    ${reviewBanner('esta lição')}
+    <div id="steps">${L.steps.map((s, k) => stepHtml(L, k)).join('')}</div>
+    <div id="rvSum"></div>
+    <div class="row" style="margin-top:14px"><a class="btn sec-b" href="#/l/${L.id}">${ic('chevL')}Voltar à lição</a><a class="btn sec-b" href="#/c/${C.id}">Capítulo ${C.idx + 1}</a></div>
+  </article><aside class="toc">${tocHtml(C, L)}</aside></div>`;
+  enhance(view);
+  bindSteps(L, () => {}, (s, i) => tr.opt(s, i, `Exercício ${i + 1}`));
+  tr.paint();
+}
+function vReviewChapter(id) {
+  const C = CHAPTERS.find((x) => x.id === id); if (!C) return vHome();
+  if (hiddenPage(C)) return;
+  if (!sum().perChapter[C.id].unlocked) { location.replace('#/c/' + C.id); return; }
+  crumbs = [['Conteúdos', '#/learn'], [`Capítulo ${C.idx + 1}`, '#/c/' + C.id], ['Revisão', '#/rc/' + C.id]];
+  const tr = reviewTracker(C.lessons.reduce((n, l) => n + l.ex.length, 0));
+  view.innerHTML = `<div class="page-h"><div><div class="eyebrow">${ic('repeat')}Modo Revisão · Capítulo ${pad2(C.idx + 1)}</div><h1>${esc(C.title)}</h1><p>Todos os exercícios do capítulo, lição a lição. Para rever a matéria, abra o <a href="#/m/${C.id}">manual do capítulo</a> ou reveja uma lição completa.</p></div></div>
+    ${reviewBanner('este capítulo')}
+    <div id="rvLessons"></div><div id="rvSum"></div>
+    <div class="row" style="margin-top:14px"><a class="btn sec-b" href="#/c/${C.id}">${ic('chevL')}Voltar ao capítulo</a></div>`;
+  const box = $('#rvLessons');
+  C.lessons.forEach((L, li) => {
+    const sec = document.createElement('section'); sec.className = 'sec rv-lesson';
+    sec.innerHTML = `<div class="row" style="justify-content:space-between;align-items:baseline"><h2>${li + 1}. ${esc(L.title)}</h2><a class="btn link sm" href="#/rl/${L.id}">${ic('book')}Rever a lição completa</a></div>`;
+    L.ex.forEach((ex, i) => sec.append(taskEl(ex, i, () => {}, tr.opt(ex, i, `Lição ${li + 1} · Exercício ${i + 1}`))));
+    box.append(sec);
+  });
+  tr.paint();
 }
 
 /* ---------- aquecimento: um exercício de uma lição anterior no início de cada lição (prática intercalada) ---------- */
@@ -1856,7 +1908,7 @@ function route() {
   if (!BK.user) { vMe(true); renderChrome(); window.scrollTo(0, 0); return; }
   if (a !== 't') quizRun = null;
   if (a !== 'rev') revRun = null;
-  ({ '': vHome, learn: vLearn, c: () => vChapter(b), l: () => vLesson(b), m: () => vManual(b), t: () => vTest(b), rev: vRev, lab: vLab, progress: vProgress, rank: vRank, me: vMe, prof: vProf, jogo: vGame, aovivo: () => (b === 'host' ? vLiveHost(h.split('/')[3] || '') : vLive()), q: () => vLivePlay(b || ''), projeto: PROJECT_ON ? vProject : vHome }[a || ''] || vHome)();
+  ({ '': vHome, learn: vLearn, c: () => vChapter(b), l: () => vLesson(b), rl: () => vReviewLesson(b), rc: () => vReviewChapter(b), m: () => vManual(b), t: () => vTest(b), rev: vRev, lab: vLab, progress: vProgress, rank: vRank, me: vMe, prof: vProf, jogo: vGame, aovivo: () => (b === 'host' ? vLiveHost(h.split('/')[3] || '') : vLive()), q: () => vLivePlay(b || ''), projeto: PROJECT_ON ? vProject : vHome }[a || ''] || vHome)();
   renderChrome();
   const steps = a === 'l' && st.lessonView === 'all' ? view.querySelectorAll('.step') : [];
   if (steps.length > 1) steps[steps.length - 1].scrollIntoView({ block: 'start' }); else window.scrollTo(0, 0);
