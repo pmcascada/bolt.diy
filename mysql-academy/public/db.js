@@ -234,6 +234,22 @@
     ['PERFORMANCE_SCHEMA', 'YES', 'Performance Schema', 'NO'],
     ['FEDERATED', 'NO', 'Federated MySQL storage engine', null],
   ];
+  // [charset, descrição, colação por omissão, bytes por carácter] — os mais usados, como no SHOW CHARACTER SET do MySQL 8.
+  const CHARSETS = [
+    ['ascii', 'US ASCII', 'ascii_general_ci', 1],
+    ['binary', 'Binary pseudo charset', 'binary', 1],
+    ['latin1', 'cp1252 West European', 'latin1_swedish_ci', 1],
+    ['utf16', 'UTF-16 Unicode', 'utf16_general_ci', 4],
+    ['utf8mb3', 'UTF-8 Unicode', 'utf8mb3_general_ci', 3],
+    ['utf8mb4', 'UTF-8 Unicode', 'utf8mb4_0900_ai_ci', 4],
+  ];
+  const COLLATIONS = [
+    ['ascii_general_ci', 'ascii'], ['ascii_bin', 'ascii'], ['binary', 'binary'],
+    ['latin1_swedish_ci', 'latin1'], ['latin1_general_ci', 'latin1'], ['latin1_general_cs', 'latin1'], ['latin1_bin', 'latin1'],
+    ['utf16_general_ci', 'utf16'], ['utf16_bin', 'utf16'], ['utf8mb3_general_ci', 'utf8mb3'], ['utf8mb3_bin', 'utf8mb3'],
+    ['utf8mb4_0900_ai_ci', 'utf8mb4'], ['utf8mb4_0900_as_ci', 'utf8mb4'], ['utf8mb4_0900_as_cs', 'utf8mb4'], ['utf8mb4_0900_bin', 'utf8mb4'],
+    ['utf8mb4_pt_0900_ai_ci', 'utf8mb4'], ['utf8mb4_pt_0900_as_cs', 'utf8mb4'], ['utf8mb4_general_ci', 'utf8mb4'], ['utf8mb4_unicode_ci', 'utf8mb4'], ['utf8mb4_bin', 'utf8mb4'],
+  ];
   const txOpen = (db) => !!db.tx;
   function control(db, s) {
     const c = s.replace(/\s+/g, ' ').trim();
@@ -266,7 +282,6 @@
       db.autocommit = on;
       return { msg: on ? 'autocommit ligado: cada instrução é gravada logo que termina.' : 'autocommit desligado: as alterações só ficam gravadas com COMMIT (ou anuladas com ROLLBACK).' };
     }
-    if (/^select @@(session\.)?autocommit$/i.test(c)) return { rows: [{ '@@autocommit': db.autocommit === false ? 0 : 1 }] };
     // Motores de armazenamento: como no MySQL 8 (no simulador, as tabelas comportam-se sempre como InnoDB).
     if (/^show (storage )?engines$/i.test(c)) {
       const def = (db.engine || 'InnoDB').toUpperCase();
@@ -278,7 +293,44 @@
       db.engine = e[0];
       return { msg: `Motor por omissão: ${e[0]}. As tabelas criadas a seguir usam este motor.` };
     }
-    if (/^select @@(session\.)?default_storage_engine$/i.test(c)) return { rows: [{ '@@default_storage_engine': db.engine || 'InnoDB' }] };
+    // Conjuntos de caracteres e colações (como no MySQL 8). Nota: o simulador não aplica as regras de comparação das colações.
+    if ((m = /^show (?:character set|charset)(?: like '([^']*)')?$/i.exec(c))) {
+      const re = m[1] === undefined ? null : new RegExp('^' + m[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/%/g, '.*').replace(/_/g, '.') + '$', 'i');
+      return { rows: CHARSETS.filter(([n]) => !re || re.test(n)).map(([n, desc, col, len]) => ({ Charset: n, Description: desc, 'Default collation': col, Maxlen: len })) };
+    }
+    if ((m = /^show collation(?: like '([^']*)')?$/i.exec(c))) {
+      const re = m[1] === undefined ? null : new RegExp('^' + m[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/%/g, '.*').replace(/_/g, '.') + '$', 'i');
+      return { rows: COLLATIONS.filter(([n]) => !re || re.test(n)).map(([n, cs]) => ({ Collation: n, Charset: cs, Default: CHARSETS.some((x) => x[2] === n) ? 'Yes' : '' })) };
+    }
+    if ((m = /^alter (?:database|schema)(?: (\w+))?((?: (?:default )?(?:character set|charset|collate) ?=? ?'?\w+'?)+)$/i.exec(c))) {
+      if (m[1] && m[1].toLowerCase() !== String(db.kind || '').toLowerCase()) throw new Error(`ERROR 1049 (42000): Unknown database '${m[1]}'`);
+      let cs = null, col = null, k;
+      const re = /(?:default )?(character set|charset|collate) ?=? ?'?(\w+)'?/gi;
+      while ((k = re.exec(m[2]))) { if (/collate/i.test(k[1])) col = k[2].toLowerCase(); else cs = k[2].toLowerCase(); }
+      if (cs && !CHARSETS.some((x) => x[0] === cs)) throw new Error(`ERROR 1115 (42000): Unknown character set: '${cs}'`);
+      if (col) {
+        const hit = COLLATIONS.find((x) => x[0] === col);
+        if (!hit) throw new Error(`ERROR 1273 (HY000): Unknown collation: '${col}'`);
+        if (cs && hit[1] !== cs) throw new Error(`ERROR 1253 (42000): COLLATION '${col}' is not valid for CHARACTER SET '${cs}'`);
+        cs = hit[1];
+      } else col = CHARSETS.find((x) => x[0] === cs)[2];
+      db.charset = cs; db.collation = col;
+      return { affected: 1, msg: `Base de dados ${db.kind || ''} alterada: charset ${cs}, colação ${col}. Só as tabelas criadas a partir de agora usam estes valores; as que já existem mantêm os seus.` };
+    }
+    // SELECT @@variável[, @@variável …]: variáveis de sistema que as lições usam.
+    if ((m = /^select ((?:@@(?:session\.|global\.)?\w+ ?, ?)*@@(?:session\.|global\.)?\w+)$/i.exec(c))) {
+      const vars = { autocommit: db.autocommit === false ? 0 : 1, default_storage_engine: db.engine || 'InnoDB',
+        character_set_database: db.charset || 'utf8mb4', collation_database: db.collation || 'utf8mb4_0900_ai_ci',
+        character_set_server: 'utf8mb4', collation_server: 'utf8mb4_0900_ai_ci', character_set_client: 'utf8mb4',
+        character_set_connection: 'utf8mb4', collation_connection: 'utf8mb4_0900_ai_ci', version: '8.0.36' };
+      const row = {};
+      for (const v of m[1].split(/ ?, ?/)) {
+        const n = v.replace(/^@@(session\.|global\.)?/i, '').toLowerCase();
+        if (!(n in vars)) throw new Error(`ERROR 1193 (HY000): Unknown system variable '${n}'`);
+        row[v.trim()] = vars[n];
+      }
+      return { rows: [row] };
+    }
     if (/^set (session |global )?transaction isolation level /i.test(c) || /^lock tables? /i.test(c) || /^unlock tables?$/i.test(c)) return { msg: 'Instrução aceite (no simulador há um só utilizador, por isso não tem efeito).' };
     return null;
   }
