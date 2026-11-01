@@ -27,8 +27,16 @@ no('AUTO_INCREMENT sem chave', 'CREATE TABLE livros (id_livro INT AUTO_INCREMENT
 const fk = { setup: 'CREATE TABLE departamentos (id_departamento INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(60) NOT NULL);',
   solution: 'CREATE TABLE funcionarios (id_funcionario INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(80) NOT NULL, id_departamento INT, FOREIGN KEY (id_departamento) REFERENCES departamentos(id_departamento) ON DELETE SET NULL);' };
 ok('FK igual', fk.solution, fk);
-ok('FK na coluna + CONSTRAINT com nome', 'CREATE TABLE funcionarios (id_funcionario INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(80) NOT NULL, id_departamento INT REFERENCES departamentos(id_departamento) ON DELETE SET NULL)', fk);
+no('FK na declaração da coluna (não se usa: o MySQL ignora-a)', 'CREATE TABLE funcionarios (id_funcionario INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(80) NOT NULL, id_departamento INT REFERENCES departamentos(id_departamento) ON DELETE SET NULL)', fk, 'declaração da coluna');
 ok('FK com nome', 'CREATE TABLE funcionarios (id_funcionario INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(80) NOT NULL, id_departamento INT, CONSTRAINT fk_func_dep FOREIGN KEY (id_departamento) REFERENCES departamentos (id_departamento) ON UPDATE CASCADE ON DELETE SET NULL)', fk);
+const fk2 = { setup: 'CREATE TABLE clientes (id_cliente INT AUTO_INCREMENT PRIMARY KEY);',
+  solution: 'CREATE TABLE encomendas (id_encomenda INT AUTO_INCREMENT PRIMARY KEY, id_cliente INT NOT NULL, FOREIGN KEY (id_cliente) REFERENCES clientes(id_cliente) ON UPDATE CASCADE ON DELETE RESTRICT);' };
+ok('FK com as ações das aulas', fk2.solution, fk2);
+ok('FK com as ações por outra ordem', fk2.solution.replace('ON UPDATE CASCADE ON DELETE RESTRICT', 'ON DELETE RESTRICT ON UPDATE CASCADE'), fk2);
+no('FK sem ON DELETE RESTRICT explícito', fk2.solution.replace(' ON DELETE RESTRICT', ''), fk2, 'explicitamente <b>ON DELETE RESTRICT');
+no('FK sem ON UPDATE CASCADE', fk2.solution.replace(' ON UPDATE CASCADE', ''), fk2, 'ON UPDATE CASCADE');
+no('FK sem ações', fk2.solution.replace(' ON UPDATE CASCADE ON DELETE RESTRICT', ''), fk2, 'ON (UPDATE|DELETE)');
+no('FK na coluna (ALTER ADD COLUMN)', 'CREATE TABLE x (id INT PRIMARY KEY); ALTER TABLE x ADD COLUMN id_c INT REFERENCES clientes(id_cliente)', fk2, 'declaração da coluna');
 no('ON DELETE errado', fk.solution.replace('SET NULL', 'CASCADE'), fk, 'ON DELETE SET NULL.*CASCADE');
 no('sem ON DELETE', fk.solution.replace(' ON DELETE SET NULL', ''), fk, 'ON DELETE SET NULL');
 no('SET NULL em coluna NOT NULL', fk.solution.replace('id_departamento INT,', 'id_departamento INT NOT NULL,'), fk, 'aceitar NULL');
