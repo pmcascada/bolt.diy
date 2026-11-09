@@ -653,6 +653,8 @@ function tocHtml(C, cur) {
 const SQL_ERRORS = [
   [/Check constraint '(\w+)' is violated\. \((\w+): (.+)\)/, (m) => `Violação da restrição CHECK ${m[1]} (${m[3]}) da tabela ${m[2]}: a instrução foi recusada e não alterou nada. (No MySQL: ERROR 3819)`],
   [/violation of check constraint/i, 'Violação da restrição CHECK: o valor não cumpre a condição. A linha não foi guardada. (No MySQL: ERROR 3819)'],
+  [/ERROR 1451.*`(\w+)`\.`(\w+)`, CONSTRAINT .*REFERENCES `(\w+)`/, (m) => `Não é possível apagar (ou mudar a chave de) linhas da tabela ${m[3]} que ainda são referenciadas na tabela ${m[2]} (chave estrangeira com ON DELETE RESTRICT). Trate primeiro as linhas de ${m[2]}. A instrução foi recusada e não alterou nada. (No MySQL: ERROR 1451)`],
+  [/ERROR 1452.*`(\w+)`\.`(\w+)`, CONSTRAINT .*FOREIGN KEY \(`(\w+)`\) REFERENCES `(\w+)`/, (m) => `O valor de ${m[3]} na tabela ${m[2]} não existe na tabela ${m[4]} (integridade referencial). A instrução foi recusada e não alterou nada. (No MySQL: ERROR 1452)`],
   [/table does not exist: (\w+)/i, (m) => `A tabela ou vista '${m[1]}' não existe. (No MySQL: ERROR 1146)`],
   [/already exists/i, 'Já existe um objeto com esse nome. (No MySQL: ERROR 1050)'],
 ];
@@ -787,7 +789,7 @@ function structureHtml(db, names, title) {
 // Etiqueta do tipo de exercício (mostrada no cabeçalho).
 const tagOf = (ex) => ex.start ? 'Corrigir o erro' : ex.t === 'quiz' && ex.sql ? 'Qual é o resultado?' : ({ quiz: 'Escolha múltipla', order: 'Ordenar', code: 'Escrever comando', query: 'Consulta SELECT', dml: 'Alterar dados', ddl: ex.loose ? 'Desafio: criar tabelas' : 'Criar/alterar tabelas' }[ex.t]);
 const msgList = (msgs) => `<ul class="ddl-msgs">${msgs.slice(0, 5).map((m) => `<li>${m}</li>`).join('')}</ul>${msgs.length > 5 ? `<span class="small">… e mais ${msgs.length - 5} diferença(s).</span>` : ''}`;
-const dbChip = (ex) => (ex.db === 'loja' ? `<span class="chip db-chip" title="Este exercício usa a base de dados loja">${ic('database')}BD loja</span>` : '');
+const dbChip = (ex) => (ex.db && ex.db !== 'escola' ? `<span class="chip db-chip" title="Este exercício usa a base de dados ${ex.db}">${ic('database')}BD ${ex.db}</span>` : '');
 // Estado de uma tabela depois de uma instrução INSERT/UPDATE/DELETE.
 const dmlTables = (tabs, title) => tabs.map((t) => `<div class="small muted" style="margin:10px 0 6px"><b>${esc(title)}:</b> ${ic('table')}${esc(t.name)}</div>${table(t.rows)}`).join('');
 
@@ -1056,6 +1058,8 @@ function finishTest(r) {
 }
 
 /* ---------- laboratório ---------- */
+// A BD clinica é a solução do desafio do capítulo 2: no laboratório só aparece depois de o desafio estar feito.
+const clinicaOpen = () => !!(st.done['ddl.6.1'] || st.rev['ddl.6.1'] || staff());
 let labDb = null, labWhich = 'escola', labSql = 'SELECT * FROM alunos;';
 // Descarrega o script MySQL de uma BD de exemplo, para a usar num servidor MySQL real.
 function downloadDb(which) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([D.toMySQL(which)], { type: 'text/plain' })); a.download = which + '.sql'; a.click(); }
@@ -1064,7 +1068,7 @@ function vLab() {
   if (!labDb) labDb = D.create(labWhich);
   const sc = D.schemaOf(labWhich);
   view.innerHTML = `<div class="page-h"><div><div class="eyebrow">Prática livre</div><h1>Laboratório SQL</h1><p>Execute instruções sobre as bases de dados de exemplo. Os dados ficam apenas no seu dispositivo e podem ser repostos a qualquer momento.</p></div></div>
-  <div class="card"><div class="card-h"><div class="seg" role="tablist" aria-label="Base de dados">${Object.values(D.DBS).map((d) => `<button class="${d.title === labWhich ? 'on' : ''}" data-db="${d.title}" title="${esc(d.desc)}">${ic('database')}${d.title}</button>`).join('')}</div>
+  <div class="card"><div class="card-h"><div class="seg" role="tablist" aria-label="Base de dados">${Object.values(D.DBS).filter((d) => d.title !== 'clinica' || clinicaOpen() || labWhich === 'clinica').map((d) => `<button class="${d.title === labWhich ? 'on' : ''}" data-db="${d.title}" title="${esc(d.desc)}">${ic('database')}${d.title}</button>`).join('')}</div>
     <span class="row" style="gap:8px"><button class="btn sec-b sm" id="schemaBtn">${ic('table')}Estrutura das tabelas</button><button class="btn sec-b sm" id="reset">${ic('reset')}Repor dados</button><button class="btn sec-b sm" id="dl" title="Script para criar esta BD num servidor MySQL real">${ic('download')}${labWhich}.sql</button></span></div>
   <p class="small muted" style="margin:0 0 10px">${esc(D.DBS[labWhich].desc)}</p><div id="labSchema"></div>
   <div class="schema">${Object.entries(sc).map(([t, x]) => `<span><b>${t}</b> (${x.cols.map((c) => c[0]).join(', ')})</span>`).join('')}</div>
@@ -1076,7 +1080,7 @@ function vLab() {
   view.querySelectorAll('[data-db]').forEach((b) => (b.onclick = () => {
     if (b.dataset.db === labWhich) return;
     labWhich = b.dataset.db; labDb = null;
-    labSql = labWhich === 'loja' ? 'SELECT * FROM encomendas ORDER BY data DESC LIMIT 10;' : 'SELECT * FROM alunos;';
+    labSql = labWhich === 'loja' ? 'SELECT * FROM encomendas ORDER BY data DESC LIMIT 10;' : labWhich === 'clinica' ? 'SELECT * FROM animais;' : 'SELECT * FROM alunos;';
     vLab();
   }));
   $('#schemaBtn').onclick = () => {
