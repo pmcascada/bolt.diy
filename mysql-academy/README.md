@@ -24,7 +24,7 @@ Aplicação de **autoaprendizagem de MySQL** para desktop e telemóvel (PWA inst
 
 O motor do browser simula também as **transações** (START TRANSACTION/BEGIN, COMMIT, ROLLBACK, SAVEPOINT, autocommit, COMMIT implícito dos comandos DDL, SELECT … FOR UPDATE) e as restrições CHECK da BD loja (`stock >= 0`, `quantidade > 0`), com o erro 3819.
 
-Duas bases de dados de exemplo correm no browser (AlaSQL): **escola** (pequena, para aprender) e **loja** (30 clientes, 18 produtos, 80 encomendas de 2024–2025, com datas e valores NULL), gerada sempre igual. O **Laboratório SQL** permite escolher a BD e executar várias instruções.
+Três bases de dados de exemplo correm no browser (AlaSQL): **escola** (pequena, para aprender), **loja** (30 clientes, 18 produtos, 80 encomendas de 2024–2025, com datas e valores NULL), gerada sempre igual, e **clinica** — a clínica veterinária desenhada no desafio do capítulo 2 (tutores, animais, consultas, medicamentos, receitas e seguros), usada na lição «Manter os dados da clínica veterinária». Na clinica o motor aplica também as chaves estrangeiras (ERROR 1451/1452) e as restrições CHECK; no Laboratório só aparece depois de concluído o desafio, porque a sua estrutura é a solução. O **Laboratório SQL** permite escolher a BD e executar várias instruções.
 
 ## Gamificação e registo de evolução
 

@@ -1,6 +1,7 @@
 /* Bases de dados de exemplo executadas no browser com AlaSQL (uma aproximação do MySQL).
      escola – pequena, para aprender: alunos, cursos e notas;
-     loja   – maior e mais realista (gerada de forma determinística): clientes, produtos, encomendas e linhas.
+     loja   – maior e mais realista (gerada de forma determinística): clientes, produtos, encomendas e linhas;
+     clinica – a clínica veterinária do desafio do capítulo 2: tutores, animais, consultas, medicamentos e receitas.
    Também verifica as respostas: consultas (pelo resultado), comandos INSERT/UPDATE/DELETE (pelo efeito nas
    tabelas) e comandos escritos (pelo texto normalizado). As mensagens explicam o que está diferente. */
 (function (root) {
@@ -140,7 +141,99 @@
     },
   };
 
-  const DBS = { escola: ESCOLA, loja: LOJA };
+  /* ---------- BD clinica: a clínica veterinária modelada no desafio do capítulo 2 ---------- */
+  const CLINICA = {
+    title: 'clinica', desc: 'Clínica veterinária (o desafio do capítulo 2): tutores, animais, consultas, medicamentos, receitas e seguros.',
+    fkStrict: true, // o motor aplica as chaves estrangeiras (ON DELETE RESTRICT), como o MySQL
+    seed: {
+      tutores: [
+        [1, 'Marta Sousa', '912345671', '234567891'], [2, 'Ricardo Alves', '913456782', '245678912'], [3, 'Sofia Nunes', '914567893', null],
+        [4, 'Pedro Matos', '915678904', '256789123'], [5, 'Inês Correia', '916789015', '267891234'], [6, 'Luís Ferraz', '917890126', null],
+        [7, 'Catarina Reis', '918901237', '278912345'], [8, 'Nuno Pinto', '919012348', '289123456'], [9, 'Teresa Lopes', '961234567', null],
+        [10, 'André Faria', '962345678', '291234567'], [11, 'Beatriz Cunha', '963456789', '212345678'], [12, 'Utilizador de teste', '960000000', null],
+      ],
+      animais: [
+        [1, 'Bobi', 'canino', '2018-04-12', 1], [2, 'Mia', 'felino', '2020-09-03', 1], [3, 'Rex', 'canino', '2016-01-20', 2],
+        [4, 'Luna', 'felino', '2021-06-15', 3], [5, 'Piu', 'ave', '2023-02-01', 3], [6, 'Max', 'canino', '2019-11-30', 4],
+        [7, 'Nina', 'felino', '2017-05-22', 5], [8, 'Tobi', 'canino', '2022-03-08', 5], [9, 'Kiko', 'ave', null, 6],
+        [10, 'Simba', 'felino', '2015-12-24', 7], [11, 'Bolinha', 'outro', '2023-07-14', 7], [12, 'Thor', 'canino', '2020-02-29', 8],
+        [13, 'Pantufa', 'felino', '2019-08-19', 9], [14, 'Lobo', 'canino', '2014-10-05', 10], [15, 'Mel', 'canino', '2021-01-11', 10],
+        [16, 'Óscar', 'felino', null, 11], [17, 'Fred', 'outro', '2022-05-30', 11], [18, 'Lili', 'felino', '2024-04-02', 4],
+        [19, 'Zeca', 'canino', '2013-06-17', 8], [20, 'TESTE', 'outro', null, 12],
+      ],
+      consultas: [
+        [1, '2024-01-15 09:30:00', 12.4, 1], [2, '2024-02-03 10:00:00', 4.1, 2], [3, '2024-02-20 11:15:00', 31, 3], [4, '2024-03-11 16:45:00', 3.6, 4],
+        [5, '2024-04-02 09:00:00', 0.04, 5], [6, '2024-05-17 14:30:00', 24.8, 6], [7, '2024-06-05 10:45:00', 4.9, 7], [8, '2024-06-28 15:00:00', 8.2, 8],
+        [9, '2024-07-19 09:15:00', 0.03, 9], [10, '2024-09-09 17:00:00', 5.4, 10], [11, '2024-10-14 11:30:00', 1.8, 11], [12, '2024-11-25 10:00:00', 28.3, 12],
+        [13, '2024-12-12 12:15:00', 4.3, 13], [14, '2025-01-08 09:45:00', 35.2, 14], [15, '2025-01-22 16:00:00', 12.9, 1], [16, '2025-02-05 10:30:00', 19.6, 15],
+        [17, '2025-02-14 14:00:00', 5.1, 16], [18, '2025-02-27 11:00:00', 0.9, 17], [19, '2025-03-03 09:30:00', 25.3, 6], [20, '2025-03-05 15:15:00', null, 2],
+        [21, '2025-03-07 10:00:00', 30.6, 3], [22, '2025-03-11 17:30:00', 5.6, 10], [23, '2025-03-14 12:00:00', 9, 8], [24, '2025-03-15 09:00:00', 4.7, 7],
+        [25, '2025-03-16 10:30:00', 3.9, 4], [26, '2025-04-02 11:45:00', 28.9, 12], [27, '2025-04-23 16:15:00', 1, 18], [28, '2025-05-06 09:30:00', 33.8, 19],
+        [29, '2025-05-20 14:45:00', 4.2, 13], [30, '2025-06-10 10:15:00', 0.04, 5], [31, '2025-06-30 12:30:00', 13.1, 1], [32, '2025-07-15 15:00:00', 2.1, 18],
+        [33, '2025-08-04 09:00:00', 20.4, 15], [34, '2025-09-12 11:00:00', 1, 20], [35, '2025-09-12 11:05:00', 1, 20], [36, '2025-10-01 10:00:00', 34.9, 14],
+      ],
+      medicamentos: [
+        [1, 'Antibiótico (amoxicilina)', 25], [2, 'Anti-inflamatório (meloxicam)', 3], [3, 'Desparasitante interno', 40], [4, 'Desparasitante externo (pipeta)', 18],
+        [5, 'Analgésico (tramadol)', 0], [6, 'Vacina antirrábica', 12], [7, 'Colírio', 4], [8, 'Pomada cicatrizante', 9], [9, 'Suplemento vitamínico', 0], [10, 'Antibiótico para aves', 2],
+      ],
+      receitas: [
+        [1, 3, '1 comprimido', 1], [1, 6, '1 dose', 1], [2, 4, '1 pipeta', 1], [3, 1, '500 mg 2x/dia', 7], [3, 2, '1 comprimido/dia', 5], [4, 3, '1/2 comprimido', 1],
+        [5, 10, '2 gotas na água', 10], [6, 1, '250 mg 2x/dia', 10], [7, 7, '1 gota 3x/dia', 7], [8, 8, 'aplicar 2x/dia', 14], [10, 2, '1/2 comprimido/dia', 5],
+        [11, 9, '1 ml/dia', 30], [12, 6, '1 dose', 1], [12, 3, '1 comprimido', 1], [14, 5, '50 mg 2x/dia', 5], [14, 2, '1 comprimido/dia', 10], [15, 4, '1 pipeta', 1],
+        [16, 1, '250 mg 2x/dia', 7], [17, 7, '1 gota 2x/dia', 10], [19, 2, '1 comprimido/dia', 5], [21, 8, 'aplicar 1x/dia', 10], [22, 3, '1 comprimido', 1],
+        [26, 1, '500 mg 2x/dia', 10], [28, 5, '50 mg 2x/dia', 7], [28, 9, '2 ml/dia', 60], [31, 6, '1 dose', 1], [33, 4, '1 pipeta', 1], [34, 3, '1 comprimido', 1],
+        [35, 8, 'aplicar 1x/dia', 3], [36, 2, '1 comprimido/dia', 5],
+      ],
+      seguradoras: [[1, 'PetSeguro'], [2, 'Animalis'], [3, 'Vida Animal']],
+      seguradoras_animais: [[1, 1], [3, 2], [6, 1], [10, 3], [12, 2], [14, 1], [15, 1], [19, 3]],
+    },
+    schema: {
+      tutores: { desc: 'Donos dos animais', cols: [
+        ['id_tutor', 'INT', 'PK', 'Identificador do tutor'], ['nome', 'VARCHAR(100)', '', 'Nome do tutor'],
+        ['telemovel', 'CHAR(9)', '', 'Telemóvel (obrigatório, sem repetições)'], ['nif', 'CHAR(9)', '', 'NIF (alguns não indicaram: NULL)'] ] },
+      animais: { desc: 'Animais seguidos pela clínica', cols: [
+        ['id_animal', 'INT', 'PK', 'Identificador do animal'], ['nome', 'VARCHAR(60)', '', 'Nome do animal'],
+        ['especie', 'VARCHAR(20)', '', "CHECK: 'canino', 'felino', 'ave' ou 'outro'"], ['data_nascimento', 'DATE', '', 'Data de nascimento (pode ser desconhecida: NULL)'],
+        ['id_tutor', 'INT', 'FK → tutores', 'Tutor (dono) do animal'] ] },
+      consultas: { desc: 'Consultas realizadas', cols: [
+        ['id_consulta', 'INT', 'PK', 'Identificador da consulta'], ['data_hora', 'DATETIME', '', 'Data e hora da consulta'],
+        ['peso', 'DECIMAL(5,2)', '', 'Peso do animal em kg (CHECK: maior que 0; NULL se não foi pesado)'], ['id_animal', 'INT', 'FK → animais', 'Animal observado'] ] },
+      medicamentos: { desc: 'Medicamentos da farmácia da clínica', cols: [
+        ['id_medicamento', 'INT', 'PK', 'Identificador do medicamento'], ['nome', 'VARCHAR(80)', '', 'Nome (sem repetições)'], ['stock', 'INT', '', 'Unidades em stock (CHECK: nunca negativo)'] ] },
+      receitas: { desc: 'Medicamentos receitados em cada consulta (tabela de ligação N:M)', cols: [
+        ['id_consulta', 'INT', 'PK, FK → consultas', 'Consulta'], ['id_medicamento', 'INT', 'PK, FK → medicamentos', 'Medicamento receitado'],
+        ['dose', 'VARCHAR(50)', '', 'Dose a dar'], ['dias', 'INT', '', 'Dias de tratamento (CHECK: maior que 0)'] ] },
+      seguradoras: { desc: 'Seguradoras de saúde animal', cols: [
+        ['id_seguradora', 'INT', 'PK', 'Identificador da seguradora'], ['nome', 'VARCHAR(80)', '', 'Nome da seguradora'] ] },
+      seguradoras_animais: { desc: 'Animais com seguro (relação opcional 0..1 — 0..*, sem nulos)', cols: [
+        ['id_animal', 'INT', 'PK, FK → animais', 'Animal com seguro'], ['id_seguradora', 'INT', 'FK → seguradoras', 'Seguradora'] ] },
+    },
+    // Restrições de coluna escritas no script MySQL descarregável (iguais às da solução do desafio).
+    extra: {
+      tutores: { nome: 'NOT NULL', telemovel: 'NOT NULL UNIQUE', nif: 'UNIQUE' },
+      animais: { nome: 'NOT NULL', especie: 'NOT NULL', id_tutor: 'NOT NULL' },
+      consultas: { data_hora: 'NOT NULL', id_animal: 'NOT NULL' },
+      medicamentos: { nome: 'NOT NULL UNIQUE', stock: 'DEFAULT 0' },
+      receitas: { dose: 'NOT NULL', dias: 'NOT NULL' },
+      seguradoras: { nome: 'NOT NULL' },
+      seguradoras_animais: { id_seguradora: 'NOT NULL' },
+    },
+    views: {},
+    auto: { tutores: 'id_tutor', animais: 'id_animal', consultas: 'id_consulta', medicamentos: 'id_medicamento', seguradoras: 'id_seguradora' },
+    checks: {
+      animais: [{ name: 'chk_animais_especie', sql: "especie IN ('canino', 'felino', 'ave', 'outro')", ok: (r) => r.especie === null || r.especie === undefined || ['canino', 'felino', 'ave', 'outro'].includes(r.especie) }],
+      consultas: [{ name: 'chk_consultas_peso', sql: 'peso > 0', ok: (r) => r.peso === null || r.peso === undefined || Number(r.peso) > 0 }],
+      medicamentos: [{ name: 'chk_medicamentos_stock', sql: 'stock >= 0', ok: (r) => r.stock === null || r.stock === undefined || Number(r.stock) >= 0 }],
+      receitas: [{ name: 'chk_receitas_dias', sql: 'dias > 0', ok: (r) => r.dias === null || r.dias === undefined || Number(r.dias) > 0 }],
+    },
+  };
+
+  const DBS = { escola: ESCOLA, loja: LOJA, clinica: CLINICA };
+  // Chaves estrangeiras de cada BD, lidas do esquema ('FK → tabela[.coluna]').
+  for (const d of [ESCOLA, LOJA, CLINICA]) {
+    d.fks = [];
+    for (const [t, s] of Object.entries(d.schema)) for (const [c, , k] of s.cols) { const m = /FK → (\w+)(?:\.(\w+))?/.exec(k); if (m) d.fks.push({ child: t, col: c, parent: m[1], pcol: m[2] || c }); }
+  }
   const SQLTYPE = (t) => t.replace(/^DECIMAL.*/, 'DECIMAL').replace(/^VARCHAR.*/, 'VARCHAR(255)');
   for (const d of Object.values(DBS)) {
     d.cols = {}; d.ddl = {};
@@ -345,7 +438,9 @@
     const writes = /^(insert|update|delete|replace)\b/i.test(s);
     if (writes && db.autocommit === false && !db.tx) db.tx = { snap: snapshot(db), saves: [], implicit: true };
     const checked = writes && db.checks ? Object.keys(db.checks).filter((t) => db.tables[t] && new RegExp(`\\b${t}\\b`, 'i').test(s)) : [];
-    const before = checked.length ? snapshot(db) : null;
+    const def = DBS[db.kind] || {};
+    const fks = writes && def.fkStrict ? def.fks.filter((f) => [f.child, f.parent].some((t) => new RegExp(`\\b${t}\\b`, 'i').test(s))) : [];
+    const before = checked.length || fks.length ? snapshot(db) : null;
     // UNION (sem ALL): o motor só elimina parte dos repetidos; elimina-os todos no fim, como o MySQL
     // (um LIMIT final aplica-se depois de eliminar os repetidos).
     if (/^\(?\s*select\b/i.test(s) && /\bunion\b/i.test(s) && !/\bunion\s+all\b/i.test(s)) {
@@ -359,6 +454,17 @@
     const res = db.exec(s);
     for (const t of checked) for (const k of db.checks[t]) {
       if (db.tables[t].data.some((r) => !k.ok(r))) { restore(db, before, checked); throw new Error(`ERROR 3819 (HY000): Check constraint '${k.name}' is violated. (${t}: ${k.sql})`); }
+    }
+    // Integridade referencial: cada valor de uma chave estrangeira tem de existir na tabela "pai".
+    const target = (/^(?:delete\s+from|update|insert\s+into|replace\s+into)\s+`?(\w+)/i.exec(s) || [])[1];
+    for (const f of fks) {
+      const keys = new Set(db.tables[f.parent].data.map((r) => String(r[f.pcol])));
+      if (!db.tables[f.child].data.some((r) => r[f.col] !== null && r[f.col] !== undefined && !keys.has(String(r[f.col])))) continue;
+      restore(db, before);
+      const fkTxt = `(\`${db.kind}\`.\`${f.child}\`, CONSTRAINT \`${f.child}_ibfk\` FOREIGN KEY (\`${f.col}\`) REFERENCES \`${f.parent}\` (\`${f.pcol}\`))`;
+      throw new Error(target && target.toLowerCase() === f.parent && target.toLowerCase() !== f.child
+        ? `ERROR 1451 (23000): Cannot delete or update a parent row: a foreign key constraint fails ${fkTxt}`
+        : `ERROR 1452 (23000): Cannot add or update a child row: a foreign key constraint fails ${fkTxt}`);
     }
     return { res };
   }
@@ -551,7 +657,8 @@
     for (const t of Object.keys(d.seed)) {
       const s = d.schema[t];
       const pk = s.cols.filter((c) => /^PK/.test(c[2])).map((c) => c[0]);
-      const lines = s.cols.map(([c, ty]) => `  ${c} ${ty}${pk.includes(c) ? ' NOT NULL' : ''}${c === d.auto[t] ? ' AUTO_INCREMENT' : ''}`);
+      const extra = (c) => (d.extra && d.extra[t] && d.extra[t][c] ? ' ' + d.extra[t][c] : '');
+      const lines = s.cols.map(([c, ty]) => `  ${c} ${ty}${pk.includes(c) ? ' NOT NULL' : extra(c)}${c === d.auto[t] ? ' AUTO_INCREMENT' : ''}`);
       if (pk.length) lines.push(`  PRIMARY KEY (${pk.join(', ')})`);
       for (const [c] of s.cols) { const f = fk(t, c); if (f && d.schema[f[0]]) lines.push(`  FOREIGN KEY (${c}) REFERENCES ${f[0]}(${f[1] === c || !f[1] ? c : f[1]}) ON UPDATE CASCADE ON DELETE RESTRICT`); }
       for (const k of (d.checks && d.checks[t]) || []) lines.push(`  CONSTRAINT ${k.name} CHECK (${k.sql})`);

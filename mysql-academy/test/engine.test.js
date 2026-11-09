@@ -138,4 +138,23 @@ t('perguntas «prever o resultado» com tabela: a resposta certa bate com os dad
     assert.strictEqual(String(got), String(ans).replace(/\D/g, ''), `${q.id}: o motor dá ${got}, a resposta certa é ${ans}`);
   }
 });
+t('BD clinica: chaves estrangeiras aplicadas (1451/1452) e restrições CHECK', () => {
+  const run = (q) => { const db = D.create('clinica'); try { return D.runMany(db, q).affected; } catch (e) { return e.message.slice(0, 10); } };
+  assert.strictEqual(run('DELETE FROM consultas WHERE id_animal = 20'), 'ERROR 1451');
+  assert.strictEqual(run("INSERT INTO animais (nome, especie, id_tutor) VALUES ('X', 'felino', 99)"), 'ERROR 1452');
+  assert.strictEqual(run("INSERT INTO animais (nome, especie, id_tutor) VALUES ('X', 'gato', 9)"), 'ERROR 3819');
+  assert.strictEqual(run('DELETE FROM receitas WHERE id_consulta IN (SELECT id_consulta FROM consultas WHERE id_animal = 20);\nDELETE FROM consultas WHERE id_animal = 20;'), 2);
+  const e = D.create('escola'); assert.strictEqual(D.runMany(e, "DELETE FROM alunos WHERE cidade = 'Lisboa'").affected, 4); // na escola não se aplicam
+});
+t('lição da clínica: respostas erradas típicas são recusadas', () => {
+  const L = CHAPTERS.find((c) => c.id === 'dml').lessons.find((l) => l.id === 'dml.loja');
+  const [up, ins, del, peso] = L.ex;
+  const no = (sql, ex) => { try { return !D.checkDml(sql, ex).ok; } catch { return true; } }; // um erro do MySQL também é recusa
+  assert.ok(L.ex.every((x) => x.db === 'clinica' && D.checkDml(x.solution, x).ok));
+  assert.ok(no('UPDATE medicamentos SET stock = 10 WHERE stock < 5', up));
+  assert.ok(no("INSERT INTO animais (nome, especie, data_nascimento, id_tutor) VALUES ('Tico', 'gato', '2025-03-10', 9)", ins));
+  assert.ok(no('DELETE FROM consultas WHERE id_animal = 20;\nDELETE FROM receitas WHERE id_consulta IN (SELECT id_consulta FROM consultas WHERE id_animal = 20);', del));
+  assert.ok(no("UPDATE consultas SET peso = peso - 0.5 WHERE data_hora >= '2025-03-01' AND data_hora <= '2025-03-15'", peso));
+  assert.ok(D.checkDml("UPDATE consultas SET peso = peso - 0.5 WHERE data_hora BETWEEN '2025-03-01' AND '2025-03-15 23:59:59'", peso).ok);
+});
 console.log(`${n} verificações do motor e da pontuação`);
