@@ -160,6 +160,17 @@ function table(rows) {
   const body = rows.slice(0, 100).map((r) => '<tr>' + cols.map((c) => `<td>${r[c] === null || r[c] === undefined ? '<span class="muted">NULL</span>' : esc(r[c])}</td>`).join('') + '</tr>').join('');
   return `<div class="res"><table><thead><tr>${cols.map((c) => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div><div class="res-meta">${rows.length} ${rows.length === 1 ? 'linha' : 'linhas'}</div>`;
 }
+// Tabela de exemplo mostrada com uma pergunta «prever o resultado» (q.data), lida da própria BD de exemplo.
+const dataDbs = {};
+const dataRows = (d) => D.run(dataDbs[d.db] || (dataDbs[d.db] = D.create(d.db)), `SELECT ${d.cols.join(', ')} FROM ${d.table}`);
+const dataHtml = (d) => (d ? `<div class="q-data"><div class="small muted">${ic('table')}Tabela <b>${esc(d.table)}</b> (BD ${esc(d.db)}):</div>${table(dataRows(d))}</div>` : '');
+// A mesma tabela em texto, como no cliente mysql (para o quiz ao vivo, que só mostra o SQL).
+function dataText(d) {
+  const rows = dataRows(d), cols = d.cols, w = cols.map((c) => Math.max(c.length, ...rows.map((r) => String(r[c] ?? 'NULL').length)));
+  const line = '+' + w.map((n) => '-'.repeat(n + 2)).join('+') + '+';
+  const row = (vals) => '| ' + vals.map((v, i) => String(v).padEnd(w[i])).join(' | ') + ' |';
+  return [`Tabela ${d.table}:`, line, row(cols), line, ...rows.map((r) => row(cols.map((c) => r[c] ?? 'NULL'))), line].map((x) => '-- ' + x).join('\n');
+}
 const bar = (p, cls = '') => `<div class="bar ${cls}" role="progressbar" aria-valuenow="${p}" aria-valuemin="0" aria-valuemax="100"><i style="width:${p}%"></i></div>`;
 const alertBox = (kind, icon, html) => `<div class="alert ${kind}">${ic(icon)}<div>${html}</div></div>`;
 const initials = (n) => (n || '?').split(/\s+/).map((x) => x[0]).join('').slice(0, 2).toUpperCase();
@@ -791,7 +802,7 @@ function taskEl(ex, i, onPass, opt = {}) {
     const chip = R ? (done ? `<span class="chip ok">${ic('check')}Revisto</span>` : rev ? '<span class="chip">Resposta vista</span>' : `<span class="chip">${ic('repeat')}Revisão</span>`)
       : done ? `<span class="chip ok">${ic('check')}+${S.exXp(ex, done.tries, done.hints)} XP</span>` : rev ? '<span class="chip">Resposta consultada · 0 XP</span>' : `<span class="chip">${S.baseOf(ex)} XP</span>`;
     el.innerHTML = `<div class="task-h"><span>${ic(R ? 'repeat' : 'edit')}${opt.label || `Exercício ${i + 1}`} · ${tagOf(ex)}</span><span class="row" style="gap:6px">${dbChip(ex)}${chip}</span></div>
-      <div class="task-b"><div class="q">${esc(ex.q)}</div>${ex.t === 'quiz' && ex.sql ? `<div class="code q-code"><pre><code class="hl">${hl(ex.sql)}</code></pre></div>` : ''}<div class="body"></div><div class="fb" aria-live="polite">${fbHtml || ''}</div></div>`;
+      <div class="task-b"><div class="q">${esc(ex.q)}</div>${ex.t === 'quiz' && ex.sql ? `<div class="code q-code"><pre><code class="hl">${hl(ex.sql)}</code></pre></div>${dataHtml(ex.data)}` : ''}<div class="body"></div><div class="fb" aria-live="polite">${fbHtml || ''}</div></div>`;
     const body = el.querySelector('.body'), fb = el.querySelector('.fb');
     // Resultado de uma verificação: no modo normal conta para a pontuação; na revisão só o 1.º resultado conta.
     const result = (ok, answer) => {
@@ -999,7 +1010,7 @@ function vTest(id) {
     const top = `<div class="row" style="justify-content:space-between;margin-bottom:8px"><span class="small muted">Pergunta ${r.i + 1} de ${r.qs.length}${x.practice ? ' · exercício prático' : ''}</span><button class="btn link sm" id="quit">Abandonar</button></div>${bar(pctOf(r.i, r.qs.length))}`;
     const nav = `<div class="row" style="justify-content:space-between;margin-top:18px">${r.i ? `<button class="btn sec-b" id="prev">${ic('chevL')}Anterior</button>` : '<span></span>'}<button class="btn" id="nextQ" ${r.ans[r.i] === undefined || r.ans[r.i] === '' ? 'disabled' : ''}>${r.i === r.qs.length - 1 ? 'Terminar e corrigir' : 'Seguinte'} ${ic('chevR')}</button></div>`;
     if (!x.practice) {
-      view.innerHTML = head + `<div class="card test-q">${top}<h2 style="margin:20px 0 16px">${esc(q.q)}</h2>${q.sql ? `<div class="code q-code"><pre><code class="hl">${hl(q.sql)}</code></pre></div>` : ''}<div class="opts">${x.order.map((k, j) => `<button class="opt ${r.ans[r.i] === k ? 'sel' : ''}" data-k="${k}"><span class="lt">${'ABCD'[j]}</span><span>${esc(q.opts[k])}</span></button>`).join('')}</div>${nav}</div>`;
+      view.innerHTML = head + `<div class="card test-q">${top}<h2 style="margin:20px 0 16px">${esc(q.q)}</h2>${q.sql ? `<div class="code q-code"><pre><code class="hl">${hl(q.sql)}</code></pre></div>${dataHtml(q.data)}` : ''}<div class="opts">${x.order.map((k, j) => `<button class="opt ${r.ans[r.i] === k ? 'sel' : ''}" data-k="${k}"><span class="lt">${'ABCD'[j]}</span><span>${esc(q.opts[k])}</span></button>`).join('')}</div>${nav}</div>`;
       view.querySelectorAll('.opt').forEach((b) => (b.onclick = () => { r.ans[r.i] = +b.dataset.k; view.querySelectorAll('.opt').forEach((y) => y.classList.toggle('sel', y === b)); $('#nextQ').disabled = false; }));
     } else {
       view.innerHTML = head + `<div class="card test-q">${top}<div class="row" style="margin:18px 0 6px;gap:8px"><span class="chip acc">${tagOf(q)}</span>${dbChip(q)}</div><h2 style="margin:6px 0 14px">${esc(q.q)}</h2>
@@ -1724,7 +1735,7 @@ function vLive() {
     const pool = ch === '*' ? chs.flatMap((c) => c.test) : CHAPTERS.find((c) => c.id === ch).test;
     const questions = shuffle(pool).slice(0, n).map((q) => {
       const order = shuffle(q.opts.map((o, k) => k));
-      return { q: q.q, sql: q.sql || null, opts: order.map((k) => q.opts[k]), a: order.indexOf(q.a), why: q.why || null };
+      return { q: q.q, sql: q.sql ? (q.data ? q.sql + '\n\n' + dataText(q.data) : q.sql) : null, opts: order.map((k) => q.opts[k]), a: order.indexOf(q.a), why: q.why || null };
     });
     const title = ch === '*' ? 'Todos os capítulos' : CHAPTERS.find((c) => c.id === ch).title;
     if ($('#lvK')) sessionStorage.setItem('mya.teacherKey', $('#lvK').value);

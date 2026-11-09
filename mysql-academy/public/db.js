@@ -346,6 +346,16 @@
     if (writes && db.autocommit === false && !db.tx) db.tx = { snap: snapshot(db), saves: [], implicit: true };
     const checked = writes && db.checks ? Object.keys(db.checks).filter((t) => db.tables[t] && new RegExp(`\\b${t}\\b`, 'i').test(s)) : [];
     const before = checked.length ? snapshot(db) : null;
+    // UNION (sem ALL): o motor só elimina parte dos repetidos; elimina-os todos no fim, como o MySQL
+    // (um LIMIT final aplica-se depois de eliminar os repetidos).
+    if (/^\(?\s*select\b/i.test(s) && /\bunion\b/i.test(s) && !/\bunion\s+all\b/i.test(s)) {
+      const lim = /\s+limit\s+(\d+)(?:\s*,\s*(\d+)|\s+offset\s+(\d+))?\s*$/i.exec(s);
+      const rows = db.exec(lim ? s.slice(0, lim.index) : s);
+      const seen = new Set(), out = rows.filter((r) => { const k = JSON.stringify(Object.values(r)); return !seen.has(k) && seen.add(k); });
+      if (!lim) return { res: out };
+      const off = lim[2] !== undefined ? +lim[1] : +(lim[3] || 0), n = lim[2] !== undefined ? +lim[2] : +lim[1];
+      return { res: out.slice(off, off + n) };
+    }
     const res = db.exec(s);
     for (const t of checked) for (const k of db.checks[t]) {
       if (db.tables[t].data.some((r) => !k.ok(r))) { restore(db, before, checked); throw new Error(`ERROR 3819 (HY000): Check constraint '${k.name}' is violated. (${t}: ${k.sql})`); }

@@ -712,3 +712,9 @@ body.gated #nav,body.gated #mini,body.gated #tabbar,body.gated #topr .pill{displ
 .rv-sum{display:grid;gap:10px;margin-top:18px;position:sticky;bottom:12px;z-index:5;box-shadow:0 6px 18px rgba(15,23,42,.12)}
 .rv-sum.end{border-color:var(--ok)}
 .rv-lesson .task{margin-bottom:14px}
+
+/* tabela de exemplo numa pergunta «prever o resultado» */
+.q-data{margin:10px 0 4px}
+.q-data .res{max-height:none;margin-top:0}
+.q-data .res th,.q-data .res td{padding:4px 12px}
+.q-data .small{display:flex;align-items:center;gap:6px;margin-bottom:6px}
