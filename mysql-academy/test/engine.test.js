@@ -121,4 +121,21 @@ t('concorrência: o UPDATE com condição vende só a última unidade', () => {
   const sell = () => D.runMany(db, 'UPDATE produtos SET stock = stock - 1 WHERE id_produto = 17 AND stock >= 1').affected;
   assert.deepStrictEqual([sell(), sell()], [1, 0]);
 });
+t('UNION elimina todos os repetidos (também com ORDER BY e LIMIT); UNION ALL mantém-nos', () => {
+  const db = D.create('escola'), cid = (q) => D.runMany(db, q).rows.map((r) => r.cidade);
+  assert.deepStrictEqual(cid('SELECT cidade FROM alunos WHERE idade > 22 UNION SELECT cidade FROM alunos WHERE idade < 20').sort(), ['Braga', 'Lisboa']);
+  assert.deepStrictEqual(cid('SELECT cidade FROM alunos WHERE idade < 20 UNION SELECT cidade FROM alunos WHERE idade > 22').sort(), ['Braga', 'Lisboa']);
+  assert.deepStrictEqual(cid('SELECT cidade FROM alunos UNION SELECT cidade FROM alunos ORDER BY cidade LIMIT 1, 2'), ['Coimbra', 'Lisboa']);
+  assert.strictEqual(cid('SELECT cidade FROM alunos UNION ALL SELECT cidade FROM alunos').length, 20);
+});
+t('perguntas «prever o resultado» com tabela: a resposta certa bate com os dados', () => {
+  const qs = CHAPTERS.flatMap((c) => [...c.lessons.flatMap((l) => l.steps), ...(c.test || [])]).filter((q) => q.data);
+  assert.ok(qs.length >= 6);
+  for (const q of qs) {
+    const db = D.create(q.data.db), r = D.runMany(db, q.sql), ans = q.opts[q.a];
+    const left = D.runMany(db, `SELECT COUNT(*) AS n FROM ${q.data.table}`).rows[0].n;
+    const got = /ficam/.test(q.q) ? left : /^\s*(update|delete)\b/i.test(q.sql) ? r.affected : r.rows.length;
+    assert.strictEqual(String(got), String(ans).replace(/\D/g, ''), `${q.id}: o motor dá ${got}, a resposta certa é ${ans}`);
+  }
+});
 console.log(`${n} verificações do motor e da pontuação`);

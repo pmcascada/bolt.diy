@@ -16,8 +16,10 @@
 // preview: conceitos só mostrados de passagem (ex.: o SELECT no capítulo 1), que ainda não contam como ensinados.
 const learn = (title, html, examples = [], preview) => ({ t: 'learn', title, html, examples, ...(preview ? { preview } : {}) });
 const quiz = (q, opts, a, why, sql) => ({ t: 'quiz', q, opts, a, why, ...(sql ? { sql } : {}) });
-// "Qual é o resultado?": quiz que mostra uma instrução.
-const predict = (q, sql, opts, a, why) => quiz(q, opts, a, why, sql);
+// "Qual é o resultado?": quiz que mostra uma instrução. data: tabela de exemplo a mostrar com a instrução, quando a
+// resposta depende dos dados (ex.: { db: 'escola', table: 'alunos', cols: ['nome', 'idade'] }); é lida da própria BD.
+const predict = (q, sql, opts, a, why, data) => ({ ...quiz(q, opts, a, why, sql), ...(data ? { data } : {}) });
+const ALUNOS = { db: 'escola', table: 'alunos', cols: ['id_aluno', 'nome', 'idade', 'cidade'] };
 const code = (q, ok, solution, hint, opts = {}) => ({ t: 'code', q, ok, solution, hint, ...opts });
 // opts: db ('loja'), start (texto inicial, ex.: uma consulta com um erro para corrigir), xp
 const query = (q, solution, hint, ordered, opts = {}) => ({ t: 'query', q, solution, hint, ordered: !!ordered, ...opts });
@@ -757,7 +759,7 @@ CREATE TABLE seguradoras_animais (
       <tr><td><code>OR</code></td><td>basta uma ser verdadeira</td><td><code>cidade = 'Porto' OR cidade = 'Braga'</code></td></tr></table>
       <p>As datas comparam-se como o texto, entre plicas: <code>data &lt; '2025-07-01'</code> significa "antes de 1 de julho de 2025". No capítulo 4 (SELECT) verá ainda <code>IN</code>, <code>BETWEEN</code> e <code>LIKE</code>.</p>`,
       [ex("UPDATE alunos SET cidade = 'Faro'\nWHERE idade > 22 AND cidade = 'Braga';", 'Só os alunos de Braga com mais de 22 anos.')]),
-    key('p1', predict('Quantas linhas altera esta instrução na BD escola?', "UPDATE alunos SET cidade = 'Faro'\nWHERE idade > 22;", ['Nenhuma', '3', '5', 'Todas (10)'], 1, 'Só os alunos com mais de 22 anos: Diogo (24), Filipe (23) e Hugo (25).')),
+    key('p1', predict('Quantas linhas altera esta instrução na tabela alunos da BD escola (abaixo)?', "UPDATE alunos SET cidade = 'Faro'\nWHERE idade > 22;", ['Nenhuma', '3', '5', 'Todas (10)'], 1, 'Só os alunos com mais de 22 anos: Diogo (24), Filipe (23) e Hugo (25).', ALUNOS)),
     key('f1', dml('Um colega queria mudar para 1000 as horas do curso de Gestão, mas a instrução abaixo alteraria todos os cursos. Corrija-a antes de a executar.', 'UPDATE cursos SET horas = 1000 WHERE id_curso = 2;', "Falta o WHERE: só o curso de Gestão (id_curso 2 ou nome = 'Gestão').", { start: 'UPDATE cursos SET horas = 1000;' })),
   ] },
   { title: 'DELETE e TRUNCATE', steps: [
@@ -894,7 +896,7 @@ COMMIT;`, 'START TRANSACTION; · INSERT na encomenda · INSERT das 2 linhas · 2
     quiz('Qual destes comandos aceita WHERE?', ['TRUNCATE', 'DELETE', 'DROP TABLE', 'CREATE TABLE'], 1, 'Só o DELETE filtra linhas.'),
     quiz('Que comando esvazia toda a tabela de forma rápida e reinicia o AUTO_INCREMENT?', ['DELETE FROM t WHERE 1', 'DROP TABLE t', 'TRUNCATE TABLE t', 'UPDATE t SET coluna = 0'], 2, 'TRUNCATE mantém a estrutura mas apaga todas as linhas.'),
     quiz('Antes de executar um UPDATE ou DELETE importante, qual é a boa prática?', ['Desligar o servidor', 'Testar primeiro o WHERE com um SELECT', 'Apagar os índices', 'Usar sempre TRUNCATE'], 1, 'O SELECT mostra exatamente que linhas vão ser afetadas.'),
-    predict('Quantas linhas ficam na tabela alunos (10 linhas) depois desta instrução?', 'DELETE FROM alunos WHERE cidade = \'Lisboa\';', ['0', '6', '4', '10'], 1, 'Há 4 alunos de Lisboa: ficam 6.'),
+    predict('Quantas linhas ficam na tabela alunos (abaixo) depois desta instrução?', 'DELETE FROM alunos WHERE cidade = \'Lisboa\';', ['0', '6', '4', '10'], 1, 'Há 4 alunos de Lisboa: ficam 6.', ALUNOS),
     quiz('Que instrução regista um aluno sem indicar o id_aluno (AUTO_INCREMENT)?', ["INSERT INTO alunos VALUES ('Rita', 20)", "INSERT INTO alunos (nome, idade) VALUES ('Rita', 20)", "INSERT alunos SET id_aluno = AUTO", "UPDATE alunos ADD ('Rita', 20)"], 1, 'Indica-se a lista de colunas; o id é gerado automaticamente.'),
     quiz('Como se alteram duas colunas na mesma instrução?', ['UPDATE t SET a = 1 AND b = 2', 'UPDATE t SET a = 1, b = 2', 'UPDATE t SET (a, b) = 1, 2', 'São precisas duas instruções'], 1, 'As atribuições separam-se por vírgulas.'),
     quiz('Porque é que o MySQL pode recusar DELETE FROM encomendas WHERE id_encomenda = 5?', ['Porque falta LIMIT', 'Porque existem linhas de encomenda que a referenciam (chave estrangeira)', 'Porque DELETE não aceita WHERE', 'Porque a tabela tem AUTO_INCREMENT'], 1, 'Com ON DELETE RESTRICT, a integridade referencial impede deixar linhas "órfãs": apagam-se primeiro as linhas.'),
@@ -972,7 +974,7 @@ COMMIT;`, 'START TRANSACTION; · INSERT na encomenda · INSERT das 2 linhas · 2
     query('Mostre o nome dos 2 alunos mais velhos.', 'SELECT nome FROM alunos ORDER BY idade DESC LIMIT 2', 'ORDER BY idade DESC LIMIT 2', true),
     learn('DISTINCT', `<p><code>DISTINCT</code> elimina as linhas repetidas do resultado:</p>`, [ex('SELECT DISTINCT disciplina FROM notas;', 'Cada disciplina aparece uma só vez.', true)]),
     query('Mostre, sem repetições, as cidades onde vivem os alunos.', 'SELECT DISTINCT cidade FROM alunos', 'SELECT DISTINCT …'),
-    key('p1', predict('Quantas linhas devolve esta consulta?', 'SELECT DISTINCT cidade FROM alunos;', ['10', '4', '3', '1'], 1, 'Há alunos de 4 cidades diferentes: Lisboa, Porto, Braga e Coimbra.')),
+    key('p1', predict('Quantas linhas devolve esta consulta?', 'SELECT DISTINCT cidade FROM alunos;', ['10', '4', '3', '1'], 1, 'Há alunos de 4 cidades diferentes: Lisboa, Porto, Braga e Coimbra.', ALUNOS)),
   ] },
   { title: 'Funções de agregação e GROUP BY', steps: [
     learn('Funções de agregação', `<p>As funções de agregação resumem várias linhas num único valor:</p>
@@ -992,7 +994,7 @@ COMMIT;`, 'START TRANSACTION; · INSERT na encomenda · INSERT das 2 linhas · 2
     query('Mostre as cidades com 3 ou mais alunos.', 'SELECT cidade FROM alunos GROUP BY cidade HAVING COUNT(*) >= 3', 'GROUP BY cidade HAVING COUNT(*) >= 3'),
     key('o1', order('Ordene as cláusulas desta consulta, que mostra as 3 disciplinas com melhor média, considerando só as notas positivas e as disciplinas com pelo menos 3 notas.',
       ['SELECT disciplina, AVG(nota) AS media', 'FROM notas', 'WHERE nota >= 10', 'GROUP BY disciplina', 'HAVING COUNT(*) >= 3', 'ORDER BY media DESC', 'LIMIT 3'], 'A ordem de escrita é sempre SELECT, FROM, WHERE, GROUP BY, HAVING, ORDER BY, LIMIT.')),
-    key('p1', predict('Quantas linhas devolve esta consulta?', 'SELECT cidade, COUNT(*)\nFROM alunos\nWHERE idade > 21\nGROUP BY cidade;', ['5', '3', '4', '1'], 1, 'Com mais de 21 anos há alunos do Porto, de Braga e de Lisboa: 3 grupos, 3 linhas.')),
+    key('p1', predict('Quantas linhas devolve esta consulta?', 'SELECT cidade, COUNT(*)\nFROM alunos\nWHERE idade > 21\nGROUP BY cidade;', ['5', '3', '4', '1'], 1, 'Com mais de 21 anos há alunos do Porto, de Braga e de Lisboa: 3 grupos, 3 linhas.', ALUNOS)),
   ] },
   { title: 'Juntar tabelas com JOIN', steps: [
     learn('INNER JOIN', `<p>Os dados estão repartidos por várias tabelas. O <code>JOIN</code> volta a juntá-los através das colunas relacionadas. O <code>INNER JOIN</code> devolve apenas as combinações que têm correspondência nas duas tabelas:</p>
@@ -1060,7 +1062,7 @@ COMMIT;`, 'START TRANSACTION; · INSERT na encomenda · INSERT das 2 linhas · 2
     query('Na BD loja, mostre o nome de cada cliente e o valor total gasto (soma de quantidade × preço unitário), considerando todas as encomendas. Chame total à soma.', 'SELECT c.nome, SUM(l.quantidade * l.preco_unitario) AS total FROM clientes c JOIN encomendas e ON e.id_cliente = c.id_cliente JOIN linhas_encomenda l ON l.id_encomenda = e.id_encomenda GROUP BY c.nome', 'Três tabelas e SUM(l.quantidade * l.preco_unitario) … GROUP BY c.nome', false, { db: 'loja', xp: 30 }),
     learn('UNION e UNION ALL', `<p><code>UNION</code> junta, <b>uma por baixo da outra</b>, as linhas de duas consultas com o mesmo número de colunas. Elimina as linhas repetidas; <code>UNION ALL</code> mantém-nas (e é mais rápido).</p>`,
       [ex("SELECT nome, 'aluno' AS tipo FROM alunos WHERE cidade = 'Braga'\nUNION\nSELECT nome, 'curso' FROM cursos;", 'Alunos de Braga e cursos, numa só lista.', true)]),
-    predict('Quantas linhas devolve esta consulta?', "SELECT cidade FROM alunos WHERE idade > 22\nUNION\nSELECT cidade FROM alunos WHERE idade < 20;", ['5', '3', '2', '4'], 2, 'Acima de 22: Braga, Lisboa, Braga; abaixo de 20: Lisboa, Lisboa. O UNION elimina os repetidos: Braga e Lisboa.'),
+    predict('Quantas linhas devolve esta consulta?', "SELECT cidade FROM alunos WHERE idade > 22\nUNION\nSELECT cidade FROM alunos WHERE idade < 20;", ['5', '3', '2', '4'], 2, 'Acima de 22: Braga, Lisboa, Braga; abaixo de 20: Lisboa, Lisboa. O UNION elimina os repetidos: Braga e Lisboa.', ALUNOS),
     query("Mostre, numa só lista sem repetições, as cidades dos alunos da BD escola com mais de 22 anos e as dos alunos com menos de 20 anos (use UNION).", "SELECT cidade FROM alunos WHERE idade > 22 UNION SELECT cidade FROM alunos WHERE idade < 20", '… UNION …'),
   ] },
   { key: 'neg', title: 'Perguntas de negócio (BD loja)', steps: [
@@ -1093,7 +1095,7 @@ COMMIT;`, 'START TRANSACTION; · INSERT na encomenda · INSERT das 2 linhas · 2
     quiz('Que função conta linhas?', ['SUM()', 'COUNT()', 'TOTAL()', 'NUM()'], 1, 'COUNT(*).'),
     quiz('O que devolve um LEFT JOIN entre alunos e notas?', ['Só alunos com notas', 'Todos os alunos, com NULL nas notas em falta', 'Só as notas', 'Apenas as linhas sem correspondência'], 1, 'Mantém todas as linhas da esquerda.'),
     quiz('Como se testa se uma coluna não tem valor?', ['= NULL', 'IS NULL', "= ''", '== NULL'], 1, 'NULL compara-se com IS NULL.'),
-    predict('Quantas linhas devolve esta consulta na BD escola?', "SELECT nome FROM alunos\nWHERE cidade = 'Porto' OR idade < 20;", ['3', '5', '2', '10'], 1, 'Porto: Bruno, Eva, Inês; menos de 20: Carla e João. Total: 5.'),
+    predict('Quantas linhas devolve esta consulta na BD escola?', "SELECT nome FROM alunos\nWHERE cidade = 'Porto' OR idade < 20;", ['3', '5', '2', '10'], 1, 'Porto: Bruno, Eva, Inês; menos de 20: Carla e João. Total: 5.', ALUNOS),
     quiz('Qual a ordem correta das cláusulas?', ['SELECT, WHERE, FROM, ORDER BY', 'SELECT, FROM, WHERE, GROUP BY, HAVING, ORDER BY', 'FROM, SELECT, HAVING, WHERE', 'SELECT, FROM, HAVING, GROUP BY'], 1, 'E LIMIT no fim.'),
     quiz('Que função devolve o número de dias entre duas datas?', ['DAYS()', 'DATEDIFF()', 'YEAR()', 'DATE_FORMAT()'], 1, "DATEDIFF('2025-12-31', data)"),
     quiz('O que devolve COUNT(email) numa tabela com 30 linhas, 3 delas com email NULL?', ['30', '27', '3', 'NULL'], 1, 'COUNT(coluna) ignora os nulos.'),
