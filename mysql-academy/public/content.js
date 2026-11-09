@@ -586,58 +586,68 @@ CREATE TABLE requisicoes (
   FOREIGN KEY (id_livro) REFERENCES livros(id_livro) ON UPDATE CASCADE ON DELETE RESTRICT
 );`, 'Três tabelas: primeiro leitores e livros; depois requisicoes, com duas chaves estrangeiras NOT NULL (ON UPDATE CASCADE ON DELETE RESTRICT).', { loose: true, xp: 40 }),
   ] },
-  { title: 'Desafio: modelar uma loja online', steps: [
-    learn('O cenário', `<p>Uma pequena loja online precisa de uma base de dados. Leia os requisitos com atenção e decida os tipos, as chaves e as restrições. Use exatamente os nomes de tabelas e colunas indicados. As multiplicidades indicam o tipo de cada relação.</p>
+  { title: 'Desafio: modelar uma clínica veterinária', steps: [
+    learn('O cenário', `<p>Uma clínica veterinária quer substituir as fichas em papel por uma base de dados. Leia os requisitos com atenção e decida os tipos, as chaves e as restrições. Use exatamente os nomes de tabelas e colunas indicados. As multiplicidades indicam o tipo de cada relação.</p>
       <ol>
-        <li><b>clientes</b> — <code>id_cliente</code> (gerado automaticamente), <code>nome</code> (obrigatório, até 100 caracteres), <code>email</code> (obrigatório e sem repetições), <code>nif</code> (exatamente 9 caracteres, sem repetições).</li>
-        <li><b>produtos</b> — <code>id_produto</code> (gerado automaticamente), <code>nome</code> (obrigatório), <code>preco</code> (obrigatório, com 2 casas decimais e sempre maior que 0), <code>stock</code> (inteiro, 0 por omissão).</li>
-        <li><b>encomendas</b> — <code>id_encomenda</code> (gerado automaticamente), <code>data</code> (obrigatória) e o cliente que a fez (<code>id_cliente</code>): clientes 1..1 — 0..* encomendas.</li>
-        <li><b>linhas_encomenda</b> — cada encomenda tem vários produtos e cada produto aparece em várias encomendas (encomendas 0..* — 1..* produtos). Para cada produto de uma encomenda guarda-se a <code>quantidade</code> (obrigatória, maior que 0) e o <code>preco_unitario</code> (com 2 casas decimais). O mesmo produto não pode aparecer duas vezes na mesma encomenda.</li>
-        <li><b>transportadoras</b> — <code>id_transportadora</code> (gerado automaticamente) e <code>nome</code> (obrigatório). Algumas encomendas são entregues por uma transportadora, outras são levantadas na loja: transportadoras 0..1 — 0..* encomendas. Represente esta relação <b>sem valores nulos</b>, na tabela <b>transportadoras_encomendas</b>.</li>
+        <li><b>tutores</b> (os donos dos animais) — <code>id_tutor</code> (gerado automaticamente), <code>nome</code> (obrigatório, até 100 caracteres), <code>telemovel</code> (obrigatório, exatamente 9 caracteres, sem repetições) e <code>nif</code> (exatamente 9 caracteres, sem repetições).</li>
+        <li><b>animais</b> — <code>id_animal</code> (gerado automaticamente), <code>nome</code> (obrigatório), <code>especie</code> (obrigatória; só pode ser <code>'canino'</code>, <code>'felino'</code>, <code>'ave'</code> ou <code>'outro'</code>), <code>data_nascimento</code> (data) e o tutor (<code>id_tutor</code>): tutores 1..1 — 1..* animais.</li>
+        <li><b>consultas</b> — <code>id_consulta</code> (gerado automaticamente), <code>data_hora</code> (data e hora, obrigatória), <code>peso</code> do animal nessa consulta (com 2 casas decimais e sempre maior que 0) e o animal observado (<code>id_animal</code>): animais 1..1 — 0..* consultas.</li>
+        <li><b>medicamentos</b> — <code>id_medicamento</code> (gerado automaticamente), <code>nome</code> (obrigatório e sem repetições) e <code>stock</code> (inteiro, 0 por omissão, nunca negativo).</li>
+        <li><b>receitas</b> — numa consulta podem ser receitados vários medicamentos e cada medicamento aparece em várias consultas (consultas 0..* — 0..* medicamentos). Para cada medicamento receitado guarda-se a <code>dose</code> (obrigatória, até 50 caracteres) e o número de <code>dias</code> do tratamento (obrigatório, maior que 0). O mesmo medicamento não pode ser receitado duas vezes na mesma consulta.</li>
+        <li><b>seguradoras</b> — <code>id_seguradora</code> (gerado automaticamente) e <code>nome</code> (obrigatório). Alguns animais têm seguro de saúde, outros não: seguradoras 0..1 — 0..* animais. Represente esta relação <b>sem valores nulos</b>, na tabela <b>seguradoras_animais</b>.</li>
       </ol>
-      <p>Todas as chaves estrangeiras são <code>NOT NULL</code> e usam as ações aconselhadas: <code>ON UPDATE CASCADE</code> e <code>ON DELETE RESTRICT</code>. Pense na ordem de criação das tabelas e no tipo de cada relação. A verificação aceita tamanhos de texto diferentes dos da solução, mas confirma os tipos, as chaves, as relações e as restrições pedidas.</p>`),
-    ddl('Escreva as instruções CREATE TABLE para as seis tabelas da loja online (clientes, produtos, encomendas, linhas_encomenda, transportadoras e transportadoras_encomendas).', `CREATE TABLE clientes (
-  id_cliente INT AUTO_INCREMENT PRIMARY KEY,
+      <p>Todas as chaves estrangeiras são <code>NOT NULL</code>, declaradas no fim da tabela e com <code>ON UPDATE CASCADE</code> e <code>ON DELETE RESTRICT</code>. Pense na ordem de criação das tabelas e no tipo de cada relação. A verificação aceita tamanhos de texto diferentes dos da solução, mas confirma os tipos, as chaves, as relações e as restrições pedidas.</p>`),
+    ddl('Escreva as instruções CREATE TABLE para as sete tabelas da clínica veterinária (tutores, animais, consultas, medicamentos, receitas, seguradoras e seguradoras_animais).', `CREATE TABLE tutores (
+  id_tutor INT AUTO_INCREMENT PRIMARY KEY,
   nome VARCHAR(100) NOT NULL,
-  email VARCHAR(100) NOT NULL UNIQUE,
+  telemovel CHAR(9) NOT NULL UNIQUE,
   nif CHAR(9) UNIQUE
 );
 
-CREATE TABLE produtos (
-  id_produto INT AUTO_INCREMENT PRIMARY KEY,
-  nome VARCHAR(100) NOT NULL,
-  preco DECIMAL(8,2) NOT NULL CHECK (preco > 0),
-  stock INT DEFAULT 0
+CREATE TABLE animais (
+  id_animal INT AUTO_INCREMENT PRIMARY KEY,
+  nome VARCHAR(60) NOT NULL,
+  especie VARCHAR(20) NOT NULL CHECK (especie IN ('canino', 'felino', 'ave', 'outro')),
+  data_nascimento DATE,
+  id_tutor INT NOT NULL,
+  FOREIGN KEY (id_tutor) REFERENCES tutores(id_tutor) ON UPDATE CASCADE ON DELETE RESTRICT
 );
 
-CREATE TABLE encomendas (
-  id_encomenda INT AUTO_INCREMENT PRIMARY KEY,
-  data DATE NOT NULL,
-  id_cliente INT NOT NULL,
-  FOREIGN KEY (id_cliente) REFERENCES clientes(id_cliente) ON UPDATE CASCADE ON DELETE RESTRICT
+CREATE TABLE consultas (
+  id_consulta INT AUTO_INCREMENT PRIMARY KEY,
+  data_hora DATETIME NOT NULL,
+  peso DECIMAL(5,2) CHECK (peso > 0),
+  id_animal INT NOT NULL,
+  FOREIGN KEY (id_animal) REFERENCES animais(id_animal) ON UPDATE CASCADE ON DELETE RESTRICT
 );
 
-CREATE TABLE linhas_encomenda (
-  id_encomenda INT,
-  id_produto INT,
-  quantidade INT NOT NULL CHECK (quantidade > 0),
-  preco_unitario DECIMAL(8,2),
-  PRIMARY KEY (id_encomenda, id_produto),
-  FOREIGN KEY (id_encomenda) REFERENCES encomendas(id_encomenda) ON UPDATE CASCADE ON DELETE RESTRICT,
-  FOREIGN KEY (id_produto) REFERENCES produtos(id_produto) ON UPDATE CASCADE ON DELETE RESTRICT
+CREATE TABLE medicamentos (
+  id_medicamento INT AUTO_INCREMENT PRIMARY KEY,
+  nome VARCHAR(80) NOT NULL UNIQUE,
+  stock INT DEFAULT 0 CHECK (stock >= 0)
 );
 
-CREATE TABLE transportadoras (
-  id_transportadora INT AUTO_INCREMENT PRIMARY KEY,
+CREATE TABLE receitas (
+  id_consulta INT,
+  id_medicamento INT,
+  dose VARCHAR(50) NOT NULL,
+  dias INT NOT NULL CHECK (dias > 0),
+  PRIMARY KEY (id_consulta, id_medicamento),
+  FOREIGN KEY (id_consulta) REFERENCES consultas(id_consulta) ON UPDATE CASCADE ON DELETE RESTRICT,
+  FOREIGN KEY (id_medicamento) REFERENCES medicamentos(id_medicamento) ON UPDATE CASCADE ON DELETE RESTRICT
+);
+
+CREATE TABLE seguradoras (
+  id_seguradora INT AUTO_INCREMENT PRIMARY KEY,
   nome VARCHAR(80) NOT NULL
 );
 
-CREATE TABLE transportadoras_encomendas (
-  id_encomenda INT PRIMARY KEY,
-  id_transportadora INT NOT NULL,
-  FOREIGN KEY (id_encomenda) REFERENCES encomendas(id_encomenda) ON UPDATE CASCADE ON DELETE RESTRICT,
-  FOREIGN KEY (id_transportadora) REFERENCES transportadoras(id_transportadora) ON UPDATE CASCADE ON DELETE RESTRICT
-);`, 'Ordem: clientes, produtos, encomendas, linhas_encomenda, transportadoras e transportadoras_encomendas. linhas_encomenda é uma tabela de ligação N:M (chave composta); transportadoras_encomendas resolve a relação opcional 0..1 — 0..* (a chave primária é id_encomenda, o lado com *).', { loose: true, xp: 80 }),
+CREATE TABLE seguradoras_animais (
+  id_animal INT PRIMARY KEY,
+  id_seguradora INT NOT NULL,
+  FOREIGN KEY (id_animal) REFERENCES animais(id_animal) ON UPDATE CASCADE ON DELETE RESTRICT,
+  FOREIGN KEY (id_seguradora) REFERENCES seguradoras(id_seguradora) ON UPDATE CASCADE ON DELETE RESTRICT
+);`, 'Ordem: tutores, animais, consultas, medicamentos, receitas, seguradoras e seguradoras_animais. receitas é uma tabela de ligação N:M (chave composta, com dose e dias); seguradoras_animais resolve a relação opcional 0..1 — 0..* (a chave primária é id_animal, o lado com *).', { loose: true, xp: 80 }),
   ] }],
   cheat: [
     ['CREATE DATABASE [IF NOT EXISTS] bd;', 'Criar base de dados'], ['USE bd;', 'Selecionar a base de dados ativa'], ['DROP DATABASE bd;', 'Eliminar base de dados'],
@@ -1368,7 +1378,7 @@ const INTROS = {
   'ddl.opc': 'Na opção adotada nas aulas, uma chave estrangeira nunca fica a NULL. Nesta lição aprende o que fazer quando a ligação é opcional (0..1) ou de um para um: criar uma tabela nova, usar UNIQUE ou juntar as entidades numa só tabela, conforme as multiplicidades. Conhece também outra perspetiva, que não é a adotada nas aulas: chaves estrangeiras que aceitam NULL.',
   'ddl.5': 'As necessidades mudam e as tabelas também: é preciso acrescentar colunas, corrigir tipos ou ligar tabelas já existentes. Aprende a alterar a estrutura com ALTER TABLE sem perder os dados (incluindo acrescentar chaves estrangeiras e restrições CHECK), e a eliminar tabelas pela ordem certa.',
   'ddl.norm': 'Até aqui as tabelas eram indicadas no enunciado. Num projeto real é o aluno que as tem de decidir a partir de um texto. Nesta lição aprende a encontrar entidades e relações e a aplicar as formas normais para evitar dados repetidos.',
-  'ddl.6': 'Desafio final do capítulo: a partir dos requisitos de uma loja online, cria sozinho as quatro tabelas, com chaves, relações e restrições. É a aplicação de tudo o que aprendeu no capítulo.',
+  'ddl.6': 'Desafio final do capítulo: a partir dos requisitos de uma clínica veterinária, cria sozinho as sete tabelas, com chaves, relações e restrições. É a aplicação de tudo o que aprendeu no capítulo.',
   'dml.1': 'Com as tabelas criadas, é preciso colocar-lhes dados. Nesta lição aprende o comando INSERT, para acrescentar uma ou várias linhas a uma tabela.',
   'dml.2': 'Os dados mudam: um aluno muda de cidade, um preço aumenta. Aprende o comando UPDATE e, sobretudo, a escolher com WHERE exatamente as linhas a alterar — um UPDATE sem WHERE altera a tabela inteira.',
   'dml.3': 'Por fim, aprende a eliminar dados: linhas escolhidas com DELETE ou a tabela inteira com TRUNCATE. Tal como no UPDATE, o WHERE é o que separa uma operação segura de um desastre.',
