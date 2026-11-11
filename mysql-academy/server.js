@@ -76,11 +76,14 @@ function cleanState(s) {
   for (const [id, r] of Object.entries(s.real || {})) if (CHAPTER_IDS.has(id) && Array.isArray(r)) real[id] = [...new Set(r.map((k) => int(k, 0, 30)))].sort((a, b) => a - b);
   const pj = s.project || {};
   const project = pj.at ? { title: str(pj.title, 120), script: str(pj.script, 30000), output: str(pj.output, 30000), notes: str(pj.notes, 2000), at: +pj.at || 0, sent: !!pj.sent } : {};
-  return { done, rev, tests, pos, game, days, log, review, real, project };
+  return { ...(+s.resetAt ? { resetAt: +s.resetAt } : {}), done, rev, tests, pos, game, days, log, review, real, project };
 }
 
 // Junta o progresso de dois dispositivos sem nunca perder trabalho já feito.
 function mergeState(a, b) {
+  // b foi reiniciado (pelo professor) depois da cópia que chega: a cópia antiga é descartada.
+  if ((b.resetAt || 0) > (a.resetAt || 0)) return b;
+  if (b.resetAt) a.resetAt = Math.max(a.resetAt || 0, b.resetAt);
   for (const [id, d] of Object.entries(b.done || {})) if (!a.done[id] || a.done[id].at > d.at) a.done[id] = d;
   Object.assign(a.rev, b.rev || {});
   for (const [id, t] of Object.entries(b.tests || {})) {
@@ -183,6 +186,16 @@ async function api(req, res, url) {
   if (req.method === 'GET' && url.pathname === '/api/admin/students') {
     if (!TEACHER_KEY || req.headers['x-teacher-key'] !== TEACHER_KEY) return send(res, 403, { error: 'Chave de professor inválida.' });
     return send(res, 200, Object.values(users).map((u) => ({ ...publicRow(u), created: u.created, chapters: SCORE.summarize(u.state).perChapter, log: u.state.log.slice(-100), state: u.state })));
+  }
+  if (req.method === 'POST' && url.pathname === '/api/admin/reset') {
+    // Professor: reinicia o progresso dos alunos indicados (pelo nome).
+    if (!TEACHER_KEY || req.headers['x-teacher-key'] !== TEACHER_KEY) return send(res, 403, { error: 'Chave de professor inválida.' });
+    const b = await body(req);
+    const names = Array.isArray(b.names) ? b.names.slice(0, 500).map((n) => key(String(n))) : [];
+    let n = 0;
+    for (const k of names) { const u = users[k]; if (!u) continue; u.state = { ...cleanState({}), resetAt: Date.now() }; u.updated = Date.now(); n++; }
+    if (n) save();
+    return send(res, 200, { reset: n });
   }
   if (req.method === 'POST' && (url.pathname === '/api/register' || url.pathname === '/api/login')) {
     if (throttled(ip)) return send(res, 429, { error: 'Demasiadas tentativas. Aguarde um minuto.' });

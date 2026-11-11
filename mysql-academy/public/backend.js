@@ -169,9 +169,16 @@
     B.liveAnswer = (code, token, choice) => rpc('live_answer', { c: code, t: token, ch: choice });
     B.livePoll = (code, token) => rpc('live_poll', { c: code, t: token || null });
     B.students = async () => {
-      const { data, error } = await sb.from('progress').select('state, updated_at, profiles(name, is_teacher, turma)');
+      const { data, error } = await sb.from('progress').select('user_id, state, updated_at, profiles(name, is_teacher, turma)');
       if (error) throw error;
-      return data.filter((r) => r.profiles && !r.profiles.is_teacher).map((r) => ({ name: r.profiles.name, turma: r.profiles.turma || '', state: r.state || {}, updated: Date.parse(r.updated_at) }));
+      return data.filter((r) => r.profiles && !r.profiles.is_teacher).map((r) => ({ id: r.user_id, name: r.profiles.name, turma: r.profiles.turma || '', state: r.state || {}, updated: Date.parse(r.updated_at) }));
+    };
+    // Professor: reinicia o progresso dos alunos indicados; devolve quantos foram reiniciados.
+    B.resetStudents = async (ids) => {
+      const { data, error } = await sb.rpc('teacher_reset', { ids });
+      if (error) throw error;
+      if (data === null) throw new Error('Só os professores podem reiniciar o progresso dos alunos.');
+      return data;
     };
     B.errorText = (e) => { const m = String((e && e.message) || e); const hit = SB_ERRORS.find(([re]) => re.test(m)); return hit ? hit[1] : m; };
     return B;
@@ -222,7 +229,8 @@
       try { return await api(`/api/live/poll?code=${encodeURIComponent(code)}&token=${encodeURIComponent(token || '')}`, 'GET', null, { 'x-live-host': hostKey(code) }); }
       catch (e) { if (e.status === 404) return null; throw e; }
     };
-    B.students = async (key) => (await api('/api/admin/students', 'GET', null, { 'x-teacher-key': key })).map((r) => ({ name: r.name, turma: r.turma || '', state: r.state || {}, updated: r.updated }));
+    B.resetStudents = async (ids, key) => (await api('/api/admin/reset', 'POST', { names: ids }, { 'x-teacher-key': key })).reset;
+    B.students = async (key) => (await api('/api/admin/students', 'GET', null, { 'x-teacher-key': key })).map((r) => ({ id: r.name, name: r.name, turma: r.turma || '', state: r.state || {}, updated: r.updated }));
     B.errorText = (e) => (e && e.status ? e.message : 'Servidor indisponível. Execute "npm start" para ativar as contas e a classificação.');
     return B;
   }
