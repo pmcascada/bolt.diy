@@ -718,3 +718,8 @@ body.gated #nav,body.gated #mini,body.gated #tabbar,body.gated #topr .pill{displ
 .q-data .res{max-height:none;margin-top:0}
 .q-data .res th,.q-data .res td{padding:4px 12px}
 .q-data .small{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+
+/* Área do professor: seleção de alunos para reiniciar o progresso */
+.prof-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.tbl .sel-c{width:34px;text-align:center;padding-left:12px;padding-right:0}
+.tbl .sel-c input{width:16px;height:16px;cursor:pointer;accent-color:var(--accent)}

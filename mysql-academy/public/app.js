@@ -123,7 +123,7 @@ async function push() {
       const remote = await BK.load();
       if (remote) merge(remote);
       await BK.save(payload(), sum());
-      if (resetNotice) { resetNotice = false; setTimeout(() => { modal('reset', 'Progresso reiniciado', 'O gestor do site aprovou o seu pedido: o seu progresso no curso foi reiniciado. Pode começar de novo a partir do primeiro capítulo.'); route(); }, 300); }
+      if (resetNotice) { resetNotice = false; setTimeout(() => { route(); modal('reset', 'Progresso reiniciado', 'O seu progresso no curso foi reiniciado (pelo professor ou pelo gestor do site, a seu pedido). Pode começar de novo a partir do primeiro capítulo.'); }, 300); }
       online = true;
       try { localStorage.setItem(KEY, JSON.stringify(st)); } catch { /* ignorar */ }
     } catch { online = false; } finally { pushing = null; }
@@ -1367,6 +1367,7 @@ function askNewPassword() {
 
 /* ---------- área do professor ---------- */
 let profRows = null, profSort = 'xp', profTurma = '', profAll = false;
+const profSel = new Set(); // alunos selecionados para reiniciar o progresso
 // Dificuldades: por exercício, quantos acertaram à primeira, quantos viram a resposta e quais os erros mais comuns.
 function difficulty(rows) {
   const stat = {};
@@ -1433,8 +1434,8 @@ async function vProf() {
     <div class="kpi"><div class="l">${ic('checkCircle')}Conclusão média</div><div class="v">${avg((r) => r.s.pct)}%</div><div class="s">do curso</div></div>
     <div class="kpi"><div class="l">${ic('clipboard')}Minitestes</div><div class="v">${rows.reduce((k, r) => k + r.s.testsPassed, 0)}</div><div class="s">aprovações no total</div></div>
     <div class="kpi"><div class="l">${ic('zap')}XP médio</div><div class="v">${avg((r) => r.s.xp)}</div><div class="s">por aluno${PROJECT_ON ? ` · ${rows.filter((r) => r.s.projectSent).length} projetos entregues` : ''}</div></div></div>
-  <div class="card" style="margin-top:16px;padding:0">${n ? `<div class="scroll"><table class="tbl prof"><thead><tr><th>Aluno</th>${turmas.length ? '<th>Turma</th>' : ''}<th>Nível</th><th class="r">XP</th><th style="width:18%">Conclusão</th>${CHAPTERS.map((c) => `<th class="c" title="${esc(c.title)}">C${c.idx + 1}</th>`).join('')}<th>Última atividade</th></tr></thead><tbody>
-    ${rows.map((r, i) => `<tr class="pr" data-i="${i}"><td><span class="who"><span class="avatar">${esc(initials(r.name))}</span><b>${esc(r.name)}</b>${r.s.projectSent ? ` <span class="chip ok" title="Projeto final entregue">${ic('folder')}</span>` : ''}</span></td>${turmas.length ? `<td class="small muted">${esc(r.turma || '—')}</td>` : ''}<td>${r.s.level}</td><td class="r"><b>${r.s.xp}</b></td><td><div class="row" style="flex-wrap:nowrap">${bar(r.s.pct)}<span class="small muted num-t" style="min-width:36px">${r.s.pct}%</span></div></td>
+  <div class="card" style="margin-top:16px;padding:0">${n ? `<div class="prof-bar"><span class="small muted" id="pselN"></span><button class="btn danger sm" id="preset" disabled>${ic('reset')}Reiniciar progresso</button></div><div class="scroll"><table class="tbl prof"><thead><tr><th class="sel-c"><input type="checkbox" id="pall" aria-label="Selecionar todos os alunos da lista"></th><th>Aluno</th>${turmas.length ? '<th>Turma</th>' : ''}<th>Nível</th><th class="r">XP</th><th style="width:18%">Conclusão</th>${CHAPTERS.map((c) => `<th class="c" title="${esc(c.title)}">C${c.idx + 1}</th>`).join('')}<th>Última atividade</th></tr></thead><tbody>
+    ${rows.map((r, i) => `<tr class="pr" data-i="${i}"><td class="sel-c"><input type="checkbox" class="psel" data-id="${esc(r.id)}" aria-label="Selecionar ${esc(r.name)}" ${profSel.has(r.id) ? 'checked' : ''}></td><td><span class="who"><span class="avatar">${esc(initials(r.name))}</span><b>${esc(r.name)}</b>${r.s.projectSent ? ` <span class="chip ok" title="Projeto final entregue">${ic('folder')}</span>` : ''}</span></td>${turmas.length ? `<td class="small muted">${esc(r.turma || '—')}</td>` : ''}<td>${r.s.level}</td><td class="r"><b>${r.s.xp}</b></td><td><div class="row" style="flex-wrap:nowrap">${bar(r.s.pct)}<span class="small muted num-t" style="min-width:36px">${r.s.pct}%</span></div></td>
       ${CHAPTERS.map((c) => { const p = r.s.perChapter[c.id]; return `<td class="c">${p.test.passed ? `<span class="chip ok" title="Miniteste aprovado">${p.test.best}%</span>` : p.test.attempts ? `<span class="chip bad" title="Melhor resultado no miniteste">${p.test.best}%</span>` : `<span class="small muted" title="Lições concluídas">${p.lessonsOk}/${p.lessons}</span>`}</td>`; }).join('')}
       <td class="small muted" style="white-space:nowrap">${r.updated ? new Date(r.updated).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' }) : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Ainda não há alunos inscritos.</div>'}</div>
   ${BK.user && BK.user.admin ? '<div id="resetReqs"></div><div id="chVis"></div><div id="sitePass"></div><div id="adminBox"></div>' : ''}
@@ -1454,6 +1455,31 @@ async function vProf() {
     const lines = rows.map((r) => [q(r.name), q(r.turma || ''), r.s.level, r.s.xp, r.s.pct, r.s.exDone, r.s.lessonsDone.length, r.s.chaptersDone.length, ...CHAPTERS.map((c) => (r.s.perChapter[c.id].test.attempts ? r.s.perChapter[c.id].test.best : '')), r.updated ? new Date(r.updated).toISOString() : ''].join(','));
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + [head2.join(','), ...lines].join('\n')], { type: 'text/csv' })); a.download = 'alunos-mysql-academy.csv'; a.click();
   };
+  // Reiniciar o progresso de um ou mais alunos (seleção com as caixas da primeira coluna).
+  for (const id of [...profSel]) if (!rows.some((r) => r.id === id)) profSel.delete(id); // só os que estão na lista (filtro de turma)
+  const selPaint = () => {
+    if (!$('#pselN')) return;
+    $('#pselN').textContent = profSel.size ? `${profSel.size} ${profSel.size === 1 ? 'aluno selecionado' : 'alunos selecionados'}` : 'Selecione alunos na primeira coluna para reiniciar o progresso.';
+    $('#preset').disabled = !profSel.size;
+    const all = $('#pall'); all.checked = profSel.size === rows.length; all.indeterminate = profSel.size > 0 && profSel.size < rows.length;
+  };
+  view.querySelectorAll('.psel').forEach((c) => {
+    c.onclick = (e) => e.stopPropagation();
+    c.onchange = () => { if (c.checked) profSel.add(c.dataset.id); else profSel.delete(c.dataset.id); selPaint(); };
+  });
+  if ($('#pall')) $('#pall').onchange = () => { const on = $('#pall').checked; rows.forEach((r) => (on ? profSel.add(r.id) : profSel.delete(r.id))); view.querySelectorAll('.psel').forEach((c) => (c.checked = on)); selPaint(); };
+  if ($('#preset')) $('#preset').onclick = async () => {
+    const chosen = rows.filter((r) => profSel.has(r.id)); if (!chosen.length) return;
+    const list = chosen.slice(0, 12).map((r) => '• ' + r.name).join('\n') + (chosen.length > 12 ? `\n… e mais ${chosen.length - 12}` : '');
+    if (!confirm(`Reiniciar o progresso de ${chosen.length} ${chosen.length === 1 ? 'aluno' : 'alunos'}?\n\n${list}\n\nApaga as lições, os exercícios, os minitestes, as revisões e o XP (a pontuação do Protocolo NEXUS mantém-se). Não é possível desfazer.`)) return;
+    const b = $('#preset'); b.disabled = true;
+    try {
+      const n2 = await BK.resetStudents(chosen.map((r) => r.id), sessionStorage.getItem('mya.teacherKey'));
+      toast(`Progresso reiniciado: ${n2} ${n2 === 1 ? 'aluno' : 'alunos'}`, 'reset');
+      profSel.clear(); profRows = null; vProf();
+    } catch (e) { toast(BK.errorText(e), 'alert'); b.disabled = false; }
+  };
+  selPaint();
   view.querySelectorAll('tr.pr').forEach((tr) => (tr.onclick = () => {
     const r = rows[+tr.dataset.i];
     view.querySelectorAll('tr.pr').forEach((x) => x.classList.toggle('me', x === tr));

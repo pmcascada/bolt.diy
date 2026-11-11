@@ -623,6 +623,30 @@ do 'begin
   end if;
 end';
 
+-- ------------------------------------------------------------
+-- Versão 11: o professor reinicia o progresso de um ou mais alunos na Área do professor.
+-- Só contas de professor; contas de professores ou do gestor nunca são reiniciadas por aqui.
+-- O progresso fica só com a marca resetAt: a app apaga também a cópia guardada no dispositivo do aluno.
+-- ------------------------------------------------------------
+create or replace function public.teacher_reset(ids uuid[]) returns int
+language plpgsql volatile security definer set search_path = public as
+'declare n int;
+begin
+  if not public.is_teacher() or ids is null or cardinality(ids) > 500 then return null; end if;
+  update public.progress p
+     set state = jsonb_build_object(''resetAt'', floor(extract(epoch from now()) * 1000)::bigint),
+         xp = 0, week_xp = 0, level = 1, pct = 0, ex_done = 0, chapters_done = 0, streak = 0, badges = 0
+   where p.user_id = any(ids)
+     and not exists (select 1 from public.profiles f where f.id = p.user_id and (f.is_teacher or f.is_admin));
+  get diagnostics n = row_count;
+  update public.reset_requests set status = ''aprovado'', decided_at = now()
+   where user_id = any(ids) and status = ''pendente''
+     and not exists (select 1 from public.profiles f where f.id = user_id and (f.is_teacher or f.is_admin));
+  return n;
+end';
+revoke execute on function public.teacher_reset(uuid[]) from public, anon;
+grant execute on function public.teacher_reset(uuid[]) to authenticated;
+
 -- ============================================================
 -- Gestor do site: executar uma única vez, com o email da conta do gestor. A partir daí,
 -- o gestor atribui o perfil de professor a outras contas na Área do professor.
