@@ -16,7 +16,7 @@ Aplicação de **autoaprendizagem de MySQL** para desktop e telemóvel (PWA inst
 
 1. Introdução ao MySQL
 2. Criar bases de dados e tabelas (tipos de dados e restrições, **validação de dados com CHECK** — condições com AND/OR, BETWEEN e IN, regras entre colunas com nome e o caso do NULL —, multiplicidades e chaves estrangeiras sempre NOT NULL — relações 1:N, N:M, opcionais (0..1) e 1:1 com tabelas próprias, e a outra perspetiva, não adotada nas aulas, com chaves estrangeiras que aceitam NULL —, ON UPDATE CASCADE e ON DELETE RESTRICT, ALTER TABLE, **normalização: do enunciado às tabelas (1FN, 2FN, 3FN)** e um desafio final: modelar uma loja online)
-3. Inserir, alterar e eliminar dados (INSERT, UPDATE, DELETE, TRUNCATE, manutenção de dados da BD loja e **transações**: START TRANSACTION, COMMIT, ROLLBACK, autocommit, uma encomenda em várias tabelas, falha a meio com anulação e concorrência — dois clientes e a última unidade, com um simulador de duas sessões)
+3. Inserir, alterar e eliminar dados (INSERT, UPDATE, DELETE, TRUNCATE, manutenção de dados da BD clinica — a clínica veterinária do capítulo 2 — e uma introdução às **transações**: tudo ou nada, START TRANSACTION, COMMIT, ROLLBACK, autocommit e falha a meio com anulação)
 4. Consultas com SELECT (SELECT, WHERE, ORDER BY/LIMIT/DISTINCT, agregações e GROUP BY/HAVING, JOIN, subconsultas, **funções de texto, números e datas**, **CASE e IFNULL/COALESCE**, **JOIN de três tabelas e UNION** e **perguntas de negócio** com enunciados abertos)
 5. Índices e vistas (CREATE INDEX, EXPLAIN, CREATE VIEW)
 6. Segurança: utilizadores, GRANT/REVOKE, roles
