@@ -802,18 +802,13 @@ CREATE TABLE seguradoras_animais (
     quiz('Com o autocommit ligado (o modo por omissão) e sem START TRANSACTION, executou DELETE FROM clientes WHERE id_cliente = 30; e depois ROLLBACK;. O cliente volta?', ['Sim, o ROLLBACK anula sempre a última instrução', 'Não: com autocommit, o DELETE foi gravado logo que terminou', 'Só se fizer COMMIT antes', 'Só se a tabela tiver chave primária'], 1, 'Sem transação aberta não há nada para anular. Antes de alterações arriscadas, abra uma transação.'),
     learn('Quando algo falha a meio', `<p>Se uma instrução da transação dá erro (por exemplo, o stock ficaria negativo), as anteriores ficam <b>pendentes</b>: a aplicação decide e, se a operação não pode acontecer, faz <code>ROLLBACK</code>. Se a ligação ao servidor cair antes do <code>COMMIT</code>, o MySQL anula a transação: nada fica a meio.</p>`),
     withId('dml.trans.5', quiz('Numa transação, as duas primeiras instruções correram bem e a terceira deu erro. Em que estado fica a base de dados?', ['Tudo foi anulado automaticamente', 'As duas primeiras alterações estão pendentes; a transação continua aberta até COMMIT ou ROLLBACK', 'As duas primeiras foram gravadas definitivamente', 'A base de dados fica bloqueada'], 1, 'O MySQL só anula a instrução que falhou; a decisão de anular tudo (ROLLBACK) é da aplicação.')),
-    learn('Dois clientes, a última unidade', `<p>Se dois clientes compram a última unidade ao mesmo tempo, os dois podem ver «1 em stock» e vender o mesmo produto duas vezes. Evita-se com <b>uma só instrução</b> que confirma o stock e o baixa ao mesmo tempo:</p>
-      <pre><code>UPDATE produtos SET stock = stock - 1
-WHERE id_produto = 17 AND stock &gt;= 1;</code></pre>
-      <p>Se afetar <b>0 linhas</b>, o produto esgotou.</p>`),
-    withId('dml.trans.8', dml('O produto 17 (bicicleta urbana) tem agora 1 unidade em stock. Escreva o UPDATE que vende uma unidade só se ainda houver stock. Para simular dois clientes a comprar ao mesmo tempo, a sua instrução vai ser executada duas vezes: no fim, o stock deve ser 0 e nunca negativo.', 'UPDATE produtos SET stock = stock - 1 WHERE id_produto = 17 AND stock >= 1;', 'SET stock = stock - 1 WHERE id_produto = 17 AND …', { db: 'loja', setup: 'UPDATE produtos SET stock = 1 WHERE id_produto = 17;', repeat: 2, need: [['stock\\s*=\\s*stock\\s*-\\s*1', 'Calcule o novo stock a partir do valor atual (SET stock = stock - 1), e não de um valor lido antes: é isso que evita a venda dupla.'], ['stock\\s*(>=\\s*1|>\\s*0)|(1\\s*<=|0\\s*<)\\s*stock', 'Acrescente ao WHERE a condição que só deixa vender se ainda houver stock.']] })),
   ] }],
   cheat: [
     ["INSERT INTO t (c1, c2) VALUES (v1, v2);", 'Inserir uma linha'], ["INSERT INTO t (c1, c2) VALUES (…), (…);", 'Inserir várias linhas'],
     ['UPDATE t SET c = v WHERE condição;', 'Alterar linhas'], ['UPDATE t SET c = c + 1 WHERE …;', 'Alterar com expressão'],
     ['DELETE FROM t WHERE condição;', 'Eliminar linhas'], ['TRUNCATE TABLE t;', 'Esvaziar tabela'],
     ['START TRANSACTION; … COMMIT;', 'Transação: grava tudo no fim'], ['ROLLBACK;', 'Anula tudo desde START TRANSACTION'],
-    ['SELECT @@autocommit;', 'Ver o modo autocommit (1, por omissão: cada instrução é gravada logo que termina)'], ['UPDATE t SET stock = stock - 1 WHERE id = … AND stock >= 1;', 'Vender só se houver stock (0 linhas afetadas = esgotado)'],
+    ['SELECT @@autocommit;', 'Ver o modo autocommit (1, por omissão: cada instrução é gravada logo que termina)'],
   ],
   test: [
     quiz('Qual a sintaxe correta para inserir um curso?', ["INSERT cursos VALUES nome='Arte'", "INSERT INTO cursos (nome) VALUES ('Arte');", "ADD INTO cursos ('Arte')", "UPDATE cursos ADD ('Arte')"], 1, 'INSERT INTO … (colunas) VALUES (…).'),
@@ -834,7 +829,7 @@ WHERE id_produto = 17 AND stock &gt;= 1;</code></pre>
     quiz('O que faz ROLLBACK?', ['Grava as alterações', 'Anula todas as alterações feitas desde o START TRANSACTION', 'Anula só a última instrução', 'Apaga a tabela'], 1, 'COMMIT grava; ROLLBACK anula.'),
     quiz('Que significa o «A» de ACID?', ['Autenticação', 'Atomicidade: ou se fazem todas as alterações da transação, ou nenhuma', 'Agregação', 'Atualização automática'], 1, 'Tudo ou nada.'),
     quiz('Com autocommit ligado e sem START TRANSACTION, quando fica gravado um UPDATE?', ['Só depois de COMMIT', 'Logo que a instrução termina', 'Quando a sessão termina', 'Nunca'], 1, 'Cada instrução é uma transação sozinha.'),
-    quiz('Dois clientes compram a última unidade. Que instrução evita a venda dupla?', ['UPDATE produtos SET stock = 0 WHERE id_produto = 17', 'UPDATE produtos SET stock = stock - 1 WHERE id_produto = 17 AND stock >= 1', 'DELETE FROM produtos WHERE id_produto = 17', 'SELECT stock FROM produtos WHERE id_produto = 17'], 1, 'O segundo UPDATE afeta 0 linhas: o produto esgotou.'),
+    quiz('Abriu uma transação com START TRANSACTION e fez dois INSERT. O que é preciso para as alterações ficarem gravadas?', ['Nada: ficam gravadas logo', 'Terminar a transação com COMMIT', 'Terminar a transação com ROLLBACK', 'Fechar a tabela'], 1, 'Dentro de uma transação, as alterações ficam pendentes até ao COMMIT; o ROLLBACK anula-as.'),
     quiz('O que acontece a uma transação aberta se a ligação ao servidor cair antes do COMMIT?', ['As alterações ficam gravadas', 'É anulada: nenhuma alteração fica gravada', 'Fica a meio', 'O servidor pede confirmação'], 1, 'A atomicidade garante que nada fica a meio.'),
     quiz('Que cuidado ter antes de um DELETE com WHERE?', ['Nenhum', 'Executar primeiro um SELECT com o mesmo WHERE para ver as linhas afetadas', 'Fazer TRUNCATE', 'Desativar as chaves'], 1, 'Assim confirma exatamente o que vai ser apagado.'),
   ],
@@ -845,7 +840,7 @@ WHERE id_produto = 17 AND stock &gt;= 1;</code></pre>
     'Antes de cada UPDATE/DELETE, executar um SELECT com o mesmo WHERE e comparar o número de linhas afetadas.',
     'Tentar apagar uma encomenda que tem linhas e ler o erro <b>1451</b>; depois apagar pela ordem correta.',
     'Abrir uma transação, apagar as linhas de uma encomenda, confirmar com SELECT e anular com <code>ROLLBACK</code>; repetir com <code>SET autocommit = 0</code>.',
-    'Abrir <b>duas janelas</b> do cliente mysql (duas sessões) e pôr a bicicleta com 1 unidade: <code>UPDATE loja.produtos SET stock = 1 WHERE id_produto = 17;</code>. Nas duas janelas: <code>START TRANSACTION; UPDATE loja.produtos SET stock = stock - 1 WHERE id_produto = 17 AND stock &gt;= 1;</code> — a segunda fica à espera. Fazer <code>COMMIT</code> na primeira e observar a segunda continuar com <b>0 linhas afetadas</b> (esgotado); terminar a segunda com <code>ROLLBACK</code>.',
+    'No cliente mysql, na BD <b>loja</b>: <code>START TRANSACTION;</code>, apagar as linhas de uma encomenda (<code>DELETE FROM linhas_encomenda WHERE id_encomenda = 1;</code>), confirmar com um <code>SELECT</code> que desapareceram, fazer <code>ROLLBACK;</code> e confirmar que voltaram.',
   ],
   practice: [
     dml("Registe o curso 'Psicologia' com 1100 horas.", "INSERT INTO cursos (nome, horas) VALUES ('Psicologia', 1100);", "INSERT INTO cursos (nome, horas) VALUES (…);"),
@@ -1312,7 +1307,7 @@ const INTROS = {
   'dml.1': 'Com as tabelas criadas, é preciso colocar-lhes dados. Nesta lição aprende o comando INSERT, para acrescentar uma ou várias linhas a uma tabela.',
   'dml.2': 'Os dados mudam: um aluno muda de cidade, um preço aumenta. Aprende o comando UPDATE e, sobretudo, a escolher com WHERE exatamente as linhas a alterar — um UPDATE sem WHERE altera a tabela inteira.',
   'dml.3': 'Por fim, aprende a eliminar dados: linhas escolhidas com DELETE ou a tabela inteira com TRUNCATE. Tal como no UPDATE, o WHERE é o que separa uma operação segura de um desastre.',
-  'dml.trans': 'Registar uma encomenda são várias instruções que têm de acontecer todas ou nenhuma. Aprende a agrupá-las numa transação (START TRANSACTION, COMMIT, ROLLBACK), o modo autocommit, o que fazer quando algo falha a meio e o que acontece quando dois clientes tentam comprar a última unidade ao mesmo tempo.',
+  'dml.trans': 'Registar uma encomenda são várias instruções que têm de acontecer todas ou nenhuma. Aprende a agrupá-las numa transação (START TRANSACTION, COMMIT, ROLLBACK), o modo autocommit e o que acontece quando algo falha a meio.',
   'dml.loja': 'Para praticar num cenário realista, usa a base de dados da clínica veterinária que modelou no desafio do capítulo 2, agora com dados. Aplica INSERT, UPDATE e DELETE a situações do dia a dia da clínica, incluindo dados relacionados entre tabelas.',
   'select.1': 'Consultar dados é a tarefa mais frequente em SQL. Esta lição apresenta o comando SELECT: como ler uma tabela, escolher colunas e fazer cálculos no resultado.',
   'select.2': 'Raramente se quer ver uma tabela inteira. Aprende a filtrar as linhas com WHERE e com os operadores de comparação, AND/OR, IN, BETWEEN e LIKE.',
