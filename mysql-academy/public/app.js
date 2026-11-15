@@ -365,7 +365,7 @@ function vChapter(id) {
     const open = lessonOpen(c, i), n = l.ex.filter(passed).length, done = n === l.ex.length;
     const pos = Math.min(st.pos[l.id] || 0, l.steps.length - 1);
     const inner = `<span class="status ${done ? 'done' : n || pos ? 'part' : ''}">${done ? ic('check') : open ? i + 1 : ic('lock')}</span><span><b>${esc(l.title)}</b><span class="d">${l.steps.filter((s) => s.t === 'learn').length} conceitos · ${l.ex.length} exercícios</span></span>
-    <span class="chip ${done ? 'ok' : n || pos ? 'acc' : ''}">${done ? 'Concluída' : !open ? 'Bloqueada' : n || pos ? `Passo ${pos + 1} de ${l.steps.length}` : 'Por iniciar'}</span><span class="chev">${open ? ic('chevR') : ''}</span>`;
+    <span class="row" style="gap:6px;flex-wrap:nowrap">${done ? `<span class="btn sec-b sm rep-l" role="link" tabindex="0" data-rl="${l.id}" title="Repetir os exercícios desta lição sem ganhar XP">${ic('repeat')}Repetir</span>` : ''}<span class="chip ${done ? 'ok' : n || pos ? 'acc' : ''}">${done ? 'Concluída' : !open ? 'Bloqueada' : n || pos ? `Passo ${pos + 1} de ${l.steps.length}` : 'Por iniciar'}</span></span><span class="chev">${open ? ic('chevR') : ''}</span>`;
     return open ? `<a class="item lesson-i" href="#/l/${l.id}">${inner}</a>` : `<div class="item lesson-i locked" title="Conclua a lição anterior para desbloquear">${inner}</div>`;
   }).join('')}</div>
   <div class="two" style="margin-top:16px">
@@ -375,11 +375,16 @@ function vChapter(id) {
       ${p.test.attempts ? `<p class="small">Melhor resultado: <b>${p.test.best}%</b> · ${p.test.attempts} ${p.test.attempts === 1 ? 'tentativa' : 'tentativas'} ${p.test.passed ? '<span class="chip ok">Aprovado</span>' : ''}</p>` : ''}
       ${p.unlocked ? `<a class="btn" href="#/t/${c.id}">${p.test.attempts ? 'Repetir miniteste' : 'Iniciar miniteste'}</a>` : `<span class="chip">${ic('lock')}Disponível após concluir as ${c.lessons.length} lições</span>`}</div></div>
   </div>
-  ${p.unlocked ? `<div class="card side-card" style="margin-top:16px"><span class="side-i">${ic('repeat')}</span><div><h3>Rever o capítulo</h3><p class="small muted">Volte a fazer todos os exercícios do capítulo em <b>modo Revisão</b>: pode repeti-los as vezes que quiser, mas não contam para a pontuação. Cada lição concluída também pode ser revista sozinha.</p><a class="btn sec-b" href="#/rc/${c.id}">${ic('repeat')}Rever o capítulo</a></div></div>` : ''}
+  ${c.lessons.some(lessonDone) ? `<div class="card side-card" style="margin-top:16px"><span class="side-i">${ic('repeat')}</span><div><h3>Repetir o capítulo</h3><p class="small muted">Volte a fazer os exercícios das lições já concluídas (${c.lessons.filter(lessonDone).length} de ${c.lessons.length}), as vezes que quiser, em <b>modo Revisão</b>: <b>não dá XP</b> e o resultado da primeira vez mantém-se. Cada lição concluída também pode ser repetida sozinha, no botão <b>Repetir</b> da lista acima.</p><a class="btn sec-b" href="#/rc/${c.id}">${ic('repeat')}Repetir o capítulo · sem XP</a></div></div>` : ''}
   ${c.real ? `<div class="card real-card" style="margin-top:16px"><div class="card-h"><h3>${ic('cpu')}Prática no MySQL real</h3><span class="small muted">${p.real}/${p.realTot} feitas</span></div>
     <p class="small muted" style="margin-top:0">O simulador serve para aprender; o objetivo é usar um servidor MySQL a sério. Faça estas tarefas no seu computador (MySQL Community Server + Workbench) e marque-as à medida que as concluir.</p>
     <ul class="real">${c.real.map((t, k) => `<li><label><input type="checkbox" data-r="${k}" ${(st.real[c.id] || []).includes(k) ? 'checked' : ''}><span>${t}</span></label></li>`).join('')}</ul>
     <div class="row"><button class="btn sec-b sm" data-dl="escola">${ic('download')}escola.sql</button><button class="btn sec-b sm" data-dl="loja">${ic('download')}loja.sql</button><span class="small muted">Scripts para criar as bases de dados de exemplo no seu MySQL.</span></div></div>` : ''}`;
+  // «Repetir» dentro do item da lição (que é ele próprio um link): abre o modo Revisão em vez da lição.
+  view.querySelectorAll('[data-rl]').forEach((b) => {
+    const go = (e) => { e.preventDefault(); e.stopPropagation(); location.hash = '#/rl/' + b.dataset.rl; };
+    b.onclick = go; b.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') go(e); };
+  });
   view.querySelectorAll('[data-r]').forEach((b) => (b.onchange = () => {
     const before = sum(), k = +b.dataset.r, cur = new Set(st.real[c.id] || []);
     if (b.checked) cur.add(k); else cur.delete(k);
@@ -428,7 +433,7 @@ function bindSteps(L, onPass, optOf) {
 }
 const lessonHead = (C, L, idx, label, pct, done, paged) => `<div class="lesson-head"><div class="eyebrow">Capítulo ${C.idx + 1} · Lição ${idx + 1} de ${C.lessons.length}</div><h1>${esc(L.title)}</h1>
   <div class="row lesson-meta"><div class="grow"><div class="row small" style="justify-content:space-between;margin-bottom:6px"><span class="muted">${label}</span><span class="muted num-t">${pct}%</span></div>${bar(pct, done ? 'ok' : '')}</div>
-  ${done ? `<a class="btn sec-b sm" href="#/rl/${L.id}" title="Repetir os exercícios sem contar para a pontuação">${ic('repeat')}Rever a lição</a>` : ''}<button class="btn sec-b sm" id="openManual">${ic('book')}Manual</button><button class="btn link sm" id="lessonMode" title="Alternar a forma de apresentar a lição">${ic(paged ? 'list' : 'layers')}${paged ? 'Ver a lição inteira' : 'Ver por páginas'}</button></div></div>`;
+  ${done ? `<a class="btn sec-b sm" href="#/rl/${L.id}" title="Repetir os exercícios sem contar para a pontuação">${ic('repeat')}Repetir a lição · sem XP</a>` : ''}<button class="btn sec-b sm" id="openManual">${ic('book')}Manual</button><button class="btn link sm" id="lessonMode" title="Alternar a forma de apresentar a lição">${ic(paged ? 'list' : 'layers')}${paged ? 'Ver a lição inteira' : 'Ver por páginas'}</button></div></div>`;
 
 function vLesson(id) {
   const f = findLesson(id); if (!f) return vHome();
@@ -539,7 +544,7 @@ function doneCardHtml(C, L, idx, paged) {
   const next = C.lessons[idx + 1], p = sum().perChapter[C.id];
   return `<div class="card done-card"><span class="side-i ok">${ic('checkCircle')}</span><div><h2>Lição concluída</h2>
     <p class="muted">${next ? `Pode avançar para a lição seguinte: <b>${esc(next.title)}</b>.` : p.test.passed ? 'Este capítulo já está concluído. Pode repetir o miniteste para melhorar o resultado.' : `Concluiu todas as lições deste capítulo. Faça agora o miniteste final (mínimo ${PASS_MARK}%) para o dar como concluído.`}</p>
-    <div class="row">${paged ? `<button class="btn sec-b" data-prev>${ic('chevL')}Anterior</button>` : ''}<a class="btn sec-b" href="#/rl/${L.id}">${ic('repeat')}Rever a lição</a>${next ? `<a class="btn" href="#/l/${next.id}">Lição seguinte ${ic('chevR')}</a>` : `<a class="btn" href="#/t/${C.id}">${ic('clipboard')}${p.test.passed ? 'Repetir miniteste' : 'Fazer o miniteste'}</a>`}<a class="btn sec-b" href="#/m/${C.id}">${ic('book')}Rever no manual</a></div></div></div>`;
+    <div class="row">${paged ? `<button class="btn sec-b" data-prev>${ic('chevL')}Anterior</button>` : ''}<a class="btn sec-b" href="#/rl/${L.id}">${ic('repeat')}Repetir a lição · sem XP</a>${next ? `<a class="btn" href="#/l/${next.id}">Lição seguinte ${ic('chevR')}</a>` : `<a class="btn" href="#/t/${C.id}">${ic('clipboard')}${p.test.passed ? 'Repetir miniteste' : 'Fazer o miniteste'}</a>`}<a class="btn sec-b" href="#/m/${C.id}">${ic('book')}Rever no manual</a></div></div></div>`;
 }
 
 /* ---------- modo Revisão: repetir uma lição ou um capítulo já concluídos, sem pontos ----------
@@ -576,17 +581,19 @@ function vReviewLesson(id) {
 function vReviewChapter(id) {
   const C = CHAPTERS.find((x) => x.id === id); if (!C) return vHome();
   if (hiddenPage(C)) return;
-  if (!sum().perChapter[C.id].unlocked) { location.replace('#/c/' + C.id); return; }
+  const doneL = C.lessons.filter(lessonDone);
+  if (!doneL.length) { location.replace('#/c/' + C.id); return; }
   crumbs = [['Conteúdos', '#/learn'], [`Capítulo ${C.idx + 1}`, '#/c/' + C.id], ['Revisão', '#/rc/' + C.id]];
-  const tr = reviewTracker(C.lessons.reduce((n, l) => n + l.ex.length, 0));
-  view.innerHTML = `<div class="page-h"><div><div class="eyebrow">${ic('repeat')}Modo Revisão · Capítulo ${pad2(C.idx + 1)}</div><h1>${esc(C.title)}</h1><p>Todos os exercícios do capítulo, lição a lição. Para rever a matéria, abra o <a href="#/m/${C.id}">manual do capítulo</a> ou reveja uma lição completa.</p></div></div>
+  const tr = reviewTracker(doneL.reduce((n, l) => n + l.ex.length, 0));
+  view.innerHTML = `<div class="page-h"><div><div class="eyebrow">${ic('repeat')}Modo Revisão · Capítulo ${pad2(C.idx + 1)}</div><h1>${esc(C.title)}</h1><p>${doneL.length === C.lessons.length ? 'Todos os exercícios do capítulo' : (doneL.length === 1 ? `Os exercícios da única lição concluída (de ${C.lessons.length})` : `Os exercícios das ${doneL.length} lições concluídas (de ${C.lessons.length})`)}, lição a lição. Para rever a matéria, abra o <a href="#/m/${C.id}">manual do capítulo</a> ou reveja uma lição completa.</p></div></div>
     ${reviewBanner('este capítulo')}
     <div id="rvLessons"></div><div id="rvSum"></div>
     <div class="row" style="margin-top:14px"><a class="btn sec-b" href="#/c/${C.id}">${ic('chevL')}Voltar ao capítulo</a></div>`;
   const box = $('#rvLessons');
-  C.lessons.forEach((L, li) => {
+  doneL.forEach((L) => {
+    const li = C.lessons.indexOf(L);
     const sec = document.createElement('section'); sec.className = 'sec rv-lesson';
-    sec.innerHTML = `<div class="row" style="justify-content:space-between;align-items:baseline"><h2>${li + 1}. ${esc(L.title)}</h2><a class="btn link sm" href="#/rl/${L.id}">${ic('book')}Rever a lição completa</a></div>`;
+    sec.innerHTML = `<div class="row" style="justify-content:space-between;align-items:baseline"><h2>${li + 1}. ${esc(L.title)}</h2><a class="btn link sm" href="#/rl/${L.id}">${ic('book')}Repetir a lição completa</a></div>`;
     L.ex.forEach((ex, i) => sec.append(taskEl(ex, i, () => {}, tr.opt(ex, i, `Lição ${li + 1} · Exercício ${i + 1}`))));
     box.append(sec);
   });
