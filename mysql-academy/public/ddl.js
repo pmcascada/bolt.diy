@@ -7,13 +7,20 @@
   const ACTIONS = ['RESTRICT', 'CASCADE', 'SET NULL', 'NO ACTION', 'SET DEFAULT'];
 
   class SqlError extends Error {}
-  const fail = (msg) => { throw new SqlError(msg); };
+  // Posição (no texto do aluno) do símbolo onde a análise parou: vai no erro, para o assinalar ao aluno.
+  let cursor = null;
+  const fail = (msg) => { const e = new SqlError(msg); if (cursor) e.pos = cursor.pos; throw e; };
 
   /* ---------- análise léxica ---------- */
   function tokenize(src) {
     const out = []; let i = 0;
+    cursor = null;
+    const push = out.push.bind(out);
+    out.push = (t) => push({ ...t, pos: start, end: i }); // posição de cada símbolo
+    let start = 0;
     while (i < src.length) {
       const c = src[i];
+      start = i; cursor = { pos: i };
       if (/\s/.test(c)) { i++; continue; }
       if (c === '-' && src[i + 1] === '-') { while (i < src.length && src[i] !== '\n') i++; continue; }
       if (c === '#') { while (i < src.length && src[i] !== '\n') i++; continue; }
@@ -36,13 +43,15 @@
       if (op) { out.push({ t: 'sym', v: op[0] }); i += op[0].length; continue; }
       fail(`Carácter inesperado: ${c}`);
     }
+    cursor = null;
+    out.eof = src.length;
     return out;
   }
 
   /* ---------- análise sintática ---------- */
   function Parser(tokens) {
     let p = 0;
-    const peek = (k = 0) => tokens[p + k];
+    const peek = (k = 0) => { const t = tokens[p + k]; if (k === 0) cursor = t || { pos: tokens.eof }; return t; };
     const near = () => { const t = peek(); return t ? ` perto de "${t.t === 'str' ? `'${t.v}'` : t.v}"` : ' no fim da instrução'; };
     const isKw = (t, kw) => t && t.t === 'id' && !t.q && t.v === kw;
     const isSym = (t, s) => t && t.t === 'sym' && t.v === s;
