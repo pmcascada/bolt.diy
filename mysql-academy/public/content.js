@@ -793,63 +793,35 @@ CREATE TABLE seguradoras_animais (
       <li><code>encomendas(id_encomenda, id_cliente, data, estado)</code></li><li><code>linhas_encomenda(id_encomenda, id_produto, quantidade, preco_unitario)</code></li></ul>
       <p>Use o botão <b>Estrutura das tabelas</b> nos exercícios para ver as colunas e os dados. No laboratório pode escolher a BD loja.</p>`,
       [ex("SELECT * FROM produtos WHERE categoria = 'Livros';", 'Os livros à venda.', 'loja')]),
-    learn('Uma encomenda são várias operações', `<p>Registar uma encomenda na BD loja não é uma só instrução: é preciso <b>criar a encomenda</b>, <b>inserir as suas linhas</b> e <b>baixar o stock</b> de cada produto. Se o servidor falhar a meio — ou uma das instruções der erro — a base de dados fica incoerente: uma encomenda sem linhas, ou produtos vendidos sem baixa de stock.</p>
-      <p>Uma <b>transação</b> junta várias instruções numa unidade de trabalho que acontece <b>toda ou nada</b>. As bases de dados garantem quatro propriedades, conhecidas pela sigla <b>ACID</b>:</p>
-      <table><tr><th>Propriedade</th><th>Significa</th></tr>
-      <tr><td><b>A</b>tomicidade</td><td>ou são feitas todas as alterações, ou nenhuma</td></tr>
-      <tr><td><b>C</b>onsistência</td><td>a BD passa de um estado válido para outro estado válido (chaves e CHECK respeitados)</td></tr>
-      <tr><td><b>I</b>solamento</td><td>as transações de vários utilizadores ao mesmo tempo não se atrapalham</td></tr>
-      <tr><td><b>D</b>urabilidade</td><td>depois de gravada, a alteração não se perde, mesmo que o servidor desligue</td></tr></table>
-      <p>No MySQL, as transações são suportadas pelo motor de tabelas <b>InnoDB</b>, que é o usado por omissão.</p>`),
+    learn('Uma encomenda são várias operações', `<p>Registar uma encomenda não é uma só instrução: é preciso <b>criar a encomenda</b>, <b>inserir as suas linhas</b> e <b>baixar o stock</b> dos produtos. Se algo falhar a meio, a base de dados fica incoerente — por exemplo, uma encomenda sem linhas.</p>
+      <p>Uma <b>transação</b> junta várias instruções numa unidade que acontece <b>toda ou nada</b>. A esta propriedade chama-se <b>atomicidade</b> — é o «A» da sigla <b>ACID</b>, que resume as garantias das transações.</p>`),
     quiz('Porque se deve registar uma encomenda (encomenda + linhas + baixa de stock) numa transação?', ['Para as instruções serem mais rápidas', 'Para que, se algo falhar a meio, nenhuma das alterações fique gravada', 'Para não ser preciso escrever WHERE', 'Para poder usar AUTO_INCREMENT'], 1, 'Atomicidade: tudo ou nada.'),
-    session('START TRANSACTION, COMMIT e ROLLBACK', `<p>Uma transação começa com <code>START TRANSACTION</code> (ou <code>BEGIN</code>). A partir daí, as alterações ficam <b>pendentes</b>: a própria sessão já as vê, mas ainda não estão gravadas. A transação termina de uma de duas formas:</p>
-      <ul><li><code>COMMIT</code> — grava definitivamente todas as alterações;</li><li><code>ROLLBACK</code> — anula todas as alterações feitas desde o início da transação.</li></ul>
-      <p>Experimente: apague «por engano» as linhas da encomenda 1, confirme que desapareceram e depois anule tudo.</p>`,
+    session('START TRANSACTION, COMMIT e ROLLBACK', `<p>Uma transação começa com <code>START TRANSACTION</code>. As alterações seguintes ficam <b>pendentes</b> até a transação terminar com:</p>
+      <ul><li><code>COMMIT</code> — grava todas as alterações;</li><li><code>ROLLBACK</code> — anula todas as alterações feitas desde o início.</li></ul>
+      <p>Experimente pela ordem: apague «por engano» as linhas da encomenda 1 e depois anule tudo.</p>`,
       [ex('START TRANSACTION;', 'Abre a transação.', 'loja'),
        ex('DELETE FROM linhas_encomenda WHERE id_encomenda = 1;', 'O engano: apaga as linhas da encomenda 1.', 'loja'),
-       ex('SELECT * FROM linhas_encomenda WHERE id_encomenda = 1;', 'Dentro da transação, as linhas já não aparecem.', 'loja'),
        ex('ROLLBACK;', 'Anula tudo o que a transação fez.', 'loja'),
        ex('SELECT * FROM linhas_encomenda WHERE id_encomenda = 1;', 'As linhas voltaram.', 'loja')]),
     order('Ordene as instruções que registam uma encomenda numa transação.', ['START TRANSACTION;', "INSERT INTO encomendas (id_cliente, data, estado) VALUES (12, '2025-06-01', 'pendente');", 'INSERT INTO linhas_encomenda VALUES (81, 7, 2, 24.90);', 'UPDATE produtos SET stock = stock - 2 WHERE id_produto = 7;', 'COMMIT;'], 'Abre-se a transação, cria-se a encomenda antes das suas linhas (as linhas referenciam-na), baixa-se o stock e só no fim se grava com COMMIT.'),
-    session('O modo autocommit', `<p>Se não abrir nenhuma transação, o MySQL está em modo <b>autocommit</b>: cada instrução é uma transação sozinha e é gravada <b>logo que termina</b>. Por isso, um <code>DELETE</code> feito sem <code>START TRANSACTION</code> já não pode ser anulado com <code>ROLLBACK</code>.</p>
-      <ul><li><code>SELECT @@autocommit;</code> mostra o modo atual (1 = ligado, o valor por omissão);</li>
-      <li><code>SET autocommit = 0;</code> desliga-o: a partir daí, todas as alterações ficam pendentes até um <code>COMMIT</code> ou <code>ROLLBACK</code>;</li>
-      <li><code>SET autocommit = 1;</code> volta ao modo normal (e grava o que estiver pendente).</li></ul>
-      <p><b>Atenção:</b> os comandos DDL (<code>CREATE</code>, <code>ALTER</code>, <code>DROP</code>, <code>TRUNCATE</code>) fazem um <code>COMMIT</code> implícito — não podem ser anulados e gravam a transação que estiver aberta.</p>`,
-      [ex('SELECT @@autocommit;', 'Por omissão: 1.', 'loja'),
-       ex('SET autocommit = 0;', 'Desliga o autocommit nesta sessão.', 'loja'),
-       ex('UPDATE produtos SET preco = 0 WHERE id_produto = 1;', 'Um erro grave: o portátil passa a custar 0 €.', 'loja'),
-       ex('ROLLBACK;', 'Com o autocommit desligado, ainda é possível anular.', 'loja'),
-       ex('SELECT nome, preco FROM produtos WHERE id_produto = 1;', 'O preço voltou a 749,90 €.', 'loja'),
-       ex('SET autocommit = 1;', 'Volta ao modo normal.', 'loja')]),
+    learn('O modo autocommit', `<p>Sem <code>START TRANSACTION</code>, o MySQL está em modo <b>autocommit</b> (o modo por omissão): cada instrução é gravada <b>logo que termina</b>. Por isso, um <code>DELETE</code> feito sem abrir uma transação já não pode ser anulado com <code>ROLLBACK</code>. O modo atual vê-se com <code>SELECT @@autocommit;</code> (1 = ligado).</p>`,
+      [ex('SELECT @@autocommit;', 'Por omissão: 1.', 'loja')]),
     quiz('Com o autocommit ligado (o modo por omissão) e sem START TRANSACTION, executou DELETE FROM clientes WHERE id_cliente = 30; e depois ROLLBACK;. O cliente volta?', ['Sim, o ROLLBACK anula sempre a última instrução', 'Não: com autocommit, o DELETE foi gravado logo que terminou', 'Só se fizer COMMIT antes', 'Só se a tabela tiver chave primária'], 1, 'Sem transação aberta não há nada para anular. Antes de alterações arriscadas, abra uma transação.'),
-    learn('Registar uma encomenda numa transação', `<p>O cliente 3 encomenda 2 exemplares do livro «Bases de Dados Relacionais» (produto 9, 32,50 €). Tudo dentro de uma transação:</p>
-      <pre><code>START TRANSACTION;
-INSERT INTO encomendas (id_cliente, data, estado) VALUES (3, '2025-06-01', 'pendente');
-INSERT INTO linhas_encomenda VALUES (81, 9, 2, 32.50);
-UPDATE produtos SET stock = stock - 2 WHERE id_produto = 9;
-COMMIT;</code></pre>
-      <p>A nova encomenda recebe o número 81 (a BD tem 80 encomendas e <code>id_encomenda</code> é AUTO_INCREMENT). Numa aplicação, o número gerado obtém-se com <code>SELECT LAST_INSERT_ID();</code>, logo a seguir ao INSERT.</p>`,
-      [ex("START TRANSACTION;\nINSERT INTO encomendas (id_cliente, data, estado) VALUES (3, '2025-06-01', 'pendente');\nINSERT INTO linhas_encomenda VALUES (81, 9, 2, 32.50);\nUPDATE produtos SET stock = stock - 2 WHERE id_produto = 9;\nCOMMIT;\nSELECT * FROM linhas_encomenda WHERE id_encomenda = 81;", 'Executa a transação inteira e mostra as linhas da nova encomenda.', 'loja')]),
     dml("Registe numa transação a encomenda 81 do cliente 12, com data '2025-06-01' e estado 'pendente': 2 unidades do produto 7 (24,90 € cada) e 1 unidade do produto 14 (12,50 €). Não se esqueça de baixar o stock dos dois produtos.", `START TRANSACTION;
 INSERT INTO encomendas (id_cliente, data, estado) VALUES (12, '2025-06-01', 'pendente');
 INSERT INTO linhas_encomenda VALUES (81, 7, 2, 24.90), (81, 14, 1, 12.50);
 UPDATE produtos SET stock = stock - 2 WHERE id_produto = 7;
 UPDATE produtos SET stock = stock - 1 WHERE id_produto = 14;
 COMMIT;`, 'START TRANSACTION; · INSERT na encomenda · INSERT das 2 linhas · 2 UPDATE ao stock · COMMIT;', { db: 'loja', tables: ['encomendas', 'linhas_encomenda', 'produtos'], need: [['\\b(start\\s+transaction|begin)\\b', 'Comece por abrir uma transação com START TRANSACTION.'], ['\\bcommit\\b', 'Termine a transação com COMMIT, para gravar as alterações.']] }),
-    session('Quando algo falha a meio', `<p>Na BD loja, a tabela produtos tem a restrição <code>CHECK (stock &gt;= 0)</code>. O cliente 3 tenta comprar um monitor de 27" (produto 4), mas o stock é 0. Execute os passos pela ordem:</p>
-      <ol><li>a encomenda e a linha são inseridas (pendentes);</li><li>o <code>UPDATE</code> do stock falha com o erro 3819;</li><li>a encomenda ainda lá está: o MySQL só anulou <b>a instrução que falhou</b> — a transação continua aberta;</li><li>é a aplicação que decide: aqui, como a venda não pode acontecer, faz <code>ROLLBACK</code> e a encomenda desaparece.</li></ol>
+    session('Quando algo falha a meio', `<p>O stock nunca pode ser negativo (<code>CHECK (stock &gt;= 0)</code>). O cliente 3 tenta comprar um monitor (produto 4) que está esgotado. Execute pela ordem: o <code>UPDATE</code> do stock falha e a aplicação faz <code>ROLLBACK</code> — a encomenda e a linha já inseridas desaparecem.</p>
       <p>Se a ligação ao servidor cair antes do <code>COMMIT</code>, o MySQL também anula a transação: nada fica a meio.</p>`,
       [ex('START TRANSACTION;', '', 'loja'),
-       ex("INSERT INTO encomendas (id_cliente, data, estado) VALUES (3, '2025-06-02', 'pendente');", 'Encomenda 81, pendente.', 'loja'),
-       ex('INSERT INTO linhas_encomenda VALUES (81, 4, 1, 229.00);', 'Linha da encomenda, pendente.', 'loja'),
+       ex("INSERT INTO encomendas (id_cliente, data, estado) VALUES (3, '2025-06-02', 'pendente');\nINSERT INTO linhas_encomenda VALUES (81, 4, 1, 229.00);", 'A encomenda e a linha ficam pendentes.', 'loja'),
        exFail('UPDATE produtos SET stock = stock - 1 WHERE id_produto = 4;', 'Falha: o stock ficaria −1 (ERROR 3819).', 'loja'),
-       ex('SELECT * FROM encomendas WHERE id_encomenda = 81;', 'A encomenda continua lá (pendente).', 'loja'),
        ex('ROLLBACK;', 'Anula a encomenda e a linha.', 'loja'),
        ex('SELECT * FROM encomendas WHERE id_encomenda = 81;', 'Já não existe.', 'loja')]),
     quiz('Numa transação, as duas primeiras instruções correram bem e a terceira deu erro. Em que estado fica a base de dados?', ['Tudo foi anulado automaticamente', 'As duas primeiras alterações estão pendentes; a transação continua aberta até COMMIT ou ROLLBACK', 'As duas primeiras foram gravadas definitivamente', 'A base de dados fica bloqueada'], 1, 'O MySQL só anula a instrução que falhou; a decisão de anular tudo (ROLLBACK) é da aplicação.'),
-    dml('A transação abaixo já foi iniciada e as duas primeiras instruções foram executadas, mas a seguinte — UPDATE produtos SET stock = stock - 1 WHERE id_produto = 4; — falhou com o ERROR 3819: o monitor está esgotado. A venda não pode acontecer. Deixe a base de dados como estava antes da encomenda.', 'ROLLBACK;', 'Uma só palavra anula tudo o que a transação fez.', { db: 'loja', tables: ['encomendas', 'linhas_encomenda'], setup: "START TRANSACTION;\nINSERT INTO encomendas (id_cliente, data, estado) VALUES (3, '2025-06-02', 'pendente');\nINSERT INTO linhas_encomenda VALUES (81, 4, 1, 229.00);", start: "-- Já executado:\n-- START TRANSACTION;\n-- INSERT INTO encomendas (id_cliente, data, estado) VALUES (3, '2025-06-02', 'pendente');\n-- INSERT INTO linhas_encomenda VALUES (81, 4, 1, 229.00);\n-- UPDATE produtos SET stock = stock - 1 WHERE id_produto = 4;   → ERROR 3819\n", need: [['\\brollback\\b', 'Para anular tudo o que a transação fez, use ROLLBACK.']] }),
-    race('Concorrência: dois clientes, a última bicicleta', `<p>Numa loja online, muitas pessoas compram ao mesmo tempo, cada uma na sua <b>sessão</b> (ligação ao MySQL). A bicicleta urbana (produto 17) tem <b>1 unidade</b> e dois clientes carregam em «Comprar» quase no mesmo instante. Avance passo a passo nos três cenários e compare o resultado.</p>`, { scenarios: [
+    race('Concorrência: dois clientes, a última bicicleta', `<p>Numa loja online, muitas pessoas compram ao mesmo tempo, cada uma na sua <b>sessão</b> (ligação ao MySQL). A bicicleta urbana (produto 17) tem <b>1 unidade</b> e dois clientes carregam em «Comprar» quase no mesmo instante. Avance passo a passo nos dois cenários e compare o resultado.</p>`, { scenarios: [
       { name: '1 · Sem proteção', intro: 'A aplicação lê o stock, decide se pode vender e grava o novo valor calculado a partir do que leu.', ok: false,
         result: 'Venda dupla: foram criadas duas encomendas para uma só bicicleta e o stock diz 0. A alteração de A foi «perdida» pela de B (lost update).',
         steps: [
@@ -866,32 +838,20 @@ COMMIT;`, 'START TRANSACTION; · INSERT na encomenda · INSERT das 2 linhas · 2
           { a: 'INSERT INTO encomendas …;\nCOMMIT;', b: 'wait', stock: 0, note: 'A grava a encomenda e termina a transação: a linha é desbloqueada.' },
           { b: 'UPDATE produtos SET stock = stock - 1\nWHERE id_produto = 17 AND stock >= 1;\n-- 0 linhas afetadas\nROLLBACK;', stock: 0, good: true, note: 'O UPDATE de B continua, agora com stock = 0: a condição falha e nenhuma linha é alterada. A aplicação percebe que esgotou.' },
         ] },
-      { name: '3 · SELECT … FOR UPDATE', intro: 'A aplicação lê o stock com FOR UPDATE: a linha fica bloqueada para as outras sessões até ao COMMIT ou ROLLBACK.', ok: true,
-        result: 'Uma só venda. B só conseguiu ler o stock depois de A terminar, e por isso viu 0.',
-        steps: [
-          { a: 'START TRANSACTION;\nSELECT stock FROM produtos\nWHERE id_produto = 17 FOR UPDATE;   -- 1', stock: 1, note: 'A lê 1 unidade e bloqueia a linha da bicicleta.' },
-          { b: 'wait', stock: 1, note: 'B pede o mesmo SELECT … FOR UPDATE e fica à espera.' },
-          { a: 'UPDATE produtos SET stock = stock - 1\nWHERE id_produto = 17;\nINSERT INTO encomendas …;\nCOMMIT;', b: 'wait', stock: 0, note: 'A vende e termina: a linha é desbloqueada.' },
-          { b: 'SELECT stock …   -- 0\nROLLBACK;   -- «Esgotado»', stock: 0, good: true, note: 'B lê finalmente o stock, já atualizado: 0. Não vende.' },
-        ] },
     ] }),
-    quiz('No cenário 1, qual foi a causa da venda dupla?', ['O MySQL não suporta dois utilizadores ao mesmo tempo', 'Os dois clientes leram o stock antes de algum o alterar, e cada um gravou um valor calculado a partir do que tinha lido', 'Faltou o COMMIT', 'A tabela não tinha chave primária'], 1, 'É o problema da «atualização perdida» (lost update).'),
-    learn('Proteger a última unidade', `<p>Duas formas de impedir a venda dupla:</p>
-      <ol><li><b>UPDATE com condição</b> — <code>UPDATE produtos SET stock = stock - 1 WHERE id_produto = 17 AND stock &gt;= 1;</code> O novo valor é calculado a partir do valor <b>atual</b> (<code>stock - 1</code>) e a condição só deixa vender se ainda houver stock. Se o resultado for <b>0 linhas afetadas</b>, o produto esgotou e a aplicação faz <code>ROLLBACK</code>.</li>
-      <li><b>SELECT … FOR UPDATE</b> — dentro de uma transação, lê a linha e <b>bloqueia-a</b>: as outras sessões que a queiram alterar ou ler com FOR UPDATE esperam até ao <code>COMMIT</code> ou <code>ROLLBACK</code>. Útil quando é preciso ler o valor antes de decidir.</li></ol>
-      <p><b>Boas práticas:</b> as transações devem ser <b>curtas</b> — nunca se espera pelo utilizador (um formulário, uma confirmação) com uma transação aberta, porque as outras sessões ficam bloqueadas. Se duas transações esperarem uma pela outra (<i>deadlock</i>), o MySQL anula uma delas, que deve ser repetida. Um <code>SELECT</code> normal não bloqueia: lê uma «fotografia» consistente dos dados (nível de isolamento <code>REPEATABLE READ</code>, o do MySQL por omissão).</p>`),
-    dml('O produto 17 (bicicleta urbana) tem agora 1 unidade em stock. Escreva o UPDATE que vende uma unidade só se ainda houver stock. Para simular dois clientes a comprar ao mesmo tempo, a sua instrução vai ser executada duas vezes: no fim, o stock deve ser 0 e nunca negativo.', 'UPDATE produtos SET stock = stock - 1 WHERE id_produto = 17 AND stock >= 1;', 'SET stock = stock - 1 WHERE id_produto = 17 AND …', { db: 'loja', setup: 'UPDATE produtos SET stock = 1 WHERE id_produto = 17;', repeat: 2, need: [['stock\\s*=\\s*stock\\s*-\\s*1', 'Calcule o novo stock a partir do valor atual (SET stock = stock - 1), e não de um valor lido antes: é isso que evita a venda dupla.'], ['stock\\s*(>=\\s*1|>\\s*0)|(1\\s*<=|0\\s*<)\\s*stock', 'Acrescente ao WHERE a condição que só deixa vender se ainda houver stock.']] }),
-    code('Dentro de uma transação, escreva a instrução que lê o stock do produto 17 e bloqueia essa linha até ao fim da transação.', ['^select (stock|\\*) from produtos where id_produto=17 for update$'], 'SELECT stock FROM produtos WHERE id_produto = 17 FOR UPDATE;', 'SELECT … FROM produtos WHERE … FOR UPDATE;'),
-    quiz('A sessão A fez SELECT … FOR UPDATE sobre o produto 17 e ainda não terminou a transação. O que acontece à sessão B se tentar alterar o stock do mesmo produto?', ['Altera o stock sem problemas', 'Fica à espera até A fazer COMMIT ou ROLLBACK', 'Recebe sempre um erro imediato', 'Desfaz a transação de A'], 1, 'A linha está bloqueada; se a espera for longa (50 s por omissão), B recebe um erro de tempo de espera.'),
-    quiz('Qual destas é uma boa prática com transações?', ['Abrir a transação quando o cliente entra no site e fechar quando sai', 'Manter as transações curtas, sem esperar pelo utilizador a meio', 'Nunca usar COMMIT', 'Usar sempre SET autocommit = 0 e nunca terminar a transação'], 1, 'Transações longas bloqueiam as outras sessões.'),
+    withId('dml.trans.7', quiz('No cenário 1, qual foi a causa da venda dupla?', ['O MySQL não suporta dois utilizadores ao mesmo tempo', 'Os dois clientes leram o stock antes de algum o alterar, e cada um gravou um valor calculado a partir do que tinha lido', 'Faltou o COMMIT', 'A tabela não tinha chave primária'], 1, 'É o problema da «atualização perdida» (lost update).')),
+    learn('Proteger a última unidade', `<p>A venda dupla evita-se com <b>uma só instrução</b> que confirma o stock e o baixa ao mesmo tempo:</p>
+      <pre><code>UPDATE produtos SET stock = stock - 1
+WHERE id_produto = 17 AND stock &gt;= 1;</code></pre>
+      <p>O novo valor é calculado a partir do stock <b>atual</b> e a condição só deixa vender se ainda houver unidades. Se o resultado for <b>0 linhas afetadas</b>, o produto esgotou e a aplicação faz <code>ROLLBACK</code>.</p>`),
+    withId('dml.trans.8', dml('O produto 17 (bicicleta urbana) tem agora 1 unidade em stock. Escreva o UPDATE que vende uma unidade só se ainda houver stock. Para simular dois clientes a comprar ao mesmo tempo, a sua instrução vai ser executada duas vezes: no fim, o stock deve ser 0 e nunca negativo.', 'UPDATE produtos SET stock = stock - 1 WHERE id_produto = 17 AND stock >= 1;', 'SET stock = stock - 1 WHERE id_produto = 17 AND …', { db: 'loja', setup: 'UPDATE produtos SET stock = 1 WHERE id_produto = 17;', repeat: 2, need: [['stock\\s*=\\s*stock\\s*-\\s*1', 'Calcule o novo stock a partir do valor atual (SET stock = stock - 1), e não de um valor lido antes: é isso que evita a venda dupla.'], ['stock\\s*(>=\\s*1|>\\s*0)|(1\\s*<=|0\\s*<)\\s*stock', 'Acrescente ao WHERE a condição que só deixa vender se ainda houver stock.']] })),
   ] }],
   cheat: [
     ["INSERT INTO t (c1, c2) VALUES (v1, v2);", 'Inserir uma linha'], ["INSERT INTO t (c1, c2) VALUES (…), (…);", 'Inserir várias linhas'],
     ['UPDATE t SET c = v WHERE condição;', 'Alterar linhas'], ['UPDATE t SET c = c + 1 WHERE …;', 'Alterar com expressão'],
     ['DELETE FROM t WHERE condição;', 'Eliminar linhas'], ['TRUNCATE TABLE t;', 'Esvaziar tabela'],
     ['START TRANSACTION; … COMMIT;', 'Transação: grava tudo no fim'], ['ROLLBACK;', 'Anula tudo desde START TRANSACTION'],
-    ['SELECT @@autocommit; · SET autocommit = 0;', 'Ver / desligar o autocommit (por omissão: 1)'], ['UPDATE t SET stock = stock - 1 WHERE id = … AND stock >= 1;', 'Vender só se houver stock (0 linhas afetadas = esgotado)'],
-    ['SELECT … WHERE … FOR UPDATE;', 'Ler e bloquear a linha até ao fim da transação'],
+    ['SELECT @@autocommit;', 'Ver o modo autocommit (1, por omissão: cada instrução é gravada logo que termina)'], ['UPDATE t SET stock = stock - 1 WHERE id = … AND stock >= 1;', 'Vender só se houver stock (0 linhas afetadas = esgotado)'],
   ],
   test: [
     quiz('Qual a sintaxe correta para inserir um curso?', ["INSERT cursos VALUES nome='Arte'", "INSERT INTO cursos (nome) VALUES ('Arte');", "ADD INTO cursos ('Arte')", "UPDATE cursos ADD ('Arte')"], 1, 'INSERT INTO … (colunas) VALUES (…).'),
@@ -923,7 +883,7 @@ COMMIT;`, 'START TRANSACTION; · INSERT na encomenda · INSERT das 2 linhas · 2
     'Antes de cada UPDATE/DELETE, executar um SELECT com o mesmo WHERE e comparar o número de linhas afetadas.',
     'Tentar apagar uma encomenda que tem linhas e ler o erro <b>1451</b>; depois apagar pela ordem correta.',
     'Abrir uma transação, apagar as linhas de uma encomenda, confirmar com SELECT e anular com <code>ROLLBACK</code>; repetir com <code>SET autocommit = 0</code>.',
-    'Abrir <b>duas janelas</b> do cliente mysql (duas sessões). Na primeira: <code>START TRANSACTION; SELECT stock FROM loja.produtos WHERE id_produto = 17 FOR UPDATE;</code>. Na segunda, o mesmo SELECT fica à espera; fazer <code>COMMIT</code> na primeira e observar a segunda continuar.',
+    'Abrir <b>duas janelas</b> do cliente mysql (duas sessões) e pôr a bicicleta com 1 unidade: <code>UPDATE loja.produtos SET stock = 1 WHERE id_produto = 17;</code>. Nas duas janelas: <code>START TRANSACTION; UPDATE loja.produtos SET stock = stock - 1 WHERE id_produto = 17 AND stock &gt;= 1;</code> — a segunda fica à espera. Fazer <code>COMMIT</code> na primeira e observar a segunda continuar com <b>0 linhas afetadas</b> (esgotado); terminar a segunda com <code>ROLLBACK</code>.',
   ],
   practice: [
     dml("Registe o curso 'Psicologia' com 1100 horas.", "INSERT INTO cursos (nome, horas) VALUES ('Psicologia', 1100);", "INSERT INTO cursos (nome, horas) VALUES (…);"),
