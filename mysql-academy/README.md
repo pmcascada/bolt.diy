@@ -26,6 +26,10 @@ O motor do browser simula também as **transações** (START TRANSACTION/BEGIN, 
 
 Três bases de dados de exemplo correm no browser (AlaSQL): **escola** (pequena, para aprender), **loja** (30 clientes, 18 produtos, 80 encomendas de 2024–2025, com datas e valores NULL), gerada sempre igual, e **clinica** — a clínica veterinária desenhada no desafio do capítulo 2 (tutores, animais, consultas, medicamentos, receitas e seguros), usada na lição «Manter os dados da clínica veterinária». Na clinica o motor aplica também as chaves estrangeiras (ERROR 1451/1452) e as restrições CHECK; no Laboratório só aparece depois de concluído o desafio, porque a sua estrutura é a solução. O **Laboratório SQL** permite escolher a BD e executar várias instruções.
 
+## «Explicar o erro»
+
+Quando uma instrução dá erro (no Laboratório, nos exemplos e nos exercícios), a mensagem aparece em português (ex.: «Erro de sintaxe na linha 2, perto de "alunos"») e há um botão **Explicar o erro**: mostra o código com a linha e o sítio do erro assinalados e as causas prováveis — vírgulas a mais ou em falta (também antes de `ON UPDATE`), parênteses e plicas por fechar, `FOREIGN KEY` sem parênteses, `VARCHAR` sem tamanho, palavras-chave mal escritas (`FORM` → `FROM`), tabelas e colunas inexistentes com sugestão do nome certo, texto ou datas sem plicas, `= NULL`, funções de agregação no `WHERE`, ordem das cláusulas, `;` em falta, `SET … AND …`, `DELETE *` e número de valores diferente do de colunas. Enganos que o simulador aceita sem erro (texto ou datas sem plicas, `= NULL`, `SET … AND …`) aparecem como aviso. A análise é local (`public/explain.js`, testada em `test/explain.test.js`, que também confirma que nenhuma instrução correta do curso recebe avisos).
+
 ## Gamificação e registo de evolução
 
 - XP por exercício (10–20 conforme o tipo; menos com várias tentativas ou dicas; zero se a solução foi consultada), +20 por lição **só se todos os exercícios forem resolvidos sem ver a resposta**, +100 por capítulo (miniteste aprovado) e +5 por cada revisão certa

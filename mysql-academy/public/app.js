@@ -670,6 +670,41 @@ function sqlError(err) {
   for (const [re, txt] of SQL_ERRORS) { const m = msg.match(re); if (m) return typeof txt === 'function' ? txt(m) : txt; }
   return msg;
 }
+/* «Explicar o erro»: botão junto de cada erro que mostra, em português, onde está o erro e as causas prováveis. */
+const X = window.EXPLAIN;
+const errInfo = new Map(); let errSeq = 0;
+// Colunas de cada tabela de uma BD do simulador (para sugerir nomes parecidos).
+const colsOf = (db) => Object.fromEntries(Object.entries((db && db.tables) || {}).map(([t, tb]) => [t, (tb.columns || []).map((c) => String(c.columnid).toLowerCase())]));
+function explainBtn(sql, err, schema) {
+  if (!X || !sql || !String(sql).trim()) return '';
+  const id = 'x' + (++errSeq); errInfo.set(id, { sql: String(sql), err, schema: schema || {} });
+  if (errInfo.size > 50) errInfo.delete(errInfo.keys().next().value);
+  return `<div class="xbox"><button type="button" class="btn link sm" data-explain="${id}">${ic('search')}Explicar o erro</button><div class="xpanel" hidden></div></div>`;
+}
+// Mensagem principal do erro, em português.
+const errText = (err, sql) => (err instanceof DDL.SqlError ? err.message : (X && X.translate(err && err.message, sql, err)) || sqlError(err));
+// Avisos para instruções que correm mas têm um engano provável (texto sem plicas, = NULL…).
+function warnHtml(sql, schema) {
+  const w = X ? X.warnings(sql, schema) : [];
+  return w.length ? alertBox('warn', 'alert', `<b>Atenção — possível engano:</b><ul class="xhints">${w.map((h) => `<li>${h.html}</li>`).join('')}</ul>`) : '';
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-explain]'); if (!b) return;
+  const panel = b.nextElementSibling, info = errInfo.get(b.dataset.explain);
+  if (!panel || !info) return;
+  if (!panel.hidden) { panel.hidden = true; return; }
+  let a;
+  try { a = X.analyze(info.sql, info.err, info.schema); } catch { a = { hints: [] }; }
+  const first = a.hints.find((h) => h.pos !== null && h.pos !== undefined);
+  const mark = first || (a.pos !== undefined && a.pos !== null ? { pos: a.pos, len: 1 } : null);
+  const line = mark ? info.sql.slice(0, mark.pos).split('\n').length : null;
+  panel.innerHTML = `<div class="xcard"><div class="small muted">${mark ? `O erro está provavelmente na <b>linha ${line}</b>, no sítio assinalado:` : 'A sua instrução:'}</div>
+    <div class="xcode">${X.codeView(info.sql, mark ? mark.pos : undefined, mark ? mark.len : 1)}</div>
+    ${a.hints.length ? `<div class="small" style="margin-top:10px"><b>Causas prováveis</b></div><ul class="xhints">${a.hints.map((h) => `<li>${h.pos !== null && h.pos !== undefined ? `<span class="xln">linha ${info.sql.slice(0, h.pos).split('\n').length}</span> ` : ''}${h.html}</li>`).join('')}</ul>`
+      : '<p class="small" style="margin:10px 0 0">Não encontrei uma causa evidente. Veja o que está <b>imediatamente antes</b> do sítio assinalado: muitas vezes falta (ou sobra) uma vírgula, um parêntese, uma plica ou uma palavra-chave.</p>'}
+    <p class="small muted" style="margin:8px 0 0">Dica: compare com a sintaxe no manual do capítulo e confirme os nomes no botão «Estrutura das tabelas».</p></div>`;
+  panel.hidden = false;
+});
 // Executa uma ou mais instruções e mostra o resultado da última (ou quantas linhas foram afetadas).
 function runSql(db, sql) {
   // Aviso enquanto houver uma transação por terminar (START TRANSACTION sem COMMIT nem ROLLBACK).
@@ -681,11 +716,11 @@ function runSql(db, sql) {
     else if (r.affected !== null && !r.rows.length) out = alertBox('ok', 'check', `Instrução executada: ${r.affected} ${r.affected === 1 ? 'linha afetada' : 'linhas afetadas'}.`);
     else if (r.count > 1 && !r.rows.length) out = alertBox('ok', 'check', `${r.count} instruções executadas.`);
     else out = table(r.rows);
-    return out + txNote();
+    return warnHtml(sql, colsOf(db)) + out + txNote();
   } catch (err) {
     const where = err.total > 1 ? ` na instrução ${err.done + 1} de ${err.total}` : '';
     const rest = err.total > 1 ? ` ${err.done ? `As ${err.done} instruções anteriores foram executadas; ` : ''}as seguintes não foram executadas.` : '';
-    return alertBox('bad', 'alert', `<b>Erro${where}:</b> ${esc(sqlError(err))}${rest}`) + txNote();
+    return alertBox('bad', 'alert', `<b>Erro${where}:</b> ${esc(errText(err, sql))}${rest}`) + explainBtn(sql, err, colsOf(db)) + txNote();
   }
 }
 
@@ -911,10 +946,10 @@ function taskEl(ex, i, onPass, opt = {}) {
           const r = D.checkDml(ta.value, ex); ok = r.ok; msgs = r.msgs;
           out.innerHTML = el._out = dmlTables(r.tables, 'Depois da sua instrução');
         } else { const r = D.check(ta.value, ex); ok = r.ok; msgs = r.msgs; out.innerHTML = el._out = table(r.rows); }
-      } catch (err) { out.innerHTML = el._out = ''; result(false, ta.value); fb.innerHTML = alertBox('bad', 'alert', `<b>Erro.</b> ${esc(err instanceof DDL.SqlError ? err.message : sqlError(err))}`); return; }
+      } catch (err) { out.innerHTML = el._out = ''; result(false, ta.value); fb.innerHTML = alertBox('bad', 'alert', `<b>Erro.</b> ${esc(errText(err, ta.value))}`) + explainBtn(ta.value, err, ex.t === 'ddl' || ex.t === 'code' ? {} : colsOf(D.create(ex.db))); return; }
       if (ok) { result(true); paint(alertBox('ok', 'checkCircle', '<b>Correto.</b>' + ({ query: ' O resultado coincide com o esperado.', ddl: ' A estrutura criada corresponde ao pedido.', dml: ' As tabelas ficaram exatamente como pedido.' }[ex.t] || ''))); onPass(); return; }
       result(false, ta.value);
-      fb.innerHTML = alertBox('bad', 'x', msgs.length ? `<b>Ainda não está certo.</b>${msgList(msgs)}` : 'Ainda não está correto. Confira a sintaxe e os nomes utilizados.');
+      fb.innerHTML = alertBox('bad', 'x', msgs.length ? `<b>Ainda não está certo.</b>${msgList(msgs)}` : 'Ainda não está correto. Confira a sintaxe e os nomes utilizados.') + (ex.t === 'query' || ex.t === 'dml' ? warnHtml(ta.value, colsOf(D.create(ex.db))) : '');
     };
     mk(ex.t === 'query' ? 'Executar e verificar' : 'Verificar', 'check', '', check);
     if (ex.t === 'query') mk('Executar', 'play', 'sec-b', () => { out.innerHTML = el._out = runSql(D.create(ex.db), ta.value); });
