@@ -1,0 +1,13 @@
+{
+  "client_id": "REPLACE_WITH_ENTRA_APP_CLIENT_ID",
+  "authorization_user_agent": "DEFAULT",
+  "redirect_uri": "msauth://com.auramail/REPLACE_WITH_URL_ENCODED_SIGNATURE_HASH",
+  "account_mode": "SINGLE",
+  "broker_redirect_uri_registered": false,
+  "authorities": [
+    {
+      "type": "AAD",
+      "audience": { "type": "AzureADandPersonalMicrosoftAccount", "tenant_id": "common" }
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- A chave da API e os tokens nunca entram em backups -->
+    <exclude domain="sharedpref" path="aura_secure_prefs.xml" />
+</full-backup-content>
